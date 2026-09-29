@@ -1,21 +1,20 @@
-# Fedora builder for Xiaomi Pad 7
+# Fedora for POCO Pad X1 and Xiaomi Pad 7
 
-Build reproducible Rawhide AArch64 RPMs, a console rootfs and profile-matched boot artifacts for Uke.
+Reproducible Fedora Rawhide AArch64 packages and system images for POCO Pad X1 and Xiaomi Pad 7 (`uke`, SM7675). This builder connects the Senemos mainline kernel, device firmware and model-specific Uke boot profiles to a console-first Fedora system.
 
-**Status: preparation only.** No project image has been built or tested on a Pad 7. This repository is a component of [Uke Linux](https://github.com/MCC45TR/uke-linux); see its [100-step plan](https://github.com/MCC45TR/uke-linux/blob/main/PLAN.md) and [hardware ledger](https://github.com/MCC45TR/uke-linux/blob/main/DEVICE-STATUS.md).
+[Uke Linux](https://github.com/MCC45TR/uke-linux) · [Build architecture](docs/ARCHITECTURE.md) · [Test COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/) · [Releases](https://github.com/MCC45TR/uke-fedora-builder/releases)
 
-## Next implementation work
+## Outputs
 
-Define a target package closure without Python, retain metadata and RPMs, and integrate only identified kernel and firmware artifacts.
+- `senemos-uke-kernel-mainline` RPMs with core, modules and development subpackages.
+- A pinned Rawhide AArch64 root filesystem and package manifest.
+- Boot artifacts matched to a kernel, device tree and firmware profile.
+- Reproducibility, image-size, module-ABI, package-solver and rollback reports.
 
-## Layout
+The first user experience is a Fedora console. Desktop, graphics and media packages follow working kernel and boot paths. The target package closure is checked so no Python script or runtime runs on the tablet.
 
-- `src/`: project code; large active upstream checkouts use ignored `src/upstream/`.
-- `configs/`, `patches/`, `scripts/`, `tests/`: reviewed configuration, attributed patches, host helpers and test definitions.
-- `docs/`, `manifests/`, `reports/`: architecture, source identities and reviewed evidence.
-- `referances/`: local unmodified reference clones and Git bundles; see its README.
-- `build/`, `artifacts/`: local generated output, excluded from source publication.
+## Downloads
 
-New native tablet tools use C++. Host automation prefers Bash; Python must never ship to or run on the tablet. Upstream kernel/firmware languages remain unchanged. Read [AGENTS.md](AGENTS.md) before contributing.
+**No packages or images have been published.** The `uke-linux-test` COPR project currently has no builds. When development packages exist, each build will provide source revisions, checksums, supported firmware/SKU scope and validation results. Package success alone does not establish tablet boot or hardware support.
 
-The source plan lists component-relative reference paths. The workspace owns acquisition and archive verification through `scripts/sources.sh`; clone the workspace with submodules to use that orchestration. Reference history and licensing are preserved independently of this repository. The MIT license covers original preparation material, not imported upstream code.
+See the [100-step platform plan](https://github.com/MCC45TR/uke-linux/blob/main/PLAN.md), [hardware status](https://github.com/MCC45TR/uke-linux/blob/main/DEVICE-STATUS.md) and [contribution rules](AGENTS.md). Firmware redistribution and licenses are handled separately from kernel source packages.
