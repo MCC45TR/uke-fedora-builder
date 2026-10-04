@@ -1,0 +1,53 @@
+Senemos Uke — source builds and update channel
+============================================
+
+Development RPM and source-build hub for Xiaomi Pad 7 / POCO Pad X1 (Uke,
+SM7675). Current target: **Fedora Rawhide AArch64**.
+
+**Available package families**
+
+- `senemos-uke-linux-kernel-mainline`: Linux 7.2.9 Uke adaptation, with matching
+  `-core`, `-modules` and `-dtbs` packages and a source RPM. Signed upstream
+  sources, seven reviewed adaptation patches and separate config fragments.
+  Local Image/DTB/1146-module compilation, payload/ABI and AArch64 RPM lifecycle
+  checks passed. First native COPR build: **11074297**.
+- `uke-orangefox-recovery`: DNF-managed, checksum-verified recovery IMG/ZIP
+  delivery with exact release, firmware, source and licensing records. The
+  initial image is the published Global OS3 alpha; later source features are
+  separate. Local installation, actual package upgrade and removal passed.
+  First upload build **11074344** and GitHub SCM build **11074373** succeeded.
+
+**Source and update infrastructure**
+
+GitHub `main` push hooks rebuild these two accepted source packages. Daily
+workflows track eligible stable sources. A kernel version requires its own
+reviewed Uke adaptation profile; recovery requires a non-prerelease stable
+manifest, the approved firmware profile, all asset/source hashes and host
+payload audits. Unsupported versions stop explicitly. Source-generation
+chroots may fetch verified sources; binary builds run without network access.
+Initial repositories for eleven additional package families are published;
+their actual Uke payloads and admission gates remain open. They are not
+represented as available hardware packages.
+
+**Engineering boundary**
+
+These are development build/package candidates. The independent Uke DTS is a
+compile-stage description; firmware-specific RAM handoff and physical
+peripheral bring-up remain open. No bootable Fedora system image, UEFI firmware
+port, tablet boot, flashing, rollback or physical hardware support is certified.
+Kernel installation does not select a boot entry. Recovery updates deliver
+files as data and never write Android partitions. Target payloads and tested
+AArch64 dependency closures exclude Python. There is no replacement for
+Fedora's general userspace `kernel-headers`.
+
+Sources and reviewed records:
+
+- [Workspace and package catalog](https://github.com/MCC45TR/uke-linux/blob/main/docs/PACKAGE-HUB.md)
+- [Kernel source and automation](https://github.com/MCC45TR/senemos-uke-kernel-mainline)
+- [Recovery delivery and stable tracking](https://github.com/MCC45TR/uke-orangefox-packaging)
+- [Builder, manifests and test reports](https://github.com/MCC45TR/uke-fedora-builder)
+- [OrangeFox device sources and releases](https://github.com/MCC45TR/orangefox_device_xiaomi_uke)
+
+Fedora 45 and native openSUSE/DEB/Alpine APK targets are planned after their
+own validation. Nabu and Muyu firmware, offsets and board assumptions are not
+portable to Uke.

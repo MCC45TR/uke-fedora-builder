@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "record_id": "UKE-K729-COPR-20261004",
+  "date": "2026-10-04",
+  "project": "mcc45tr/uke-linux-test",
+  "build_id": 11074297,
+  "build_url": "https://copr.fedorainfracloud.org/coprs/build/11074297",
+  "chroot": "fedora-rawhide-aarch64",
+  "submission_source_rpm": "senemos-uke-linux-kernel-mainline-7.2.9-1.fc46.src.rpm",
+  "submission_sha256": "dc55021f5a7e85842bbc806b6636eb31dc0a1e459f1ee23924112c53c2bbbb68",
+  "state_at_observation": "succeeded",
+  "expected_binary_packages": [
+    "senemos-uke-linux-kernel-mainline",
+    "senemos-uke-linux-kernel-mainline-core",
+    "senemos-uke-linux-kernel-mainline-modules",
+    "senemos-uke-linux-kernel-mainline-dtbs"
+  ],
+  "build_script_network": "disabled",
+  "local_validation": "passed",
+  "remote_build_validation": "passed",
+  "remote_package_audit": "1146 AArch64 modules, common vermagic, dependency/symbol checks and Python/privacy passed",
+  "hardware_tested": false,
+  "publication_authorization": "Direct user request in this session",
+  "host_upload_tools": [
+    "copr-cli-2.7-1.fc46.noarch",
+    "python3-copr-2.8-1.fc46.noarch"
+  ],
+  "remote_signature_verification": "passed",
+  "project_key_fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E",
+  "remote_config_differences": [
+    "CONFIG_CC_CAN_LINK=y on native worker",
+    "CONFIG_PAHOLE_VERSION=0 on native worker vs 130 locally"
+  ],
+  "first_remote_lifecycle": "Installation passed; RPM verification found generated-index timestamps; corrected locally with verify(not mtime)",
+  "superseding_local_release": "1.1.fc46"
+}

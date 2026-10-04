@@ -1,0 +1,46 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-04",
+  "project": "mcc45tr/uke-linux-test",
+  "project_id": 261166,
+  "chroots": [
+    "fedora-rawhide-aarch64"
+  ],
+  "binary_build_network": false,
+  "project_key_fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E",
+  "packages": [
+    {
+      "name": "senemos-uke-linux-kernel-mainline",
+      "repository": "https://github.com/MCC45TR/senemos-uke-kernel-mainline",
+      "method": "make_srpm",
+      "branch": "main",
+      "auto_rebuild": true,
+      "github_hook_id": 692160050,
+      "hook_delivery_http": 200,
+      "daily_stable_workflow": "passed manual dispatch",
+      "source_export_failure": 11074362,
+      "corrected_source_export": 11074370,
+      "corrected_binary_build": "running",
+      "queued_release_build": 11074417,
+      "queued_release": "1.1",
+      "build_after": 11074370,
+      "source_preparation": "passed; corrected SRPM export collected"
+    },
+    {
+      "name": "uke-orangefox-recovery",
+      "repository": "https://github.com/MCC45TR/uke-orangefox-packaging",
+      "method": "make_srpm",
+      "branch": "main",
+      "auto_rebuild": true,
+      "github_hook_id": 692164621,
+      "hook_delivery_http": 200,
+      "daily_stable_workflow": "passed manual dispatch; no stable release published",
+      "scm_build_id": 11074373,
+      "scm_build": "succeeded",
+      "signed_repository_install_remove": "passed"
+    }
+  ],
+  "additional_initial_repository_count": 11,
+  "unsupported_stable_version_policy": "stop before generic fallback",
+  "physical_device": false
+}

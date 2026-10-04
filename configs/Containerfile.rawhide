@@ -1,0 +1,12 @@
+ARG BASE_IMAGE
+FROM ${BASE_IMAGE}
+ARG RECIPE_SHA
+LABEL org.senemos.recipe-sha256=${RECIPE_SHA}
+RUN dnf -y --setopt=install_weak_deps=False install \
+    bash bc binutils bison clang llvm lld gcc gcc-c++ make flex \
+    elfutils-libelf-devel openssl-devel ncurses-devel dwarves \
+    perl rsync tar xz zstd gzip cpio findutils diffutils patch \
+    curl jq gnupg2 git-core ripgrep file kmod rpm-build redhat-rpm-config dtc ShellCheck \
+    && dnf clean all
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC
+WORKDIR /work
