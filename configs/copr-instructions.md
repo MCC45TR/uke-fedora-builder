@@ -55,21 +55,34 @@ for all component repositories and their readiness gates.
 
 COPR/package, emulated userspace and physical tablet acceptance remain separate.
 
-A signed, tested console selection is also available:
+Console selection packages are also available:
 
 ```sh
-sudo dnf install uke-core-meta
+sudo dnf install --allow-vendor-change uke-core-meta
 sudo dnf upgrade uke-core-meta
 ```
 
-Its release 2 refuses Python interpreter/ABI dependencies. Optional
-`plymouth-uke` delivers theme data without activation. The native Material
-Decoration RPM and Plasma meta packages are built; consult the current
-[desktop acceptance record](https://github.com/MCC45TR/uke-fedora-builder/blob/main/reports/DESKTOP-RAWHIDE-2026-10-05.json)
-before full desktop evaluation. The corrected selection requires six native
-runtime capabilities. Never bypass the Python policy with nodeps or unsafe
-solver overrides. A successful graphical dependency transaction still does not
-establish a working Uke display/session.
+Release 2 passed bounded package lifecycle tests and refuses Python interpreter
+dependencies. The complete inherited base failed its file audit on optional
+libstdc++ Python GDB helpers. Release 3 requires the source-built GNU C++ runtime
+and passed independent complete-console-root acceptance in isolated AArch64
+userspace: all 52 selected inputs, offline fresh installation, actual earlier
+console metadata upgrade and removal. The initial installation
+explicitly allows the reviewed library's vendor to change from Fedora to this
+signed COPR; ordinary interpreter conflicts and dependency checks remain active.
+Consult the current
+[test records](https://github.com/MCC45TR/uke-fedora-builder/tree/main/reports)
+before treating a root as an admitted target image.
+
+`uke-desktop-metas` release 3 carries readiness/policy data and installs no
+graphical session. KDE applications must come from the original distribution;
+cloning, forking or rebuilding them as Uke variants is prohibited. Derivative
+Plasma/Dolphin COPR source records and binaries were withdrawn. Original KDE
+Python payloads currently block complete graphical admission. Do not bypass
+either requirement with nodeps, solver overrides or manual RPM-owned file
+deletion. Optional `plymouth-uke` delivers theme data without activation. The
+explicitly requested upstream Material Decoration plugin is independently
+built and audited; rendering and Uke display/session validation remain open.
 
 `xiaomi-uke-firmware` is not admitted until file-level source/license/hash and
 kernel-request gates pass. Initial hardware component repositories are listed

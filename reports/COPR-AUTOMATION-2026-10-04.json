@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "date": "2026-10-04",
+  "date": "2026-10-05",
   "project": "mcc45tr/uke-linux-test",
   "project_id": 261166,
   "chroots": [
@@ -69,7 +69,8 @@
         "committish": "main",
         "source_build_method": "make_srpm",
         "subdirectory": ""
-      }
+      },
+      "current_revision_build": 11077017
     },
     {
       "name": "uke-desktop-metas",
@@ -79,7 +80,8 @@
         "committish": "main",
         "source_build_method": "make_srpm",
         "subdirectory": ""
-      }
+      },
+      "current_revision_build": 11077018
     },
     {
       "name": "material-decoration",
@@ -142,37 +144,35 @@
       }
     },
     {
-      "name": "plasma-workspace",
+      "name": "libstdcxx-uke-runtime",
       "auto_rebuild": true,
       "source_dict": {
         "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
         "committish": "main",
         "source_build_method": "make_srpm",
-        "subdirectory": "packaging/plasma-workspace"
-      }
-    },
-    {
-      "name": "dolphin",
-      "auto_rebuild": true,
-      "source_dict": {
-        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
-        "committish": "main",
-        "source_build_method": "make_srpm",
-        "subdirectory": "packaging/dolphin"
-      }
+        "subdirectory": "packaging/libstdcxx-uke-runtime"
+      },
+      "native_build": 11077014,
+      "native_state": "succeeded"
     }
   ],
   "additional_initial_repository_count": 11,
   "unsupported_stable_version_policy": "stop before generic fallback",
   "physical_device": false,
   "last_verified": "2026-10-05",
-  "registered_source_family_count": 12,
+  "registered_source_family_count": 11,
   "native_shared_source_workflow": {
     "repository": "MCC45TR/uke-desktop-packaging",
     "workflow": "native-runtime.yml",
     "run_id": 37264699608,
-    "result": "success; requested all six approved source families",
+    "result": "success; requests five non-KDE source families",
     "secret_public": false,
-    "acceptance": "package-specific; registration does not establish full runtime acceptance"
-  }
+    "acceptance": "package-specific; registration does not establish full runtime acceptance",
+    "latest_request_run": 37303765966
+  },
+  "withdrawn_source_families": [
+    "plasma-workspace",
+    "dolphin"
+  ],
+  "kde_application_policy": "Original distribution applications only; derivative source records removed"
 }

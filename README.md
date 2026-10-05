@@ -28,12 +28,23 @@ evidence. Other distribution targets have explicit planned profiles.
 ## Downloads
 
 The [development COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/)
-now publishes kernel packages and DNF-managed recovery image data. First kernel
-job [11074297](https://copr.fedorainfracloud.org/coprs/build/11074297) and recovery
+now publishes kernel packages and DNF-managed recovery image data. Kernel
+job [11075043](https://copr.fedorainfracloud.org/coprs/build/11075043) and recovery
 SCM job [11074373](https://copr.fedorainfracloud.org/coprs/build/11074373) succeeded.
 The [package hub](https://github.com/MCC45TR/uke-linux/blob/main/docs/PACKAGE-HUB.md)
 maps the additional initial repositories and their readiness gates.
 There is no bootable Fedora Uke system image or physical acceptance claim.
+
+Eleven source families have automatic builds, including five non-KDE native
+dependency families. KDE application derivatives were withdrawn after the
+owner prohibited cloning, forking or rebuilding them. Use original distribution
+applications. Their Python payloads currently block complete KDE admission.
+Desktop release 3 carries policy metadata only. The GNU C++ source correction
+retained all 6,100 original exports and passed a native AArch64 C++ smoke test.
+The [52-input console selection](reports/CONSOLE-RAWHIDE-2026-10-05.json) passed
+signatures, complete payloads, offline fresh installation, actual release-2 to
+release-3 upgrade, inherited-root audits and removal. The historical 603-input
+desktop transaction remains rejected; no graphical session or device boot ran.
 
 See [local kernel acceptance](reports/KERNEL-7.2.9-RAWHIDE-2026-10-04.json),
 [host-family bootstrap tests](reports/HOST-BOOTSTRAP-2026-10-04.json),

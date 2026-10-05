@@ -1,62 +1,53 @@
 Senemos Uke — source builds and update channel
-============================================
 
 Development RPM/SRPM hub for Xiaomi Pad 7 / POCO Pad X1 (Uke, SM7675).
-**Enabled target: Fedora Rawhide AArch64.**
+Enabled target: Fedora Rawhide AArch64.
 
-**Kernel and recovery**
+Kernel 7.2.9-1.3: signed upstream source, seven attributed Uke adaptation
+patches, matching Image/DTB/1,146 modules. Native signed build 11075043 passed
+ABI/dependency, fresh-install, actual 1.2-to-1.3 upgrade and removal checks.
+UEFI firmware and physical tablet boot remain independent gates.
 
-- `senemos-uke-linux-kernel-mainline` 7.2.9-1.3: matching core/modules/DTBs,
-  verified upstream signed source, seven Uke adaptation patches and separate
-  configs. Native signed build 11075043 passed Image/DTB, 1,146 module ABI/
-  dependency checks and actual fresh-install/1.2→1.3-upgrade/removal tests.
-- `uke-orangefox-recovery`: checksummed IMG/ZIP, source/license/firmware-profile
-  records, updated through DNF as data. The current image is the published
-  Global OS3 alpha. It has no scriptlets, flashing service or automatic installer.
+Recovery: uke-orangefox-recovery delivers the published, checksummed Global
+OS3 alpha IMG/ZIP and source/license/profile records as DNF-updated data.
+No flashing scriptlets, automatic ZIP installer or Android partition writes.
 
-**Screenshot counterpart packages**
+Core and desktop policy metadata: console-first selection, explicit readiness
+records, no graphical session installed. The owner forbids cloning, forking or
+rebuilding KDE desktop applications. Use original distribution KDE packages.
+Plasma/Dolphin derivative source records and binary builds were withdrawn.
+Original KDE Python payloads currently block complete graphical admission.
 
-- `uke-core-meta`: native console selection; signed dependency transaction,
-  verification, Python solver guard and removal passed.
-- `uke-desktop-metas` / `kde-plasma-uke-meta`: explicit stock-Plasma selection
-  requiring reviewed native runtime variants. Complete corrected desktop
-  acceptance is tracked separately from native RPM compilation.
-- `material-decoration`: published stable upstream C++/Qt6 decoration and KCM;
-  native AArch64 plugins and signed extracted payload checks passed.
-- `plymouth-uke`: original optional theme using current renderer dimensions;
-  installation does not select a theme, regenerate initramfs or change boot.
-- Six exact official Fedora source variants: at-spi2-core, GStreamer,
-  libaccounts-glib, libwacom, Plasma workspace and Dolphin. Optional Python
-  tools/bindings are excluded; required configuration migrations use C++.
-  See the current desktop report for package and whole-runtime gate results.
+Material Decoration: explicitly requested stable upstream C++/Qt6 plugin;
+signed native payload/ELF checks passed. Plymouth-uke: original optional theme
+data, sized by the renderer, without activation or initramfs regeneration.
 
-Twelve real source families have automatic builds. GitHub push hooks and an
-explicit shared-native-source workflow request builds; daily kernel, Material
-and recovery workflows inspect eligible stable sources. Unreviewed kernel
-versions stop before any generic ARM64 fallback. Native Fedora recipe updates
-need reviewed source/tool pins. Source workers fetch verified archives; binary
-workers have network disabled. Healthy build jobs are preserved.
+Eleven real source families have automatic builds. Five non-KDE native source
+families cover at-spi2-core, GStreamer, libaccounts-glib, libwacom and GNU
+libstdc++. Reviewed sources exclude optional Python tools. GNU C++ requires the
+complete original 6,100-symbol ABI and native smoke test; build 11077014 passed.
+The separate 52-input signed console selection passed offline fresh installation,
+actual metadata upgrade, full inherited-root audits and removal. Initial core
+installation explicitly allows the reviewed Fedora-to-COPR library vendor
+change. A historical 603-input desktop
+transaction passed bounded payload/lifecycle checks but its complete root
+failed on inherited Python debugger helpers; that root remains rejected.
 
-**Admission and hardware boundary**
+GitHub push hooks and shared-source workflows request native builds. Daily
+kernel/Material/recovery trackers inspect eligible published stable releases.
+Unreviewed kernel versions stop before generic ARM64 fallback; recovery requires
+approved firmware/asset/source identities. Binary workers have network disabled.
 
-The firmware repository is published, but no `xiaomi-uke-firmware` RPM is admitted
-without per-file Uke provenance, SHA-256, redistribution rights and matching
-kernel requests. Sensor, camera, platform, boot and hardware-integration initial
-repositories retain explicit source/physical gates. Fedora's PowerDevil and
-Plymouth engines remain shared dependencies; Nabu board patches are not copied.
+Firmware and hardware initial repositories have explicit admission gates.
+No firmware RPM until every Uke file has approved provenance, redistribution
+rights, hashes and matching kernel requests. Nabu geometry, firmware and
+hardware assumptions are not portable. No composed tablet image or physical
+support is certified by this channel.
 
-This channel certifies the recorded build/package states only. It does not
-certify UEFI firmware, firmware-specific RAM handoff, a bootable composed tablet
-image, physical boot, rollback, graphics or peripherals. Kernel/recovery package
-installation never writes Android partitions or selects a default boot target.
-Tested kernel/recovery/console closures exclude Python. The original complete
-Plasma transaction was rejected for Python; corrected closure acceptance is
-reported independently. No generic userspace `kernel-headers` is replaced.
+- [Package/update hub](https://github.com/MCC45TR/uke-linux/blob/main/docs/PACKAGE-HUB.md)
+- [KDE application policy](https://github.com/MCC45TR/uke-linux/blob/main/docs/KDE-APPLICATION-POLICY.md)
+- [Kernel sources](https://github.com/MCC45TR/senemos-uke-kernel-mainline)
+- [Recovery delivery](https://github.com/MCC45TR/uke-orangefox-packaging)
+- [Source and test records](https://github.com/MCC45TR/uke-fedora-builder/tree/main/reports)
 
-- [Workspace and package catalog](https://github.com/MCC45TR/uke-linux/blob/main/docs/PACKAGE-HUB.md)
-- [Kernel source and stable policy](https://github.com/MCC45TR/senemos-uke-kernel-mainline)
-- [Recovery delivery and stable tracking](https://github.com/MCC45TR/uke-orangefox-packaging)
-- [Desktop native sources](https://github.com/MCC45TR/uke-desktop-packaging)
-- [Builder and current test reports](https://github.com/MCC45TR/uke-fedora-builder/tree/main/reports)
-
-Fedora 45, openSUSE, native DEB and Alpine APK targets follow their own validation.
+Fedora 45, openSUSE, native DEB and Alpine APK targets require separate validation.
