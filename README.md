@@ -11,8 +11,8 @@ Fedora Rawhide AArch64 build, package and update infrastructure for POCO Pad X1 
 - Matching ARM64 Image, independent Uke DTB, modules, config and build manifest.
 - Module ABI, dependency closure, checksums and package lifecycle reports.
 
-A Rawhide AArch64 root filesystem, firmware-specific boot artifacts and physical
-rollback validation are later milestones.
+A local Rawhide AArch64 Core filesystem candidate has passed composition checks.
+Firmware-specific boot and physical rollback validation remain open.
 
 The first user experience is a Fedora Core development console. Desktop, graphics and media packages follow working kernel and boot paths. The target package closure is checked so no Python script or runtime runs on the tablet.
 
@@ -65,3 +65,9 @@ cover native binaries, actual upgrades and removal; physical enumeration is open
 The [first local Core candidate](reports/CORE-FILESYSTEM-2026-10-05.json) passed
 full EXT4/ESP/UKI and root/initramfs checks. Tablet boot, UEFI, actual geometry
 and USB/UFS/ESP32 acceptance remain open; image release assets are unpublished.
+
+[First-TTY preparation](reports/FIRST-TTY-PREPARATION-2026-10-06.json) records
+dynamic fastboot-name image inputs, signed boot release 4 lifecycle checks and
+an actual gated VT2/CDC initramfs with ARM64 helper/library and payload audits.
+Its pre-root shell does not wait for the internal EXT4 mount. The Uke firmware,
+USB/UFS board chain and physical first console are still open gates.

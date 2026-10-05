@@ -12,7 +12,15 @@ reject --jobs 0 --dry-run
 reject --jobs invalid --dry-run
 reject --jobs
 reject --unknown
+reject --esp-size 127 --dry-run
+reject --linux-size 4095 --dry-run
+reject --linux-size 999999999999 --dry-run
+reject --esp-size=-1 --dry-run
+reject --fat-sector 1024 --dry-run
+reject --fat-sector 4096 --esp-size 256 --dry-run
+reject --fat-sector --dry-run
 (image_main --build core --distro=fedora --jobs=8 --offline --dry-run) >/dev/null
+(image_main --build core --esp-size=512 --linux-size 8192 --fat-sector=4096 --offline --dry-run) | grep -F 'EXT4 8192 MiB, FAT32 ESP 512 MiB (4096-byte sectors)' >/dev/null
 jq -e '.boot_tested==false and .hardware_tested==false and .physical_geometry_verified==false and .cdc.tablet_usb_role=="host" and .development_root_shell==true' "$root/configs/images/core-rawhide.json" >/dev/null
 for input in "$root"/manifests/images/core-*.json; do
     jq -e 'all(.packages[]; (.sha256|test("^[a-f0-9]{64}$")) and (.file|test("^[A-Za-z0-9+_.~-]+\\.rpm$")) and (.url|startswith("https://")))' "$input" >/dev/null

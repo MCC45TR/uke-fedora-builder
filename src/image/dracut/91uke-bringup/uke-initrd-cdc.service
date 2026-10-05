@@ -1,0 +1,21 @@
+[Unit]
+Description=Uke Core initramfs ESP32-S3 journal stream before Linux root mount
+DefaultDependencies=no
+After=systemd-journald.service systemd-udevd.service
+Before=initrd-switch-root.target
+Conflicts=initrd-switch-root.target
+ConditionPathExists=/etc/initrd-release
+ConditionKernelCommandLine=rd.senemos.tty=1
+ConditionKernelCommandLine=senemos.debug=esp32-cdc
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/uke-boot-status --identity
+ExecStart=/usr/libexec/senemos-uke/uke-esp32-cdc --device /dev/ttyACM0
+Restart=always
+RestartSec=2
+UMask=0077
+
+[Install]
+WantedBy=initrd.target

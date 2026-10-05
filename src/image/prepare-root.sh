@@ -12,8 +12,8 @@ for archive in "$inputs"/system/packages/*.rpm "$inputs"/identity/packages/*.rpm
 done
 dnf -y --disablerepo='*' --setopt=localpkg_gpgcheck=1 replay "$inputs/system"
 dnf -y --disablerepo='*' --setopt=localpkg_gpgcheck=1 replay "$inputs/identity"
-boot_rpms=("$boot_inputs/uke-boot-integration-0.1.0-3.fc46.aarch64.rpm"
-    "$boot_inputs/uke-esp32-cdc-0.1.0-3.fc46.aarch64.rpm")
+boot_rpms=("$boot_inputs/uke-boot-integration-0.1.0-4.fc46.aarch64.rpm"
+    "$boot_inputs/uke-esp32-cdc-0.1.0-4.fc46.aarch64.rpm")
 for boot_rpm in "${boot_rpms[@]}"; do
     rpmkeys --checksig "$boot_rpm" | grep -F 'signatures OK' >/dev/null
     [[ $(rpm -qp --qf '%{ARCH}' "$boot_rpm") == aarch64 ]]
@@ -36,6 +36,11 @@ dnf -y --disablerepo='*' --setopt=clean_requirements_on_remove=False remove \
 rpm -q dnf5 dracut cpio kmod systemd systemd-udev >/dev/null
 mkdir -p /boot/efi /etc/dracut.conf.d /etc/selinux /var/lib/dbus
 install -m644 /usr/share/senemos/boot/uke/fstab.template /etc/fstab
+# Filesystem identities survive partition resizing and fastboot partition names.
+cat > /etc/fstab <<'FSTAB'
+LABEL=UKE_LINUX / ext4 defaults 0 1
+LABEL=UKE_ESP /boot/efi vfat umask=0077,nofail 0 2
+FSTAB
 cat > /etc/selinux/config <<'SELINUX'
 SELINUX=enforcing
 SELINUXTYPE=targeted
@@ -90,15 +95,20 @@ install_weak_deps=False
 allow_vendor_change=False
 DNF
 depmod "$kernel_release"
+mkdir -p /usr/lib/dracut/modules.d/91uke-bringup
+install -m644 /builder/src/image/dracut/91uke-bringup/* /usr/lib/dracut/modules.d/91uke-bringup/
+chmod 755 /usr/lib/dracut/modules.d/91uke-bringup/module-setup.sh
 # Use only installed modules; no host controller, root UUID or firmware guesses.
 dracut --force --no-hostonly --no-hostonly-cmdline --no-early-microcode \
-    --gzip --kernel-cmdline 'root=PARTLABEL=uke_linux rw rootfstype=ext4 rootwait senemos.debug=esp32-cdc' \
+    --gzip --add uke-bringup --kernel-cmdline 'root=LABEL=UKE_LINUX rw rootfstype=ext4 rootwait console=tty0 rd.senemos.tty=1 senemos.debug=esp32-cdc' \
     --filesystems ext4 --omit 'network plymouth crypt systemd-cryptsetup syslog lvm mdraid btrfs i18n' \
     "/boot/initramfs-$kernel_release.img" "$kernel_release"
 # Initramfs generation is host composition only. Remove its host-assembly RPMs
 # after generation, with full dependency checks; never redact RPM-owned bytes.
 # On-device regeneration/UKI activation still needs a separately admitted flow.
 dnf -y --disablerepo='*' --setopt=clean_requirements_on_remove=False remove dracut xkeyboard-config file file-libs
+# Remove host-only setup files left by the explicitly installed module directory.
+rm -rf /usr/lib/dracut/modules.d/91uke-bringup
 rpm -q dnf5 cpio kmod systemd systemd-udev uke-boot-integration uke-esp32-cdc >/dev/null
 [[ -s /boot/initramfs-$kernel_release.img ]]
 rm -rf /var/log/* /var/cache/dnf* /var/lib/dnf /root/.bash_history /tmp/*

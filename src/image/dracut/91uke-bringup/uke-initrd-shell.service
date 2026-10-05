@@ -1,0 +1,27 @@
+[Unit]
+Description=Uke Core initramfs development shell before Linux root mount
+DefaultDependencies=no
+After=systemd-journald.service systemd-udevd.service
+Before=initrd-switch-root.target
+Conflicts=initrd-switch-root.target
+ConditionPathExists=/etc/initrd-release
+ConditionKernelCommandLine=rd.senemos.tty=1
+ConditionKernelCommandLine=senemos.debug=esp32-cdc
+ConditionPathExists=/dev/tty2
+
+[Service]
+Type=simple
+ExecStartPre=/usr/bin/uke-boot-status --identity
+ExecStart=/bin/sh -i
+StandardInput=tty-force
+StandardOutput=journal
+StandardError=journal
+Environment=TERM=dumb
+TTYPath=/dev/tty2
+TTYReset=yes
+TTYVHangup=yes
+Restart=always
+RestartSec=2
+
+[Install]
+WantedBy=initrd.target

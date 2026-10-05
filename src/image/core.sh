@@ -13,6 +13,9 @@ Senemos Uke Fedora Core filesystem builder (host only)
 Usage: ./ukelinux.sh --build core --distro=fedora [options]
   --release rawhide  Reviewed first target (default)
   --jobs N           At most two CPUs; defaults to two
+  --esp-size N       ESP filesystem size in MiB (default 256; minimum 128)
+  --linux-size N     Linux filesystem size in MiB (default 4096; minimum 4096)
+  --fat-sector N     ESP sector bytes: 512 or 4096 (default 512)
   --offline          Require exact cached packages and container toolchain
   --dry-run          Show the profile without installing or building
   --self-test        Check CLI, profiles and host privacy fixtures
@@ -23,7 +26,8 @@ Produces separate logical EXT4 Linux and FAT32 ESP candidate files, plus a UKI.
 The explicit Core debug profile opens a local root development shell on VT2;
 ESP32-S3 HID input and CDC journal output still require physical validation.
 No passwords, network root login, flashing or default boot activation are added.
-USB/UFS DT, firmware handoff and measured partition geometry are release gates.
+Targets existing fastboot partitions esp and linux; no fixed disk offsets.
+USB/UFS DT, firmware handoff and target capacity/visibility are release gates.
 HELP
 }
 cleanup() {
@@ -62,38 +66,47 @@ recipe_hash() {
     local dir=$1
     cat "$dir/configs/Containerfile.image" "$dir/configs/images/core-rawhide.json" \
         "$dir"/src/image/*.sh "$dir"/src/image/*.cpp "$dir"/src/audit/*.sh \
+        "$dir"/src/image/dracut/91uke-bringup/* \
         "$dir"/manifests/images/core-*.json "$dir"/configs/images/transactions/*.json \
         "$dir/configs/images/selinux-namespace-policy.json" "$dir/configs/build-rules.json" \
         "$dir"/configs/keys/*.asc | sha256sum | cut -d ' ' -f1
 }
 image_main() {
     local target=core distro=fedora release=rawhide self=0 profile architecture host_platform base recipe tool_image tool_id inside key hash stage file url cached name
+    local esp_mib=256 root_mib=4096 sector=512 effective_profile
     JOBS=2 OFFLINE=0 DRY_RUN=0 ENGINE='' CID='' PAUSED=0
     while (($#)); do
         case $1 in
             --help|-h) help; return 0;;
             --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;; --self-test) self=1;; --test) :;;
-            --build=*|--distro=*|--release=*|--jobs=*) key=${1%%=*}; value=${1#*=};;
-            --build|--distro|--release|--jobs) key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
+            --build=*|--distro=*|--release=*|--jobs=*|--esp-size=*|--linux-size=*|--fat-sector=*) key=${1%%=*}; value=${1#*=};;
+            --build|--distro|--release|--jobs|--esp-size|--linux-size|--fat-sector) key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
             *) die "Unknown option: $1";;
         esac
         case ${key:-} in
             --build) target=$value;; --distro) distro=$value;; --release) release=$value;; --jobs) JOBS=$value;;
+            --esp-size) esp_mib=$value;; --linux-size) root_mib=$value;; --fat-sector) sector=$value;;
         esac
         key=''; shift
     done
     [[ $target == core && $distro == fedora && $release == rawhide ]] || die 'Only --build core --distro=fedora --release=rawhide is admitted'
     [[ $JOBS =~ ^[1-9][0-9]{0,2}$ ]] || die 'Jobs must be a positive integer'
     ((JOBS <= 2)) || JOBS=2
+    [[ $esp_mib =~ ^[1-9][0-9]{0,6}$ && $root_mib =~ ^[1-9][0-9]{0,6}$ ]] || die 'Filesystem sizes must be positive integer MiB values'
+    ((esp_mib >= 128 && esp_mib <= 65536 && root_mib >= 4096 && root_mib <= 1048576)) || die 'ESP size range: 128..65536 MiB; Linux size range: 4096..1048576 MiB'
+    [[ $sector == 512 || $sector == 4096 ]] || die 'FAT sector bytes must be 512 or 4096'
+    [[ $sector != 4096 || $esp_mib -ge 512 ]] || die '4096-byte FAT32 sectors require an ESP of at least 512 MiB'
     profile=$BUILDER/configs/images/core-rawhide.json
     [[ -f $profile ]] || die 'Core profile is missing'
     if ((self)); then
         bash "$BUILDER/tests/image-contract.sh"
         return 0
     fi
-    say "Core Rawhide AArch64 candidate; Linux 7.2.9, EXT4 4096 MiB, FAT32 ESP 256 MiB; at most $JOBS CPUs"
+    effective_profile=$(jq -S --argjson esp "$esp_mib" --argjson linux "$root_mib" --argjson sector "$sector" '. + {esp_size_mib:$esp,root_size_mib:$linux,fat_sector_bytes:$sector}' "$profile")
+    say "Core Rawhide AArch64 candidate; Linux 7.2.9, EXT4 $root_mib MiB, FAT32 ESP $esp_mib MiB ($sector-byte sectors); at most $JOBS CPUs"
     say 'ESP32 USB device / tablet USB host; HID VT2 shell and one CDC journal writer'
-    say 'Local filesystem checks only; boot, USB/UFS, firmware and physical geometry are unverified'
+    say 'fastboot targets esp/linux; filesystem labels UKE_ESP/UKE_LINUX; target sizes and firmware visibility require verification'
+    say 'Local filesystem checks only; boot, USB/UFS and firmware handoff are unverified'
     ((DRY_RUN == 0)) || return 0
     bootstrap
     ((EUID != 0)) || die 'Run the build as a normal user; elevation is limited to host prerequisite preparation'
@@ -105,8 +118,10 @@ image_main() {
     wait_idle
     local available
     available=$(df -Pk "$BUILDER/build" | awk 'NR==2 {print $4}')
-    ((available >= 12 * 1024 * 1024)) || die 'At least 12 GiB free space is required'
-    recipe=$(recipe_hash "$BUILDER")
+    ((available >= (root_mib + esp_mib + 8192) * 1024)) || die 'Insufficient free space for the selected filesystem sizes and 8 GiB assembly allowance'
+    local source_recipe
+    source_recipe=$(recipe_hash "$BUILDER")
+    recipe=$(printf '%s\n%s\n' "$source_recipe" "$effective_profile" | sha256sum | cut -d ' ' -f1)
     name=core-rawhide-${recipe:0:16}
     WORK=$BUILDER/build/images/$name; inside=/builder/build/images/$name
     mkdir -p "$WORK/inputs"; trap cleanup EXIT
@@ -117,8 +132,8 @@ image_main() {
         mkdir "$RECIPE_ROOT"
         cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/manifests" "$RECIPE_ROOT/"
     fi
-    [[ $(recipe_hash "$RECIPE_ROOT") == "$recipe" ]] || die 'Source changed while freezing the recipe'
-    cp "$profile" "$WORK/profile.json"
+    [[ $(recipe_hash "$RECIPE_ROOT") == "$source_recipe" ]] || die 'Source changed while freezing the recipe'
+    printf '%s\n' "$effective_profile" > "$WORK/profile.json"
     for stage in runtime system identity; do
         mkdir -p "$WORK/inputs/$stage/packages"
         cp "$BUILDER/configs/images/transactions/$stage.json" "$WORK/inputs/$stage/transaction.json"
@@ -164,6 +179,7 @@ image_main() {
     tool_id=$("$ENGINE" image inspect "$tool_image" --format '{{.Id}}')
     local preparation_key prepared_cache
     preparation_key=$(cat "$RECIPE_ROOT/src/image/prepare-runtime.sh" "$RECIPE_ROOT/src/image/prepare-root.sh" \
+        "$RECIPE_ROOT"/src/image/dracut/91uke-bringup/* \
         "$RECIPE_ROOT/configs/images/core-rawhide.json" "$RECIPE_ROOT"/manifests/images/core-*.json \
         "$RECIPE_ROOT"/configs/images/transactions/*.json "$RECIPE_ROOT"/configs/keys/*.asc | sha256sum | cut -d ' ' -f1)
     prepared_cache=$BUILDER/build/images/prepared/$preparation_key
@@ -194,7 +210,7 @@ image_main() {
             say "Preserved rejected/interrupted $partial; resuming from verified inputs"
         fi
     done
-    image_job "$tool_id" "$host_platform" "$WORK/compose.log" bash /builder/src/image/compose.sh "$inside" "$inside/profile.json" 256 4096 512
+    image_job "$tool_id" "$host_platform" "$WORK/compose.log" bash /builder/src/image/compose.sh "$inside" "$inside/profile.json" "$esp_mib" "$root_mib" "$sector"
     # $1 intentionally expands in the isolated container, not in the host shell.
     # shellcheck disable=SC2016
     image_job "$tool_id" "$host_platform" "$WORK/toolchain.log" bash -c 'rpm -qa --qf "%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\n" | sort > "$1/candidate/host-toolchain.tsv"' bash "$inside"

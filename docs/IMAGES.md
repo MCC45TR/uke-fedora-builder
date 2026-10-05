@@ -8,6 +8,7 @@ git clone --recurse-submodules https://github.com/MCC45TR/uke-linux.git
 cd uke-linux
 ./ukelinux.sh --build core --distro=fedora --test
 ./ukelinux.sh --build core --distro=fedora --offline --test
+./ukelinux.sh --build core --esp-size 512 --linux-size 8192 --fat-sector 4096 --test
 ./ukelinux.sh --self-test
 ```
 
@@ -52,7 +53,13 @@ or desktop security default. Root password login and SSH root access are disable
 The tablet acts as USB host; the ESP32-S3 supplies CDC and HID interfaces. The
 single C++ journal writer configures the explicitly selected `/dev/ttyACM0` at
 115200 raw, asserts DTR/RTS and streams the current boot journal. HID types into
-VT2; shell stdout/stderr go to journald. No logger is included in initramfs.
+VT2; shell stdout/stderr go to journald. The gated `uke-bringup` dracut module
+adds a VT2 shell and the same native CDC writer before root mount, selected by
+both `rd.senemos.tty=1` and `senemos.debug=esp32-cdc`. It copies native binaries,
+their libraries and host/HID/ACM modules. The initramfs writer stops before
+switch-root; the real-root unit excludes initramfs, preserving one writer per
+stage. A missing UFS root therefore need not prevent an early shell, provided
+firmware RAM/framebuffer handoff and USB host operation work.
 RPM installation alone enables neither this service nor the optional tablet
 USB-gadget service. The old ESP32 firmware remains untouched and its exact
 HID/control protocol is still unverified. PTY fixtures do not establish USB
@@ -60,11 +67,17 @@ hardware compatibility.
 
 ## Outputs and release gates
 
-The compositor writes regular files only: a 4096 MiB EXT4 Linux candidate,
-256 MiB FAT32 ESP candidate with 512-byte sectors, compressed copies, a UKI,
-package list and checksums. These are **logical assembly sizes**, not measured
-Uke GPT geometry. Partition roles are `uke_linux` and `uke_esp`; actual partition
-creation and flashing remain separate recovery operations.
+The compositor writes regular files only: EXT4 Linux and FAT32 ESP candidates,
+compressed copies, a UKI, package list and checksums. Defaults are 4096 MiB Linux,
+256 MiB ESP and 512-byte FAT sectors. `--linux-size` and `--esp-size` choose MiB
+sizes; `--fat-sector` accepts 512 or 4096. A 4096-byte sector FAT32 ESP requires
+at least 512 MiB. Each effective profile changes the recipe/cache identity.
+
+Installation targets are fastboot names `esp` and `linux`. Filesystem labels
+`UKE_ESP`/`UKE_LINUX` and `root=LABEL=UKE_LINUX` remain stable when partition
+sizes change. No GPT offset is embedded. Flashing still requires the target
+partition to exist, fit the chosen image and be visible to UEFI with compatible
+sector geometry. This builder never flashes or creates tablet partitions.
 
 Every composition verifies complete root/initramfs payloads, kernel/config
 identity, all-inode SELinux/owner/mode/capability preservation, EXT4 integrity,
@@ -72,8 +85,10 @@ complete readback, exact six-section UKI inputs, FAT integrity and ESP UKI
 readback. No default loader, EFI variable update, Android binary or Nabu offset
 is introduced. On-device kernel RPM updates do not yet regenerate/activate the UKI.
 
-Current kernel DT lacks enabled Uke USB/UFS nodes and a static RAM map. A Uke
-UEFI handoff, measured geometry, bridge enumeration, actual kernel boot and
+Current kernel DT lacks enabled Uke USB/UFS nodes. Static RAM is not guessed:
+the Linux EFI stub consumes the real firmware memory map, with firmware-owned
+carveouts needing exact-profile validation. A Uke UEFI handoff, target capacity
+and sector/firmware visibility, bridge enumeration, actual kernel boot and
 rollback are unresolved release gates. Passing filesystem/package checks is a
 local candidate result and cannot establish a bootable tablet image. Accepted
 future release assets belong to `uke-linux-images`.

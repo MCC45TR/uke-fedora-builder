@@ -10,8 +10,8 @@
   "esp_size_mib": 256,
   "root_size_mib": 4096,
   "fat_sector_bytes": 512,
-  "esp_partition_label": "uke_esp",
-  "linux_partition_label": "uke_linux",
+  "esp_partition_label": "esp",
+  "linux_partition_label": "linux",
   "esp_filesystem_label": "UKE_ESP",
   "linux_filesystem_label": "UKE_LINUX",
   "physical_geometry_verified": false,
@@ -22,7 +22,7 @@
   "kernel_config_sha256": "2436c99c1e4229a608d2321fb92934d9c47174eefc7254c89a64cef4feec79c3",
   "kernel_copr_build": 11075043,
   "profile": "core",
-  "kernel_command_line": "root=PARTLABEL=uke_linux rw rootfstype=ext4 rootwait senemos.debug=esp32-cdc",
+  "kernel_command_line": "root=LABEL=UKE_LINUX rw rootfstype=ext4 rootwait console=tty0 rd.senemos.tty=1 senemos.debug=esp32-cdc",
   "cdc": {
     "tablet_usb_role": "host",
     "esp32_usb_role": "device",
@@ -33,5 +33,17 @@
   },
   "development_root_shell": true,
   "source_kernel_prerequisites_passed": false,
-  "runtime_base_image": "registry.fedoraproject.org/fedora@sha256:9b0213742bcf87c07d8768278b03686e8655faaeb85027ecbdfe37b8d5017769"
+  "runtime_base_image": "registry.fedoraproject.org/fedora@sha256:9b0213742bcf87c07d8768278b03686e8655faaeb85027ecbdfe37b8d5017769",
+  "root_selector": "LABEL=UKE_LINUX",
+  "partition_addressing": "fastboot-name-and-filesystem-label",
+  "partition_offsets": null,
+  "early_initramfs_shell": {
+    "enabled": true,
+    "gate": "rd.senemos.tty=1",
+    "tty": "/dev/tty2",
+    "output": "journald/ESP32 CDC",
+    "requires_root_filesystem": false,
+    "physical_tested": false
+  },
+  "boot_package_copr_build": 11081332
 }

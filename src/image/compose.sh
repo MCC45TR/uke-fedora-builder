@@ -6,7 +6,8 @@ work=$1 profile=$2 esp_mib=$3 root_mib=$4 sector=$5
 [[ $work == /builder/build/images/* && -d $work && ! -L $work ]]
 [[ $esp_mib =~ ^[1-9][0-9]*$ && $root_mib =~ ^[1-9][0-9]*$ ]]
 [[ $sector == 512 || $sector == 4096 ]]
-((esp_mib >= 128 && root_mib >= 1024))
+((esp_mib >= 128 && esp_mib <= 65536 && root_mib >= 4096 && root_mib <= 1048576))
+[[ $(jq -er .esp_size_mib "$profile") == "$esp_mib" && $(jq -er .root_size_mib "$profile") == "$root_mib" && $(jq -er .fat_sector_bytes "$profile") == "$sector" ]]
 root=$work/composition-root
 out=$work/candidate
 mkdir "$root" "$out"
@@ -31,13 +32,20 @@ bash /builder/src/audit/check-target-privacy.sh --namespace-policy /builder/conf
 [[ -L $root/etc/systemd/system/sysinit.target.wants/debug-shell.service ]]
 grep -F 'StandardOutput=journal' "$root/etc/systemd/system/debug-shell.service.d/90-uke-core.conf"
 [[ $(readlink "$root/etc/systemd/system/default.target") == /usr/lib/systemd/system/multi-user.target ]]
-grep -F 'PARTLABEL=uke_linux / ext4' "$root/etc/fstab"
-grep -F 'PARTLABEL=uke_esp /boot/efi vfat' "$root/etc/fstab"
+grep -Fx 'LABEL=UKE_LINUX / ext4 defaults 0 1' "$root/etc/fstab"
+grep -Fx 'LABEL=UKE_ESP /boot/efi vfat umask=0077,nofail 0 2' "$root/etc/fstab"
 mkdir "$work/initramfs-root"
 gzip -cd "$initrd" | (cd "$work/initramfs-root"; cpio -id --quiet --no-absolute-filenames)
 bash /builder/src/audit/check-target-payload.sh "$work/initramfs-root"
 bash /builder/src/audit/check-target-privacy.sh "$work/initramfs-root"
+[[ ! -s $work/initramfs-root/etc/machine-id && ! -s $work/initramfs-root/var/lib/systemd/random-seed ]]
 [[ -e $work/initramfs-root/init || -L $work/initramfs-root/init ]]
+for service in uke-initrd-shell uke-initrd-cdc; do
+    [[ -f $work/initramfs-root/usr/lib/systemd/system/$service.service ]]
+    grep -Fx 'ConditionKernelCommandLine=rd.senemos.tty=1' "$work/initramfs-root/usr/lib/systemd/system/$service.service"
+    [[ -L $work/initramfs-root/usr/lib/systemd/system/initrd.target.wants/$service.service ]]
+done
+[[ -x $work/initramfs-root/usr/libexec/senemos-uke/uke-esp32-cdc ]]
 # GNU cross objcopy supports PE ARM64 section placement; LLVM cannot do it.
 if command -v aarch64-linux-gnu-objcopy >/dev/null; then prefix=aarch64-linux-gnu-; else prefix=''; fi
 stub=$root/usr/lib/systemd/boot/efi/linuxaa64.efi.stub
