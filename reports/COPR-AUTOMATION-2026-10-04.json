@@ -20,11 +20,33 @@
       "daily_stable_workflow": "passed manual dispatch",
       "source_export_failure": 11074362,
       "corrected_source_export": 11074370,
-      "corrected_binary_build": "running",
+      "corrected_binary_build": "succeeded",
       "queued_release_build": 11074417,
       "queued_release": "1.1",
       "build_after": 11074370,
-      "source_preparation": "passed; corrected SRPM export collected"
+      "source_preparation": "passed; corrected SRPM export collected",
+      "release_1_1_build": 11074417,
+      "release_1_1_state": "succeeded",
+      "fresh_install_builtin_correction": {
+        "release": "1.2",
+        "build_id": 11074500,
+        "state": "succeeded",
+        "local_fresh_install": "passed",
+        "local_upgrade": "passed",
+        "local_removal": "passed"
+      },
+      "installonly_correction": {
+        "release": "1.3",
+        "build_ids": [
+          11075009,
+          11075043
+        ],
+        "state": "succeeded",
+        "signed_payload": "passed",
+        "signed_fresh_install": "passed",
+        "signed_actual_1_2_to_1_3_upgrade": "passed; exactly one revision of all four packages",
+        "removal": "passed"
+      }
     },
     {
       "name": "uke-orangefox-recovery",
@@ -38,9 +60,119 @@
       "scm_build_id": 11074373,
       "scm_build": "succeeded",
       "signed_repository_install_remove": "passed"
+    },
+    {
+      "name": "uke-core-meta",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-core-meta.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": ""
+      }
+    },
+    {
+      "name": "uke-desktop-metas",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-metas.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": ""
+      }
+    },
+    {
+      "name": "material-decoration",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/material-decoration"
+      }
+    },
+    {
+      "name": "plymouth-uke",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/plymouth-uke"
+      }
+    },
+    {
+      "name": "at-spi2-core",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/at-spi2-core"
+      }
+    },
+    {
+      "name": "gstreamer1",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/gstreamer1"
+      }
+    },
+    {
+      "name": "libaccounts-glib",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/libaccounts-glib"
+      }
+    },
+    {
+      "name": "libwacom",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/libwacom"
+      }
+    },
+    {
+      "name": "plasma-workspace",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/plasma-workspace"
+      }
+    },
+    {
+      "name": "dolphin",
+      "auto_rebuild": true,
+      "source_dict": {
+        "clone_url": "https://github.com/MCC45TR/uke-desktop-packaging.git",
+        "committish": "main",
+        "source_build_method": "make_srpm",
+        "subdirectory": "packaging/dolphin"
+      }
     }
   ],
   "additional_initial_repository_count": 11,
   "unsupported_stable_version_policy": "stop before generic fallback",
-  "physical_device": false
+  "physical_device": false,
+  "last_verified": "2026-10-05",
+  "registered_source_family_count": 12,
+  "native_shared_source_workflow": {
+    "repository": "MCC45TR/uke-desktop-packaging",
+    "workflow": "native-runtime.yml",
+    "run_id": 37264699608,
+    "result": "success; requested all six approved source families",
+    "secret_public": false,
+    "acceptance": "package-specific; registration does not establish full runtime acceptance"
+  }
 }

@@ -60,34 +60,34 @@
   },
   "packages": [
     {
-      "file": "senemos-uke-linux-kernel-mainline-7.2.9-1.1.fc46.aarch64.rpm",
+      "file": "senemos-uke-linux-kernel-mainline-7.2.9-1.3.fc46.aarch64.rpm",
       "kind": "binary",
-      "nevra": "senemos-uke-linux-kernel-mainline-0:7.2.9-1.1.fc46.aarch64",
-      "sha256": "bbbb6f0dc11f3fd5b4c1e803dc9929fb050e635b453cee8f1bd7bd4d03645493"
+      "nevra": "senemos-uke-linux-kernel-mainline-0:7.2.9-1.3.fc46.aarch64",
+      "sha256": "8afdac35f678b0b1de0abde49fc3053c3b289e01df26426d5822c04eb21b3b7e"
     },
     {
-      "file": "senemos-uke-linux-kernel-mainline-core-7.2.9-1.1.fc46.aarch64.rpm",
+      "file": "senemos-uke-linux-kernel-mainline-core-7.2.9-1.3.fc46.aarch64.rpm",
       "kind": "binary",
-      "nevra": "senemos-uke-linux-kernel-mainline-core-0:7.2.9-1.1.fc46.aarch64",
-      "sha256": "ff7a48e28f445f1623629f6d51d9408d0fe9736086d1770e73b3148f87ebda25"
+      "nevra": "senemos-uke-linux-kernel-mainline-core-0:7.2.9-1.3.fc46.aarch64",
+      "sha256": "2897567296bfab57a7948a2cdc8895f2b33ef2224013cfb5e43cde529c7e8284"
     },
     {
-      "file": "senemos-uke-linux-kernel-mainline-dtbs-7.2.9-1.1.fc46.aarch64.rpm",
+      "file": "senemos-uke-linux-kernel-mainline-dtbs-7.2.9-1.3.fc46.aarch64.rpm",
       "kind": "binary",
-      "nevra": "senemos-uke-linux-kernel-mainline-dtbs-0:7.2.9-1.1.fc46.aarch64",
-      "sha256": "1caf8ba3541267f4c3cae8579bf944d9c5ebb24a6ed33865503d24ab0e52a961"
+      "nevra": "senemos-uke-linux-kernel-mainline-dtbs-0:7.2.9-1.3.fc46.aarch64",
+      "sha256": "d7a37612cc3a1b95d79111c96aa72f45eb4b6fb2fbdae53305b9a1bdf8d186e5"
     },
     {
-      "file": "senemos-uke-linux-kernel-mainline-modules-7.2.9-1.1.fc46.aarch64.rpm",
+      "file": "senemos-uke-linux-kernel-mainline-modules-7.2.9-1.3.fc46.aarch64.rpm",
       "kind": "binary",
-      "nevra": "senemos-uke-linux-kernel-mainline-modules-0:7.2.9-1.1.fc46.aarch64",
-      "sha256": "efe6d4545229235b3899c3e66638ac02be420eb54855c8b33402ce7d1d736b5c"
+      "nevra": "senemos-uke-linux-kernel-mainline-modules-0:7.2.9-1.3.fc46.aarch64",
+      "sha256": "7029144abf8eddb89a1b8995092a2c3cbfb05606653339f921dbc864cf460fa0"
     },
     {
-      "file": "senemos-uke-linux-kernel-mainline-7.2.9-1.1.fc46.src.rpm",
+      "file": "senemos-uke-linux-kernel-mainline-7.2.9-1.3.fc46.src.rpm",
       "kind": "source",
-      "nevra": "senemos-uke-linux-kernel-mainline-0:7.2.9-1.1.fc46.aarch64",
-      "sha256": "ff5d94ce5c01c87abfc5a6ddcb8a203314c092b11fee30b1729dd9fdb7512114"
+      "nevra": "senemos-uke-linux-kernel-mainline-0:7.2.9-1.3.fc46.aarch64",
+      "sha256": "6bd48c0d5dc71a978a0ab86fda48e47e23c677ec3afd598ef32328673935e7eb"
     }
   ],
   "toolchain_image": "a6fb262f41c060702100f704f5c63ac48957682e84befb0812f08e248f2bec7e",
@@ -117,11 +117,20 @@
   "offline_end_to_end": "passed",
   "standalone_srpm_preparation": "signed embedded source plus seven patches and three config fragments passed offline",
   "package_removal_payload_cleanup": "passed",
-  "same_version_release": "1.1.fc46",
-  "release_upgrade_test": "1.1.fc46 to 2.fc46 passed",
-  "mixed_release_cache_correction": "Preserved prior RPM directories; exactly four current binaries and one SRPM enforced",
-  "second_clean_full_srpm_rebuild": "not-performed",
+  "same_version_release": "1.3.fc46",
+  "fresh_install_rpm_verification": "passed",
+  "release_upgrade_test": "1.3.fc46 to 2.fc46 passed; one revision per subpackage",
+  "mixed_release_cache_correction": "Prior RPM directories preserved; four current binaries and one SRPM enforced",
+  "second_clean_full_srpm_rebuild": "not-performed locally",
   "dt_schema_validation": "not-performed",
   "kunit_runtime": "not-performed",
-  "uefi_firmware": "not-built"
+  "uefi_firmware": "not-built",
+  "installonly_policy_fixture": "Three AArch64 package-only upgrades preserve a different-version fallback; not a second kernel build",
+  "local_confirmation_exit_code": 0,
+  "local_previous_outer_termination": {
+    "exit_code": 143,
+    "after": "internal lifecycle success and artifact promotion",
+    "root_cause": "unestablished"
+  },
+  "last_verified": "2026-10-05"
 }

@@ -1,0 +1,88 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-05",
+  "project": "mcc45tr/uke-linux-test",
+  "target": "fedora-rawhide-aarch64",
+  "hardware_tested": false,
+  "boot_tested": false,
+  "priority_packages": [
+    "material-decoration",
+    "uke-core-meta",
+    "uke-desktop-metas",
+    "kde-plasma-uke-meta",
+    "plymouth-uke",
+    "xiaomi-uke-firmware"
+  ],
+  "reference_project": "mcc45tr/nabu-linux",
+  "source": {
+    "material_release": "26-09-18",
+    "material_commit": "7bf62f142c17902f4afe04d0be408b5dfef27982",
+    "firmware_admission": "No approved file-level source/hash/license/kernel-request allowlist; not registered",
+    "native_variants": "Six exact-pinned official Fedora Koji source RPMs; actual native C/C++ rebuilds"
+  },
+  "builds": [
+    {
+      "id": 11075084,
+      "package": "material-decoration",
+      "state": "succeeded",
+      "release": "20260918.151422-2.uke.fc46",
+      "signature_payload_elf_python_privacy": "passed",
+      "rendering": "not-tested"
+    },
+    {
+      "id": 11075056,
+      "package": "plymouth-uke",
+      "state": "succeeded",
+      "release": "1.0.0-1.fc46",
+      "signed_payload": "passed",
+      "theme_activation": "not-performed"
+    },
+    {
+      "id": 11075166,
+      "package": "uke-core-meta",
+      "state": "succeeded",
+      "release": "1.0.0-2.fc46",
+      "signed_payload": "passed",
+      "signed_install_verification_python_solver_guard_removal": "passed"
+    },
+    {
+      "id": 11075167,
+      "package": "uke-desktop-metas",
+      "state": "succeeded",
+      "release": "1.0.0-2.fc46",
+      "signed_payload": "passed",
+      "full_runtime": "pending"
+    }
+  ],
+  "failed_trials": [
+    {
+      "id": 11075055,
+      "reason": "Missing Qt QmlIntegration import; superseded by 11075084"
+    },
+    {
+      "id": 11075173,
+      "reason": "Host-pinning adapter removed GCC from a multi-dependency line; preserve original requirements and add pin separately"
+    },
+    {
+      "id": 11075171,
+      "reason": "Whole-source-family payload gate found optional GDB Python helpers in SDK; excluded in release 1.uke2"
+    }
+  ],
+  "host_cpp_fixtures": {
+    "calendar": "passed; ID transformation, permissions, idempotence and symlink rejection",
+    "dolphin": "passed; XML toolbar/shortcut conversion, permissions, idempotence, malformed XML and symlink rejection"
+  },
+  "initial_full_plasma_transaction": {
+    "state": "rejected",
+    "python_packages": 6,
+    "official_rpm_file_lists_inspected": 600,
+    "undeclared_python_scripts": "Two Dolphin migrations",
+    "accepted": false
+  },
+  "corrected_full_runtime": {
+    "state": "pending-native-builds-and-signed-transaction",
+    "payload_audit": "pending"
+  },
+  "host_audit_regressions": "21 root tests and eight build self-test groups passed; scanner rejects missing readelf and unreadable ELF",
+  "physical_validation": "not-performed"
+}

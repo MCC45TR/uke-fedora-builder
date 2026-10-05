@@ -54,3 +54,23 @@ and unreviewed stable versions fail explicitly. See the
 for all component repositories and their readiness gates.
 
 COPR/package, emulated userspace and physical tablet acceptance remain separate.
+
+A signed, tested console selection is also available:
+
+```sh
+sudo dnf install uke-core-meta
+sudo dnf upgrade uke-core-meta
+```
+
+Its release 2 refuses Python interpreter/ABI dependencies. Optional
+`plymouth-uke` delivers theme data without activation. The native Material
+Decoration RPM and Plasma meta packages are built; consult the current
+[desktop acceptance record](https://github.com/MCC45TR/uke-fedora-builder/blob/main/reports/DESKTOP-RAWHIDE-2026-10-05.json)
+before full desktop evaluation. The corrected selection requires six native
+runtime capabilities. Never bypass the Python policy with nodeps or unsafe
+solver overrides. A successful graphical dependency transaction still does not
+establish a working Uke display/session.
+
+`xiaomi-uke-firmware` is not admitted until file-level source/license/hash and
+kernel-request gates pass. Initial hardware component repositories are listed
+in the package catalog; they do not advertise unsupported binaries.

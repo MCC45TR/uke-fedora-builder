@@ -73,6 +73,11 @@ or namespace restrictions can still prevent this preparation; such failures
 stop the test explicitly. The test also checks the
 complete installed package list for Python. Container/package success does not
 establish a tablet boot, working peripherals, UEFI firmware or physical support.
+After an upgrade, every subpackage must have exactly one revision for the tested
+upstream version. Same-version packaging updates replace the shared module
+directory; different upstream versions retain their installonly paths. A separate
+host fixture checks that fallback policy without claiming another real kernel
+build or a boot test.
 The test runtime is built separately from the pinned AArch64 Rawhide base with
 kmod installed. Local RPM solving and lifecycle operations run with repositories
 disabled and network access blocked. `--offline --test` needs that exact cached

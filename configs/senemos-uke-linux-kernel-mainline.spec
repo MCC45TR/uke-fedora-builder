@@ -9,7 +9,7 @@
 
 Name: senemos-uke-linux-kernel-mainline
 Version: 7.2.9
-Release: %{?senemos_package_release}%{!?senemos_package_release:1.1}%{?dist}
+Release: %{?senemos_package_release}%{!?senemos_package_release:1.3}%{?dist}
 Summary: Senemos mainline kernel build candidate for Xiaomi Uke
 License: GPL-2.0-only
 URL: https://github.com/MCC45TR/senemos-uke-kernel-mainline
@@ -34,6 +34,10 @@ managed separately. No Android partition or boot selection is changed.
 Summary: Senemos Uke ARM64 kernel Image and build identity
 Provides: installonlypkg(kernel)
 Provides: kernel-uname-r(%{krel})
+# Revisions of one upstream version share krel and cannot coexist. Omit the
+# release in the equality so all revisions of this version are replaced;
+# other upstream versions keep their separate installonly fallback paths.
+Obsoletes: %{name}-core = %{version}
 
 %description core
 The EFI-enabled ARM64 Image, configuration and System.map for Senemos Uke.
@@ -43,6 +47,7 @@ Summary: Modules matching the Senemos Uke kernel
 Requires: %{name}-core = %{version}-%{release}
 Requires: kmod
 Provides: installonlypkg(kernel)
+Obsoletes: %{name}-modules = %{version}
 
 %description modules
 Rebuilt AArch64 modules from the same source and configuration as Image.
@@ -51,6 +56,7 @@ Rebuilt AArch64 modules from the same source and configuration as Image.
 Summary: Independent Uke compile-stage device tree
 Requires: %{name}-core = %{version}-%{release}
 Provides: installonlypkg(kernel)
+Obsoletes: %{name}-dtbs = %{version}
 
 %description dtbs
 Uke-specific CPU, interrupt and static reservation description. The future
@@ -161,7 +167,9 @@ fi
 /usr/lib/modules/%{krel}/vmlinuz
 /usr/lib/modules/%{krel}/config
 /usr/lib/modules/%{krel}/System.map
-/usr/lib/modules/%{krel}/modules.builtin*
+/usr/lib/modules/%{krel}/modules.builtin
+/usr/lib/modules/%{krel}/modules.builtin.modinfo
+%verify(not mtime) /usr/lib/modules/%{krel}/modules.builtin*.bin
 /usr/lib/modules/%{krel}/modules.order
 /usr/share/senemos/uke/%{krel}/source-lock.json
 

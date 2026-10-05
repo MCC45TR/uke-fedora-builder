@@ -32,5 +32,73 @@
     "CONFIG_PAHOLE_VERSION=0 on native worker vs 130 locally"
   ],
   "first_remote_lifecycle": "Installation passed; RPM verification found generated-index timestamps; corrected locally with verify(not mtime)",
-  "superseding_local_release": "1.1.fc46"
+  "superseding_local_release": "1.3.fc46",
+  "later_scm_builds": [
+    {
+      "build_id": 11074370,
+      "state": "succeeded",
+      "release": "1"
+    },
+    {
+      "build_id": 11074417,
+      "state": "succeeded",
+      "release": "1.1"
+    },
+    {
+      "build_id": 11074500,
+      "state": "succeeded",
+      "release": "1.2"
+    },
+    {
+      "build_id": 11075009,
+      "state": "succeeded",
+      "release": "1.3"
+    },
+    {
+      "build_id": 11075043,
+      "state": "succeeded",
+      "release": "1.3",
+      "source_commit": "35a4fd7"
+    }
+  ],
+  "fresh_native_repository_verification": "Native 1.2 fresh install passed; actual 1.1 to 1.2 retained installonly revisions and failed coherent-upgrade gate",
+  "native_current": {
+    "build_id": 11075043,
+    "state": "succeeded",
+    "release": "1.3.fc46",
+    "signed_payload_audit": "passed",
+    "Image_machine": "IMAGE_FILE_MACHINE_ARM64",
+    "dtb": "qcom/sm7675-xiaomi-uke.dtb",
+    "module_count": 1146,
+    "vermagic": "7.2.9-senemos-uke SMP preempt mod_unload aarch64",
+    "depmod_symbol_dependencies": "passed",
+    "python_and_privacy": "passed",
+    "signed_repository_fresh_install": "passed",
+    "signed_repository_upgrade": "actual signed 1.2 to 1.3; exactly one revision of all four packages; passed",
+    "rpm_verification": "passed in both states",
+    "removal_and_generated_file_cleanup": "passed",
+    "packages": [
+      {
+        "file": "senemos-uke-linux-kernel-mainline-7.2.9-1.3.fc46.aarch64.rpm",
+        "sha256": "ec9951e3fe4b38eae4677b505ae89aaa85d28586414b00e9eb64f68757f1eabf"
+      },
+      {
+        "file": "senemos-uke-linux-kernel-mainline-7.2.9-1.3.fc46.src.rpm",
+        "sha256": "70ceabc0be11a884e68a5a51001ced85222f277438e4f78fd9fc731244234830"
+      },
+      {
+        "file": "senemos-uke-linux-kernel-mainline-core-7.2.9-1.3.fc46.aarch64.rpm",
+        "sha256": "231de4f1140c920f16d8048678cb0a3321721b1b662dff99be2e2d1ae2134a33"
+      },
+      {
+        "file": "senemos-uke-linux-kernel-mainline-dtbs-7.2.9-1.3.fc46.aarch64.rpm",
+        "sha256": "f11c288b2b8c1aff1824af4bc7d3ae1e4b8d5eb5b2c8db25d994b51bbe176ec7"
+      },
+      {
+        "file": "senemos-uke-linux-kernel-mainline-modules-7.2.9-1.3.fc46.aarch64.rpm",
+        "sha256": "c0d3a0328937f636f957215715a716e09a3f5bf52d73c25731963fefc271edd3"
+      }
+    ]
+  },
+  "last_verified": "2026-10-05"
 }
