@@ -50,7 +50,7 @@ cd uke-linux
 containers. The script installs missing official host prerequisites, limits
 resources and queues behind active native/recovery work. Other target formats
 and unreviewed stable versions fail explicitly. See the
-[package/update hub](https://github.com/MCC45TR/uke-linux/blob/main/docs/PACKAGE-HUB.md)
+[package/update hub](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/PACKAGE-HUB.md)
 for all component repositories and their readiness gates.
 
 COPR/package, emulated userspace and physical tablet acceptance remain separate.

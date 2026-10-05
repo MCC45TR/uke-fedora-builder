@@ -38,16 +38,22 @@ kernel/Material/recovery trackers inspect eligible published stable releases.
 Unreviewed kernel versions stop before generic ARM64 fallback; recovery requires
 approved firmware/asset/source identities. Binary workers have network disabled.
 
-Firmware and hardware initial repositories have explicit admission gates.
+Hardware components share the uke-linux-hardware-support source repository
+and retain explicit admission gates.
 No firmware RPM until every Uke file has approved provenance, redistribution
 rights, hashes and matching kernel requests. Nabu geometry, firmware and
 hardware assumptions are not portable. No composed tablet image or physical
 support is certified by this channel.
 
-- [Package/update hub](https://github.com/MCC45TR/uke-linux/blob/main/docs/PACKAGE-HUB.md)
-- [KDE application policy](https://github.com/MCC45TR/uke-linux/blob/main/docs/KDE-APPLICATION-POLICY.md)
+- [Package/update hub](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/PACKAGE-HUB.md)
+- [KDE application policy](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/KDE-APPLICATION-POLICY.md)
+- [Hardware support sources](https://github.com/MCC45TR/uke-linux-hardware-support)
+- [Fedora image releases](https://github.com/MCC45TR/uke-linux-images/releases)
 - [Kernel sources](https://github.com/MCC45TR/senemos-uke-kernel-mainline)
-- [Recovery delivery](https://github.com/MCC45TR/uke-orangefox-packaging)
+- [Recovery delivery](https://github.com/MCC45TR/uke-linux-hardware-support/tree/main/uke-orangefox-packaging)
 - [Source and test records](https://github.com/MCC45TR/uke-fedora-builder/tree/main/reports)
 
 Fedora 45, openSUSE, native DEB and Alpine APK targets require separate validation.
+
+Detailed package and policy documents are in the private documentation
+repository; access is required. Public status is available on the Uke landing page.

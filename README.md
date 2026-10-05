@@ -31,7 +31,7 @@ The [development COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux
 now publishes kernel packages and DNF-managed recovery image data. Kernel
 job [11075043](https://copr.fedorainfracloud.org/coprs/build/11075043) and recovery
 SCM job [11074373](https://copr.fedorainfracloud.org/coprs/build/11074373) succeeded.
-The [package hub](https://github.com/MCC45TR/uke-linux/blob/main/docs/PACKAGE-HUB.md)
+The [package hub](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/PACKAGE-HUB.md)
 maps the additional initial repositories and their readiness gates.
 There is no bootable Fedora Uke system image or physical acceptance claim.
 
@@ -51,4 +51,4 @@ See [local kernel acceptance](reports/KERNEL-7.2.9-RAWHIDE-2026-10-04.json),
 [COPR source automation](reports/COPR-AUTOMATION-2026-10-04.json) and
 [recovery delivery](reports/RECOVERY-RAWHIDE-2026-10-04.json).
 
-See the [100-step platform plan](https://github.com/MCC45TR/uke-linux/blob/main/PLAN.md), [hardware status](https://github.com/MCC45TR/uke-linux/blob/main/DEVICE-STATUS.md) and [contribution rules](AGENTS.md). Firmware redistribution and licenses are handled separately from kernel source packages.
+See the [100-step platform plan](https://github.com/MCC45TR/uke-linux-docs/blob/main/PLAN.md), [hardware status](https://github.com/MCC45TR/uke-linux-docs/blob/main/DEVICE-STATUS.md) and [contribution rules](AGENTS.md). Firmware redistribution and licenses are handled separately from kernel source packages.
