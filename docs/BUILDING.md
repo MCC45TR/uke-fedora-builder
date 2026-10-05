@@ -19,7 +19,7 @@ The workspace image entry is `ukelinux.sh`. It uses the Fedora builder
 to produce local Core candidates; future accepted releases belong to `uke-linux-images`.
 Current image prerequisites and failed/corrected trials are in the
 [private engineering records](https://github.com/MCC45TR/uke-linux-docs).
-No Uke system image or physical boot acceptance is claimed here.
+Local filesystem acceptance is recorded separately from untested tablet boot.
 
 See [Core image construction](IMAGES.md) for the locked runtime closure,
 ESP32 debug profile, local filesystem checks and unresolved device release gates.

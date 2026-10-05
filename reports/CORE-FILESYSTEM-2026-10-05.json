@@ -75,5 +75,13 @@
   "host_cli_shellcheck_and_privacy_fixtures": "passed",
   "container_stage_output_ownership": "passed in host fixtures; target roots unchanged",
   "rootful_docker_end_to_end": "not-tested",
-  "native_aarch64_host_end_to_end": "not-tested"
+  "native_aarch64_host_end_to_end": "not-tested",
+  "standalone_public_clone": "passed: only the public builder submodule, self-test and offline dry-run; no private docs",
+  "publication_validation": {
+    "tested_source_revision": "d5c71ea5a1b36cdbd4a761ca7cdb0e15796fd307",
+    "builder_github_run": 37366343931,
+    "workspace_github_run": 37366511330,
+    "github_state_at_recording": "queued for runners",
+    "local_checks": "passed"
+  }
 }
