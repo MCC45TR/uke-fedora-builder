@@ -1,0 +1,21 @@
+name: Validate Fedora image recipes
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  host-contracts:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install host verification tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep g++ libext2fs-dev libselinux1-dev
+      - name: Validate scripts and admission contracts
+        run: |
+          shellcheck src/image/*.sh src/audit/*.sh tests/*.sh
+          bash tests/image-contract.sh
+          g++ -std=c++20 -O2 -Wall -Wextra -Werror src/image/ext4-labels.cpp -o /tmp/ext4-labels -lext2fs -lcom_err -lselinux

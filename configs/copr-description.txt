@@ -22,7 +22,7 @@ Material Decoration: explicitly requested stable upstream C++/Qt6 plugin;
 signed native payload/ELF checks passed. Plymouth-uke: original optional theme
 data, sized by the renderer, without activation or initramfs regeneration.
 
-Eleven real source families have automatic builds. Five non-KDE native source
+Twelve real source families have automatic builds. Five non-KDE native source
 families cover at-spi2-core, GStreamer, libaccounts-glib, libwacom and GNU
 libstdc++. Reviewed sources exclude optional Python tools. GNU C++ requires the
 complete original 6,100-symbol ABI and native smoke test; build 11077014 passed.
@@ -57,3 +57,10 @@ Fedora 45, openSUSE, native DEB and Alpine APK targets require separate validati
 
 Detailed package and policy documents are in the private documentation
 repository; access is required. Public status is available on the Uke landing page.
+
+Core debug inputs: signed uke-boot-integration and uke-esp32-cdc 0.1.0-3
+(native build 11080676) passed actual release-1 to release-3 upgrade, subpackage
+installation and removal in isolated AArch64 userspace. The ESP32 is a USB
+device, the tablet a USB host. The Core profile uses HID VT2 input and a single
+real-root CDC journal writer. Packages enable no debug service by themselves.
+Physical enumeration and the owner's existing bridge firmware are unverified.

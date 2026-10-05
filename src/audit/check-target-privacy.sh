@@ -1,14 +1,43 @@
 #!/usr/bin/env bash
 # Host-side privacy gate for extracted tablet payloads. Never runs target files.
 set -euo pipefail
-[[ $# == 1 && -d $1 ]] || { echo 'Usage: check-target-privacy.sh EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
+allowlist=''
+if [[ ${1:-} == --namespace-policy ]]; then
+  [[ $# == 3 && -f $2 ]] || exit 2
+  allowlist=$2; shift 2
+fi
+[[ $# == 1 && -d $1 ]] || { echo 'Usage: scripts/check-target-privacy.sh [--namespace-policy PINNED_POLICY_JSON] EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
+for tool in realpath find readlink rg sha256sum cut mktemp; do
+  command -v "$tool" >/dev/null || { printf 'Missing host privacy tool: %s\n' "$tool" >&2; exit 2; }
+done
+if [[ -n $allowlist ]]; then command -v jq >/dev/null || exit 2; fi
 root=$(realpath -- "$1")
 failed=0
+matches=$(mktemp)
+trap 'rm -f "$matches"' EXIT
+# Do not convert scanner/tool failures into an empty successful result.
+# shellcheck disable=SC1003
+if rg -a -l --hidden --no-ignore --pcre2 \
+  -e '(?<![A-Za-z0-9_./-])/home/[^/\s\x00]+/' \
+  -e '(?<![A-Za-z0-9_./-])/Users/[^/\s\x00]+/' \
+  -e 'C:\\Users\\' "$root" > "$matches"; then :;
+else status=$?; ((status == 1)) || { echo 'Privacy scanner failed' >&2; exit 2; }; fi
 
 while IFS= read -r path; do
+  relative=${path#"$root/"}
+  if [[ -n $allowlist ]]; then
+    # Exact public SELinux namespace rules are required for user-home labeling.
+    # An altered file, unknown path or actual invoking host home is still denied.
+    expected=$(jq -er --arg path "$relative" '.files[] | select(.path==$path) | .sha256' "$allowlist" 2>/dev/null) || expected=''
+    if [[ -n $expected && $(sha256sum "$path" | cut -d ' ' -f1) == "$expected" ]]; then
+      if [[ -z ${SENEMOS_PRIVATE_HOST_HOME:-} ]] || ! rg -a -q -F -- "${SENEMOS_PRIVATE_HOST_HOME}/" "$path"; then
+        continue
+      fi
+    fi
+  fi
   printf 'Private absolute build path in target payload: %s\n' "${path#"$root/"}" >&2
   failed=1
-done < <(rg -a -l --hidden --no-ignore -e '/home/[^/[:space:]]+/' -e '/Users/[^/[:space:]]+/' -e 'C:[\\]Users[\\]' "$root" || true)
+done < "$matches"
 
 while IFS= read -r -d '' path; do
   link=$(readlink -- "$path")

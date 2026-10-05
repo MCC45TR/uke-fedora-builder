@@ -14,14 +14,15 @@ Fedora Rawhide AArch64 build, package and update infrastructure for POCO Pad X1 
 A Rawhide AArch64 root filesystem, firmware-specific boot artifacts and physical
 rollback validation are later milestones.
 
-The first user experience is a Fedora console. Desktop, graphics and media packages follow working kernel and boot paths. The target package closure is checked so no Python script or runtime runs on the tablet.
+The first user experience is a Fedora Core development console. Desktop, graphics and media packages follow working kernel and boot paths. The target package closure is checked so no Python script or runtime runs on the tablet.
 
 ## Local kernel builds
 
-The workspace root contains the single host entry `senemeos.sh`. Its first
+The kernel repository owns the standalone host entry `senemos.sh`. Its first
 implemented target is Fedora Rawhide AArch64 using the reviewed Linux 7.2.9
-Uke adaptation. Run `./senemeos.sh --build 7.2.9 --distro=fedora --test` from the
-workspace root. See [build rules and testing](docs/BUILDING.md) for prerequisites,
+Uke adaptation. Run `./senemos.sh --build 7.2.9 --distro=fedora --test` from that
+checkout, or `./senemos-uke-kernel/senemos.sh` from the workspace.
+See [build rules and testing](docs/BUILDING.md) for prerequisites,
 offline caching, recovery-build priority and the exact limits of compile/package
 evidence. Other distribution targets have explicit planned profiles.
 
@@ -35,7 +36,7 @@ The [package hub](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/PACKA
 maps the additional initial repositories and their readiness gates.
 There is no bootable Fedora Uke system image or physical acceptance claim.
 
-Eleven source families have automatic builds, including five non-KDE native
+Twelve source families have automatic builds, including five non-KDE native
 dependency families. KDE application derivatives were withdrawn after the
 owner prohibited cloning, forking or rebuilding them. Use original distribution
 applications. Their Python payloads currently block complete KDE admission.
@@ -52,3 +53,15 @@ See [local kernel acceptance](reports/KERNEL-7.2.9-RAWHIDE-2026-10-04.json),
 [recovery delivery](reports/RECOVERY-RAWHIDE-2026-10-04.json).
 
 See the [100-step platform plan](https://github.com/MCC45TR/uke-linux-docs/blob/main/PLAN.md), [hardware status](https://github.com/MCC45TR/uke-linux-docs/blob/main/DEVICE-STATUS.md) and [contribution rules](AGENTS.md). Firmware redistribution and licenses are handled separately from kernel source packages.
+
+## Core filesystem construction
+
+Run `./ukelinux.sh --build core --distro=fedora --test` from the Uke workspace.
+The [image guide](docs/IMAGES.md) describes the immutable base, 72 signed inputs,
+logical EXT4/ESP outputs, Core-only VT2/ESP32 debug profile and device release
+gates. [Signed boot/CDC package checks](reports/ESP32-CORE-PACKAGES-2026-10-05.json)
+cover native binaries, actual upgrades and removal; physical enumeration is open.
+
+The [first local Core candidate](reports/CORE-FILESYSTEM-2026-10-05.json) passed
+full EXT4/ESP/UKI and root/initramfs checks. Tablet boot, UEFI, actual geometry
+and USB/UFS/ESP32 acceptance remain open; image release assets are unpublished.

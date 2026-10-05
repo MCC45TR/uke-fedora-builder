@@ -1,0 +1,18 @@
+{
+  "rpms":[
+    {
+      "nevra":"fedora-release-identity-basic-46-0.1.noarch",
+      "action":"Install",
+      "reason":"User",
+      "repo_id":"@stored_transaction(ukeimagefedora)",
+      "package_path":".\/packages\/fedora-release-identity-basic-46-0.1.noarch.rpm"
+    },
+    {
+      "nevra":"fedora-release-identity-container-46-0.1.noarch",
+      "action":"Remove",
+      "reason":"User",
+      "repo_id":"@System"
+    }
+  ],
+  "version":"1.0"
+}

@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+root=$(cd "$(dirname "$0")/.." && pwd)
+# shellcheck source=../src/image/core.sh
+# shellcheck disable=SC1091
+source "$root/src/image/core.sh"
+reject() { if (image_main "$@") > /dev/null 2>&1; then echo 'Invalid image request accepted' >&2; exit 1; fi; }
+reject --build plasma --dry-run
+reject --distro debian --dry-run
+reject --release 45 --dry-run
+reject --jobs 0 --dry-run
+reject --jobs invalid --dry-run
+reject --jobs
+reject --unknown
+(image_main --build core --distro=fedora --jobs=8 --offline --dry-run) >/dev/null
+jq -e '.boot_tested==false and .hardware_tested==false and .physical_geometry_verified==false and .cdc.tablet_usb_role=="host" and .development_root_shell==true' "$root/configs/images/core-rawhide.json" >/dev/null
+for input in "$root"/manifests/images/core-*.json; do
+    jq -e 'all(.packages[]; (.sha256|test("^[a-f0-9]{64}$")) and (.file|test("^[A-Za-z0-9+_.~-]+\\.rpm$")) and (.url|startswith("https://")))' "$input" >/dev/null
+done
+fixture=$(mktemp -d); trap 'rm -rf "$fixture"' EXIT
+[[ $(package_manager fedora '') == dnf ]]
+[[ $(package_manager ubuntu debian) == apt ]]
+[[ $(package_manager opensuse-tumbleweed suse) == zypper ]]
+[[ $(package_manager arch '') == pacman ]]
+[[ $(package_manager postmarketos alpine) == apk ]]
+if package_manager unsupported ''; then exit 1; fi
+printf input > "$fixture/input"
+verify_cache "$fixture/input" "$(sha256sum "$fixture/input" | cut -d ' ' -f1)"
+if (verify_cache "$fixture/input" "$(printf corrupted | sha256sum | cut -d ' ' -f1)") >/dev/null 2>&1; then exit 1; fi
+if (verify_cache "$fixture/missing" "$(sha256sum "$fixture/input" | cut -d ' ' -f1)") >/dev/null 2>&1; then exit 1; fi
+bash "$root/tests/target-privacy-policy.sh"
+printf '%s\n' 'Image CLI, pinned-input corruption, profile gates and privacy fixtures passed'

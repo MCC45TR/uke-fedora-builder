@@ -41,9 +41,9 @@ For local signed-source builds:
 ```sh
 git clone --recurse-submodules https://github.com/MCC45TR/uke-linux.git
 cd uke-linux
-./senemeos.sh --build 7.2.9 --distro=fedora --test
-./senemeos.sh --build latest --distro=fedora
-./senemeos.sh --help
+./senemos-uke-kernel/senemos.sh --build 7.2.9 --distro=fedora --test
+./senemos-uke-kernel/senemos.sh --build latest --distro=fedora
+./senemos-uke-kernel/senemos.sh --help
 ```
 
 `lastest` is a `latest` alias. Offline builds reuse verified caches and prepared
@@ -87,3 +87,11 @@ built and audited; rendering and Uke display/session validation remain open.
 `xiaomi-uke-firmware` is not admitted until file-level source/license/hash and
 kernel-request gates pass. Initial hardware component repositories are listed
 in the package catalog; they do not advertise unsupported binaries.
+
+The signed `uke-boot-integration` and `uke-esp32-cdc` packages are Core image
+inputs and remain inactive after installation. The explicit development image
+selects tablet USB host / ESP32 USB device roles, HID input on VT2 and one CDC
+journal writer after switch-root. Native COPR 11080676 and signed release-1 to
+release-3 lifecycle checks passed. The existing bridge firmware, enabled Uke
+USB/UFS DT, UEFI handoff and physical boot remain unverified. See the
+[Core composition guide](https://github.com/MCC45TR/uke-fedora-builder/blob/main/docs/IMAGES.md).
