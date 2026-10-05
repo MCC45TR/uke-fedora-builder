@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Host-side scan of an already extracted target payload. Never runs target files.
 set -euo pipefail
-[[ $# == 1 && -d $1 ]] || { echo 'Usage: scripts/check-target-payload.sh EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
+[[ $# == 1 && -d $1 ]] || { echo 'Usage: check-target-payload.sh EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
 for tool in realpath find readlink head grep od tr readelf; do
   command -v "$tool" >/dev/null || { printf 'Missing host audit tool: %s\n' "$tool" >&2; exit 2; }
 done

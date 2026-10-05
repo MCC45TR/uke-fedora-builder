@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # Host-side privacy gate for extracted tablet payloads. Never runs target files.
 set -euo pipefail
-[[ $# == 1 && -d $1 ]] || { echo 'Usage: scripts/check-target-privacy.sh EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
+[[ $# == 1 && -d $1 ]] || { echo 'Usage: check-target-privacy.sh EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
 root=$(realpath -- "$1")
 failed=0
 
 while IFS= read -r path; do
   printf 'Private absolute build path in target payload: %s\n' "${path#"$root/"}" >&2
   failed=1
-done < <(rg -a -l --hidden --no-ignore -e '/home/[^/[:space:]]+/' -e '/Users/[^/[:space:]]+/' -e 'C:\\Users\\' "$root" || true)
+done < <(rg -a -l --hidden --no-ignore -e '/home/[^/[:space:]]+/' -e '/Users/[^/[:space:]]+/' -e 'C:[\\]Users[\\]' "$root" || true)
 
 while IFS= read -r -d '' path; do
   link=$(readlink -- "$path")
