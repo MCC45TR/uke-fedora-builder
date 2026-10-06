@@ -11,7 +11,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-ExecStartPre=/usr/bin/uke-boot-status --identity
+ExecCondition=/usr/bin/uke-boot-status --identity
 ExecStart=/usr/libexec/senemos-uke/uke-esp32-cdc --device /dev/ttyACM0
 Restart=always
 RestartSec=2

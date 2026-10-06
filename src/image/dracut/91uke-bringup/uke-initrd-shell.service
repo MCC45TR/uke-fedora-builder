@@ -11,7 +11,7 @@ ConditionPathExists=/dev/tty2
 
 [Service]
 Type=simple
-ExecStartPre=/usr/bin/uke-boot-status --identity
+ExecCondition=/usr/bin/uke-boot-status --identity
 ExecStart=/bin/sh -i
 StandardInput=tty-force
 StandardOutput=journal

@@ -43,11 +43,11 @@
       "package_path": "./packages/openssh-server-10.5p1-1.fc46.aarch64.rpm"
     },
     {
-      "nevra": "senemos-uke-linux-kernel-mainline-7.2.9-1.3.fc46.aarch64",
+      "nevra": "senemos-uke-linux-kernel-mainline-7.2.9-1.4.fc46.aarch64",
       "action": "Install",
       "reason": "Dependency",
       "repo_id": "@stored_transaction(uke)",
-      "package_path": "./packages/senemos-uke-linux-kernel-mainline-7.2.9-1.3.fc46.aarch64.rpm"
+      "package_path": "./packages/senemos-uke-linux-kernel-mainline-7.2.9-1.4.fc46.aarch64.rpm"
     },
     {
       "nevra": "plymouth-26.134.222-6.fc45.aarch64",
@@ -113,25 +113,25 @@
       "package_path": "./packages/util-linux-2.42.4-2.fc46.aarch64.rpm"
     },
     {
-      "nevra": "senemos-uke-linux-kernel-mainline-core-7.2.9-1.3.fc46.aarch64",
+      "nevra": "senemos-uke-linux-kernel-mainline-core-7.2.9-1.4.fc46.aarch64",
       "action": "Install",
       "reason": "Dependency",
       "repo_id": "@stored_transaction(uke)",
-      "package_path": "./packages/senemos-uke-linux-kernel-mainline-core-7.2.9-1.3.fc46.aarch64.rpm"
+      "package_path": "./packages/senemos-uke-linux-kernel-mainline-core-7.2.9-1.4.fc46.aarch64.rpm"
     },
     {
-      "nevra": "senemos-uke-linux-kernel-mainline-dtbs-7.2.9-1.3.fc46.aarch64",
+      "nevra": "senemos-uke-linux-kernel-mainline-dtbs-7.2.9-1.4.fc46.aarch64",
       "action": "Install",
       "reason": "Dependency",
       "repo_id": "@stored_transaction(uke)",
-      "package_path": "./packages/senemos-uke-linux-kernel-mainline-dtbs-7.2.9-1.3.fc46.aarch64.rpm"
+      "package_path": "./packages/senemos-uke-linux-kernel-mainline-dtbs-7.2.9-1.4.fc46.aarch64.rpm"
     },
     {
-      "nevra": "senemos-uke-linux-kernel-mainline-modules-7.2.9-1.3.fc46.aarch64",
+      "nevra": "senemos-uke-linux-kernel-mainline-modules-7.2.9-1.4.fc46.aarch64",
       "action": "Install",
       "reason": "Dependency",
       "repo_id": "@stored_transaction(uke)",
-      "package_path": "./packages/senemos-uke-linux-kernel-mainline-modules-7.2.9-1.3.fc46.aarch64.rpm"
+      "package_path": "./packages/senemos-uke-linux-kernel-mainline-modules-7.2.9-1.4.fc46.aarch64.rpm"
     },
     {
       "nevra": "plymouth-core-libs-26.134.222-6.fc45.aarch64",
