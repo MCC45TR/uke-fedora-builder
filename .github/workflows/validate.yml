@@ -13,9 +13,10 @@ jobs:
       - name: Install host verification tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep g++ libext2fs-dev libselinux1-dev
+          sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep device-tree-compiler g++ libext2fs-dev libselinux1-dev
       - name: Validate scripts and admission contracts
         run: |
           shellcheck src/image/*.sh src/audit/*.sh tests/*.sh
           bash tests/image-contract.sh
+          bash tests/kernel-dt-admission.sh
           g++ -std=c++20 -O2 -Wall -Wextra -Werror src/image/ext4-labels.cpp -o /tmp/ext4-labels -lext2fs -lcom_err -lselinux
