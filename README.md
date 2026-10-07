@@ -92,3 +92,49 @@ inside the recorded disposable ARM64 console image and
 `bash tests/qemu-first-console.sh KERNEL INITRD_ROOT OUTPUT BUILDER` inside
 the recorded native QEMU image. Freeze the test script before launching it;
 keep writable output separate from read-only source and payload mounts.
+
+## Stock ABL boot_b development route
+
+`./ukelinux.sh --build boot --distro=fedora --help` describes the additional
+host-only `fedora_boot.img` route. It builds a raw ARM64 kernel with a built-in
+Fedora debug initramfs and wraps it in Android boot v4. Aloha and ESP are not
+needed by this route. The debug target starts the existing identity-gated
+VT2/ESP32 services without mounting or switching to the internal Linux root.
+
+The first profile requires the qualified 13-patch 7.2.9 kernel, reviewed Core
+initramfs and an exact reviewed boot template. Android 17 EvolutionX is the
+default local template locator; OS3.0.304.0/303.0 global OEM templates remain
+separate explicit profiles. Refreshed Android properties and matching OTA
+metadata do not establish actual installed firmware bytes. Native C++ packing, linked
+initramfs byte checks, module configuration/export checks and payload audits
+run locally; no Python packer or tablet Python runtime is introduced.
+Other compiler jobs retain priority. `--dry-run`, `--offline` and `--self-test`
+are available. The script has no flashing or slot-control operation.
+
+The intended manual target is `fastboot flash boot_b fedora_boot.img` after
+separate device admission. The output is unsigned and its 96 MiB template size
+is not a live partition measurement. Matching stock vendor_boot_b/dtbo_b still
+supply DT. Actual DT/RAM handoff, ABL acceptance and physical ESP32/TTY remain
+open. A subsequent private TWRP capture established the live B capacity and
+retained its actual boot-chain backups, but found a mixed B firmware tuple.
+Its live stock root lacks the project identities required by the VT2/CDC gate;
+an unchanged stock DT would skip those services. A separately reviewed DT
+handoff is therefore required for first TTY. The independent project DTB stays
+separate. See the
+[operator guide](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/testing/FEDORA-BOOT-B.md)
+for build inputs, checks and preservation of the pre-test B image.
+
+The [October 7 boot candidate](reports/FEDORA-BOOT-B-2026-10-07.json) records
+the actual 96 MiB output, linked initramfs/module checks and matching QEMU
+result. The exact Image ignored a poison external ramdisk and conflicting
+command line. A foreign DT skipped the shell; a synthetic identity fixture
+accepted a VM USB keyboard command on VT2. A cache reuse build reproduced the
+same wrapper bytes. [New source DT inspection](reports/BOOT-SOURCE-DT-2026-10-07.json)
+keeps OEM 304 and EvolutionX alternatives separate and non-launchable.
+Native COPR [11090323](https://copr.fedorainfracloud.org/coprs/build/11090323)
+succeeded for the corrected full 13-patch kernel release 1.5. Its
+[signed native outputs](reports/COPR-KERNEL-1.5-2026-10-07.json) then passed
+all 1,146 module architecture/vermagic/symbol checks, clean 13-patch SRPM
+preparation, and actual AArch64 upgrade/removal/fresh-install/removal tests.
+The Core filesystem recipe still pins the earlier qualified native 1.4 tuple;
+no new full Core composition or tablet boot is implied by these package checks.

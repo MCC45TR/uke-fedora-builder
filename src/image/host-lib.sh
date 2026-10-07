@@ -104,8 +104,8 @@ heavy_busy() {
     local process comm group state_record
     for process in /proc/[0-9]*; do
         [[ -r $process/comm ]] || continue
-        IFS= read -r comm < "$process/comm" || continue
-        case $comm in make|gmake|ninja|ninja-build|soong_ui|ckati|clang|clang++|clang-[0-9]*|clang++-[0-9]*|cc1|cc1plus|ld.lld|ld.lld-[0-9]*|rustc) ;; *) continue;; esac
+        { IFS= read -r comm < "$process/comm"; } 2>/dev/null || continue
+        case $comm in make|gmake|ninja|ninja-build|soong_ui|soong_build|ckati|clang|clang++|clang-[0-9]*|clang++-[0-9]*|cc1|cc1plus|ld.lld|ld.lld-[0-9]*|rustc|payload-dumper-*|qemu-system-*) ;; *) continue;; esac
         IFS= read -r state_record < "$process/stat" 2>/dev/null || continue
         state_record=${state_record##*) }
         case ${state_record%% *} in Z|X) continue;; esac

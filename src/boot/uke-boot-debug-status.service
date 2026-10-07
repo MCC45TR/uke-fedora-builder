@@ -1,0 +1,11 @@
+[Unit]
+Description=Uke built-in Fedora debug initramfs status
+DefaultDependencies=no
+After=systemd-journald.service systemd-udevd.service uke-initrd-shell.service
+ConditionPathExists=/etc/initrd-release
+
+[Service]
+Type=oneshot
+ExecStart=/bin/sh /usr/libexec/uke-boot-debug-status
+StandardOutput=journal+console
+StandardError=journal+console

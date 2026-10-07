@@ -1,0 +1,7 @@
+[Unit]
+Description=Uke Fedora boot_b initramfs development console
+DefaultDependencies=no
+Requires=sysinit.target
+After=sysinit.target
+Wants=systemd-journald.service systemd-udevd.service systemd-udev-trigger.service uke-initrd-shell.service uke-initrd-cdc.service uke-boot-debug-status.service
+AllowIsolate=yes
