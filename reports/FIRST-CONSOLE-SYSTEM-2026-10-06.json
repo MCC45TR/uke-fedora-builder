@@ -49,8 +49,9 @@
     "uefi_boot_tested": false
   },
   "core_profile_inputs_updated": true,
-  "new_complete_core_filesystem_composition": "pending",
+  "new_complete_core_filesystem_composition": "passed; separate October 7 filesystem record",
   "own_device_boot_tested": false,
   "physical_esp32_ufs_and_usb_tested": false,
-  "flash_performed": false
+  "flash_performed": false,
+  "new_complete_core_filesystem_record": "CORE-FILESYSTEM-2026-10-07.json"
 }

@@ -66,6 +66,12 @@ The [first local Core candidate](reports/CORE-FILESYSTEM-2026-10-05.json) passed
 full EXT4/ESP/UKI and root/initramfs checks. Tablet boot, UEFI, actual geometry
 and USB/UFS/ESP32 acceptance remain open; image release assets are unpublished.
 
+The [October 7 Core candidate](reports/CORE-FILESYSTEM-2026-10-07.json) repeats
+those checks with the signed native COPR 1.4 kernel, boot/CDC release 4,
+512 MiB ESP, 8 GiB Linux and 4096-byte FAT sectors. It records all 15,318 SELinux
+inode contexts and the stricter RAM inspection. These are recipe sizes;
+target capacity, firmware visibility and physical first TTY remain unverified.
+
 [First-TTY preparation](reports/FIRST-TTY-PREPARATION-2026-10-06.json) records
 dynamic fastboot-name image inputs, signed boot release 4 lifecycle checks and
 an actual gated VT2/CDC initramfs with ARM64 helper/library and payload audits.
