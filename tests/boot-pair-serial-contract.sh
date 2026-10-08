@@ -12,4 +12,11 @@ printf '\033[32mUKE_ROOT_ADMITTED\033[0m\r\n\033]3008;fixture\033\\\033P+q6E616D
 printf 'UKE_ROOT_ADMITTED\nrealrootok\nselinux=1\n' > "$fixture/expected"
 normalize "$fixture/serial" > "$fixture/actual"
 cmp "$fixture/expected" "$fixture/actual"
-echo 'Serial CSI/OSC/DCS and shared-line observation fixtures passed'
+tty_command_observed "$fixture/serial"
+printf 'localhost login: realrootok\r\n' > "$fixture/login"
+tty_command_observed "$fixture/login"
+for text in unrealrootok realrootokextra 'echo realrootok > /dev/ttyAMA0' realroot; do
+    printf '%s\n' "$text" > "$fixture/reject"
+    if tty_command_observed "$fixture/reject"; then echo 'Non-command marker accepted' >&2; exit 1; fi
+done
+echo 'Serial CSI/OSC/DCS, shared login line and marker-rejection fixtures passed'

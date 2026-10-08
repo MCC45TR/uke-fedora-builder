@@ -64,7 +64,7 @@ for name in correct wrong-partname wrong-uuid; do
         done
         entered=0
         for ((i=0;i<15;++i)); do
-            if normalize "$log" | grep -Fx realrootok >/dev/null; then entered=1; break; fi
+            if tty_command_observed "$log"; then entered=1; break; fi
             sleep 1
         done
         ((entered)) || { echo 'Real-root local TTY keyboard command not observed' >&2; exit 1; }
