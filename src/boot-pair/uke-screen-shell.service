@@ -1,0 +1,23 @@
+[Unit]
+Description=Uke Fedora local development terminal on the tablet screen
+After=systemd-user-sessions.service
+ConditionKernelCommandLine=senemos.debug=cdc-acm
+Conflicts=getty@tty1.service
+
+[Service]
+ExecCondition=/usr/bin/uke-boot-status --identity
+ExecStart=/usr/libexec/uke-screen-shell
+StandardInput=tty-force
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+TTYVTDisallocate=no
+Environment=TERM=linux
+Restart=always
+RestartSec=2
+KillSignal=SIGHUP
+
+[Install]
+WantedBy=multi-user.target

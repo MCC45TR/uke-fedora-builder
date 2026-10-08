@@ -1,0 +1,14 @@
+[Unit]
+Description=Admit only the Fedora image in the linux partition
+DefaultDependencies=no
+After=systemd-udev-trigger.service
+Before=sysroot.mount
+OnFailure=emergency.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/uke-root-guard
+TimeoutStartSec=55
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console

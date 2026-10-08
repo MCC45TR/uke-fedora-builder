@@ -1,0 +1,14 @@
+[Unit]
+Description=Record the real Fedora root transition
+After=local-fs.target
+Before=uke-screen-shell.service
+
+[Service]
+Type=oneshot
+ExecCondition=/usr/bin/uke-boot-status --identity
+ExecStart=/usr/libexec/uke-root-status
+StandardOutput=journal+console
+StandardError=journal+console
+
+[Install]
+WantedBy=multi-user.target

@@ -95,6 +95,22 @@ keep writable output separate from read-only source and payload mounts.
 
 ## Stock ABL boot_b development route
 
+`./ukelinux.sh --build boot-pair --distro=fedora --help` describes the new
+two-image development recipe for `boot_b` and a separate GPT partition named
+`linux`. It prepares a root-capable built-in initramfs, source-pinned adaptation
+of the bootloader-selected DT and a local tablet-screen TTY candidate. The
+host builder never changes GPT, Android userdata, slots, init_boot, vendor_boot
+or dtbo. Actual Image/modules/DTB compilation, all 1,146 module byte comparisons
+against signed COPR release 1.5 and the linked initramfs check have passed.
+EXT4 labeling/readback and full sparse decode checks have passed. A generic
+ARM64 diagnostic VM reached the enforcing Fedora root and executed a local
+TTY keyboard command; the final frozen recipe and negative-root cases are
+under revalidation. Physical ABL, UFS, screen and input acceptance are separate
+owner-test gates.
+See the [paired-image operator guide](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/testing/FEDORA-BOOT-PAIR.md)
+for coordinated UUIDs, the separate GPT `linux` prerequisite and rollback.
+Do not substitute the older initramfs-only image for this root-capable pair.
+
 `./ukelinux.sh --build boot --distro=fedora --help` describes the additional
 host-only `fedora_boot.img` route. It builds a raw ARM64 kernel with a built-in
 Fedora debug initramfs and wraps it in Android boot v4. Aloha and ESP are not

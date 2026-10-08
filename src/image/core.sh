@@ -12,6 +12,7 @@ help() {
 Senemos Uke Fedora Core filesystem builder (host only)
 Usage: ./ukelinux.sh --build core --distro=fedora [options]
        ./ukelinux.sh --build boot --distro=fedora --help
+       ./ukelinux.sh --build boot-pair --distro=fedora --help
   --release rawhide  Reviewed first target (default)
   --jobs N           At most two CPUs; defaults to two
   --esp-size N       ESP filesystem size in MiB (default 256; minimum 128)
@@ -73,11 +74,19 @@ recipe_hash() {
         "$dir"/configs/keys/*.asc | sha256sum | cut -d ' ' -f1
 }
 image_main() {
-    local boot_target=0 prior='' argument
+    local boot_target=0 pair_target=0 prior='' argument
     for argument in "$@"; do
+        if [[ $argument == --build=boot-pair || ($prior == --build && $argument == boot-pair) ]]; then pair_target=1; fi
         if [[ $argument == --build=boot || ($prior == --build && $argument == boot) ]]; then boot_target=1; fi
         prior=$argument
     done
+    if ((pair_target)); then
+        # shellcheck source=../boot-pair/entry.sh
+        # shellcheck disable=SC1091
+        source "$BUILDER/src/boot-pair/entry.sh"
+        pair_main "$@"
+        return
+    fi
     if ((boot_target)); then
         # shellcheck source=../boot/entry.sh
         # shellcheck disable=SC1091
