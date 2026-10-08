@@ -10,10 +10,9 @@ dtc -q -I dtb -O dtb -o "$out/virt.dtb" "$out/virt-dump.dtb"
 fdtput -t s "$out/virt.dtb" / compatible linux,dummy-virt xiaomi,uke qcom,sm7675
 vm_pid=''
 trap '[[ -z $vm_pid ]] || kill "$vm_pid" 2>/dev/null || true' EXIT
-normalize() {
-    local escape=$'\033'
-    tr -d '\r' < "$1" | sed -E "s/${escape}\\[[0-?]*[ -/]*[@-~]//g;s/${escape}M//g"
-}
+# shellcheck source=../src/boot-pair/serial-normalize.sh
+# shellcheck disable=SC1091
+source "$(dirname "$0")/../src/boot-pair/serial-normalize.sh"
 qmp() {
     printf '%s\n' "$1" >&3
     local response
