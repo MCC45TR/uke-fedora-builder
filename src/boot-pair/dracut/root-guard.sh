@@ -9,16 +9,20 @@ esac
 case "$uuid" in *[!a-f0-9-]*) exit 1;; esac
 selected=/dev/disk/by-uuid/$uuid
 attempt=0
+read -r uptime _ < /proc/uptime
+started=${uptime%%.*}
 while [ "$attempt" -lt 45 ]; do
     count=0
     candidate=''
     for metadata in /sys/class/block/*/uevent; do
         [ -r "$metadata" ] || continue
-        grep -Fx PARTNAME=linux "$metadata" >/dev/null || continue
-        count=$((count + 1))
+        name='' device=''
         while IFS='=' read -r key value; do
-            [ "$key" != DEVNAME ] || candidate=/dev/$value
+            case "$key" in PARTNAME) name=$value;; DEVNAME) device=$value;; esac
         done < "$metadata"
+        [ "$name" = linux ] || continue
+        count=$((count + 1))
+        candidate=/dev/$device
     done
     if [ "$count" -gt 1 ]; then
         echo 'UKE_ROOT_REJECTED: multiple linux partitions' >&2; exit 1
@@ -35,6 +39,8 @@ while [ "$attempt" -lt 45 ]; do
         exit 0
     fi
     attempt=$((attempt + 1))
+    read -r uptime _ < /proc/uptime
+    [ "$(( ${uptime%%.*} - started ))" -lt 45 ] || break
     sleep 1
 done
 echo 'UKE_ROOT_REJECTED: matching linux partition unavailable' >&2
