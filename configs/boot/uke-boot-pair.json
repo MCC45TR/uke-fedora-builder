@@ -1,0 +1,56 @@
+{
+  "schema_version": 1,
+  "device": "uke",
+  "distribution": "fedora",
+  "release": "rawhide",
+  "mode": "stock-abl-ext4-root",
+  "default_boot_template": "android17-evolutionx-12.1",
+  "boot_templates": [
+    {
+      "id": "global-os3.0.303.0",
+      "source_class": "OEM-global",
+      "sha256": "efdee1d4e1acd7f6e77615330dbcb045caeeccad8568d89fa6abd627f606e77f",
+      "bytes": 100663296
+    },
+    {
+      "id": "global-os3.0.304.0",
+      "source_class": "OEM-global",
+      "sha256": "1eaf4858a7c70bee9b663b485f3192b164738bbdae3edbb986a5419621c8ef30",
+      "bytes": 100663296
+    },
+    {
+      "id": "android17-evolutionx-12.1",
+      "source_class": "community-ROM",
+      "sha256": "b8da3f7d9c54bba2a0cf6fc72af0df14e7f2993b251ffd2390bfa693d46d2b45",
+      "bytes": 100663296
+    }
+  ],
+  "boot_partition_bytes": 100663296,
+  "header_version": 4,
+  "kernel_release": "7.2.9-senemos-uke",
+  "patch_count": 13,
+  "kernel_manifest_sha256": "a545fe2f6029346bbf1cb34b115b07a29f0933064151116328e1f8364f9fae54",
+  "kernel_config_sha256": "e2995d52f963778ba13e48329dad9fb8fbcd784b6c7a43e97ec1a2940ab020ac",
+  "base_kernel_image_sha256": "5eacec7505f85df39df868c5a9e81274cf55bbaf6ee8d91e71fd827eba80c56c",
+  "kernel_rpm_spec_sha256": "c1db3c429f3f9856493bd05b08e886a9c46346052de22d43144ef9e0c9154ad8",
+  "base_module_symvers_sha256": "fa28dccf8b45ea718d318cb772f002004a0125abb18e8cea390977fd654f754e",
+  "host_tool_image": "40c9868d08bbad2cb58312fd4c8295ec2a3f132f95bd0eb150a45e05160c2866",
+  "kernel_tool_image": "a6fb262f41c060702100f704f5c63ac48957682e84befb0812f08e248f2bec7e",
+  "qemu_tool_image": "9a044f1e709a13ab768bfad155ce969e5ae637ea2378b7277fbc2fad358daaf6",
+  "external_initramfs": "ignored-by-CONFIG_INITRAMFS_FORCE",
+  "dt_source": "bootloader-selected-stock-FDT-with-built-in-reviewed-provider-adaptation",
+  "dt_handoff_verified": false,
+  "avb_state": "unsigned-no-footer",
+  "boot_tested": false,
+  "hardware_tested": false,
+  "root_size_mib": 3072,
+  "core_prepared_root_sha256": "33a2343d17d1f4e588737aab704b93277e4bef4f4e6b3efe01341cc4a844ecd2",
+  "root_tool_image": "9e787753723cc715b6d46fabb9f7b17ceb5195d269224a3f8262fd47a05833ad",
+  "root_selector": "UUID-and-PARTNAME-linux",
+  "system_format": "android-sparse-raw-and-fill-only",
+  "partition_changes": [
+    "boot_b",
+    "linux"
+  ],
+  "display": "simplefb-O82-3200x2136-from-runtime-splash-reservation"
+}

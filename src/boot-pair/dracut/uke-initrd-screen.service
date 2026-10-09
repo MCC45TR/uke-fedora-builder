@@ -1,0 +1,21 @@
+[Unit]
+Description=Uke early local development terminal while admitting the Fedora root
+DefaultDependencies=no
+After=systemd-udev-trigger.service
+Before=initrd-switch-root.target
+Conflicts=initrd-switch-root.target
+ConditionKernelCommandLine=senemos.debug=cdc-acm
+
+[Service]
+ExecCondition=/usr/bin/uke-boot-status --identity
+ExecStart=-/bin/sh -i
+StandardInput=tty-force
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/tty1
+TTYReset=yes
+TTYVHangup=yes
+Environment=TERM=linux
+KillSignal=SIGHUP
+Restart=always
+RestartSec=2
