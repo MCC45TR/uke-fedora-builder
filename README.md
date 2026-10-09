@@ -102,11 +102,14 @@ of the bootloader-selected DT and a local tablet-screen TTY candidate. The
 host builder never changes GPT, Android userdata, slots, init_boot, vendor_boot
 or dtbo. Actual Image/modules/DTB compilation, all 1,146 module byte comparisons
 against signed COPR release 1.5 and the linked initramfs check have passed.
-EXT4 labeling/readback and full sparse decode checks have passed. A generic
-ARM64 diagnostic VM reached the enforcing Fedora root and executed a local
-TTY keyboard command; the final frozen recipe and negative-root cases are
-under revalidation. Physical ABL, UFS, screen and input acceptance are separate
-owner-test gates.
+The [October 9 paired-image result](reports/FEDORA-BOOT-PAIR-2026-10-09.json)
+records completed EXT4 labeling/readback, independent Android sparse decoding
+and verified cache reuse. The exact Image reached the real enforcing Fedora
+root in generic ARM64 QEMU and executed a local TTY keyboard command. Separate
+wrong-partition-name and wrong-UUID cases were rejected. The local owner-test
+delivery contains a 96 MiB boot image and a 556.23 MiB sparse system image
+representing a 3 GiB filesystem. Physical ABL, UFS, screen and input acceptance
+remain separate owner-test gates; no public binary release is claimed.
 See the [paired-image operator guide](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/testing/FEDORA-BOOT-PAIR.md)
 for coordinated UUIDs, the separate GPT `linux` prerequisite and rollback.
 Do not substitute the older initramfs-only image for this root-capable pair.
