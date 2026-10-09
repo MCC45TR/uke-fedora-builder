@@ -114,6 +114,18 @@ See the [paired-image operator guide](https://github.com/MCC45TR/uke-linux-docs/
 for coordinated UUIDs, the separate GPT `linux` prerequisite and rollback.
 Do not substitute the older initramfs-only image for this root-capable pair.
 
+Before the owner's manual trial, run
+`./ukelinux.sh --check-device --pair DELIVERY_DIRECTORY` from the workspace.
+This verifies all nine delivery checksums, manifest/VM agreement, coordinated
+root UUID and 3 GiB sparse header, then performs bounded read-only inventory
+on one ADB or fastboot transport. Bootloader inventory checks Uke identity,
+slot A, unlock state, `boot_b`/`linux` capacity and a non-logical `linux` target.
+ADB can inspect physical-partition sysfs but still requires the bootloader
+check. `--offline` only verifies local files; `--report NEW_FILE` saves a private
+JSON result without unit identifiers or raw output. Exit 2 means device
+prerequisites are unavailable. The check performs no device writes and cannot
+establish backups, working Android return, physical boot or screen output.
+
 `./ukelinux.sh --build boot --distro=fedora --help` describes the additional
 host-only `fedora_boot.img` route. It builds a raw ARM64 kernel with a built-in
 Fedora debug initramfs and wraps it in Android boot v4. Aloha and ESP are not

@@ -37,4 +37,6 @@ verify_cache "$fixture/input" "$(sha256sum "$fixture/input" | cut -d ' ' -f1)"
 if (verify_cache "$fixture/input" "$(printf corrupted | sha256sum | cut -d ' ' -f1)") >/dev/null 2>&1; then exit 1; fi
 if (verify_cache "$fixture/missing" "$(sha256sum "$fixture/input" | cut -d ' ' -f1)") >/dev/null 2>&1; then exit 1; fi
 bash "$root/tests/target-privacy-policy.sh"
+bash "$root/tests/device-preflight-contract.sh"
+if command -v shellcheck >/dev/null 2>&1; then shellcheck "$root/src/device/preflight.sh"; fi
 printf '%s\n' 'Image CLI, pinned-input corruption, profile gates and privacy fixtures passed'
