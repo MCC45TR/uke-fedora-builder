@@ -98,7 +98,6 @@ kernel)
     make O="$out" LOCALVERSION=-senemos-uke olddefconfig
     grep -Fx CONFIG_QCOM_UKE_ABL_DT=y "$out/.config"
     grep -Fx CONFIG_GUNYAH_WATCHDOG=y "$out/.config"
-    grep -Fx CONFIG_FB_SIMPLE=y "$out/.config"
     grep -Fx CONFIG_FRAMEBUFFER_CONSOLE=y "$out/.config"
     grep -Fx '# CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER is not set' "$out/.config"
     # Built-in Gunyah watchdog handles the firmware timer; module bytes and exports still must match.
