@@ -63,6 +63,7 @@ audit-initramfs)
     for name in ufs_qcom phy_qcom_qmp_ufs dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke g_serial usb_f_acm u_serial; do
         modinfo -b /job/initramfs-root -k "$release" "$name" >/dev/null
     done
+    bash /builder/src/boot-pair/check-initramfs-modules.sh /job/initramfs-root /job/root "$release"
     bash /builder/src/audit/check-target-payload.sh /job/initramfs-root
     bash /builder/src/audit/check-target-privacy.sh /job/initramfs-root
     bash /builder/src/audit/check-target-payload.sh /job/root
