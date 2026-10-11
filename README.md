@@ -14,7 +14,7 @@ Fedora Rawhide AArch64 build, package and update infrastructure for POCO Pad X1 
 A local Rawhide AArch64 Core filesystem candidate has passed composition checks.
 Firmware-specific boot and physical rollback validation remain open.
 
-The first user experience is a Fedora Core development console. Desktop, graphics and media packages follow working kernel and boot paths. The target package closure is checked so no Python script or runtime runs on the tablet.
+The first user experience is a Fedora Core development console. Desktop, graphics and media packages follow working kernel and boot paths. Core and early-initramfs payloads reject Python. The owner permits a separate exception only for original signed Fedora KDE dependencies; project startup, services and tests remain native or shell.
 
 ## Local kernel builds
 
@@ -39,7 +39,8 @@ There is no bootable Fedora Uke system image or physical acceptance claim.
 Twelve source families have automatic builds, including five non-KDE native
 dependency families. KDE application derivatives were withdrawn after the
 owner prohibited cloning, forking or rebuilding them. Use original distribution
-applications. Their Python payloads currently block complete KDE admission.
+applications. The owner-authorized original KDE dependency exception is audited
+separately and does not relax Core or early-initramfs payload checks.
 Desktop release 3 carries policy metadata only. The GNU C++ source correction
 retained all 6,100 original exports and passed a native AArch64 C++ smoke test.
 The [52-input console selection](reports/CONSOLE-RAWHIDE-2026-10-05.json) passed
