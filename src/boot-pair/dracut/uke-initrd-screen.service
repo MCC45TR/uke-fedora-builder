@@ -1,6 +1,7 @@
 [Unit]
 Description=Uke early local development terminal while admitting the Fedora root
 DefaultDependencies=no
+IgnoreOnIsolate=yes
 After=systemd-udev-trigger.service
 Before=initrd-switch-root.target
 Conflicts=initrd-switch-root.target

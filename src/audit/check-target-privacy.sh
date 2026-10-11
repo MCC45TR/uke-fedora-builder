@@ -18,7 +18,7 @@ trap 'rm -f "$matches"' EXIT
 # Do not convert scanner/tool failures into an empty successful result.
 # shellcheck disable=SC1003
 if rg -a -l --hidden --no-ignore --pcre2 \
-  -e '(?<![A-Za-z0-9_./-])/home/[^/\s\x00]+/' \
+  -e '(?<![A-Za-z0-9_./-])/home/[^/:\s\x00]+/' \
   -e '(?<![A-Za-z0-9_./-])/Users/[^/\s\x00]+/' \
   -e 'C:\\Users\\' "$root" > "$matches"; then :;
 else status=$?; ((status == 1)) || { echo 'Privacy scanner failed' >&2; exit 2; }; fi
@@ -26,7 +26,7 @@ else status=$?; ((status == 1)) || { echo 'Privacy scanner failed' >&2; exit 2; 
 while IFS= read -r path; do
   relative=${path#"$root/"}
   if [[ -n $allowlist ]]; then
-    # Exact public SELinux namespace rules are required for user-home labeling.
+    # Exact reviewed public namespace files may contain non-private home prefixes.
     # An altered file, unknown path or actual invoking host home is still denied.
     expected=$(jq -er --arg path "$relative" '.files[] | select(.path==$path) | .sha256' "$allowlist" 2>/dev/null) || expected=''
     if [[ -n $expected && $(sha256sum "$path" | cut -d ' ' -f1) == "$expected" ]]; then

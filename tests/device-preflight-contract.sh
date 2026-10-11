@@ -29,7 +29,7 @@ set -eu
 printf '%s\n' "$*" >> "$PREFLIGHT_LOG"
 if [[ $* == devices ]]; then
     case $PREFLIGHT_CASE in
-        none|adb|unauthorized) exit 0;;
+        none|adb|recovery|unauthorized) exit 0;;
         multiple) printf 'fixture-one fastboot\nfixture-two fastboot\n';;
         *) printf 'fixture-one fastboot\n';;
     esac
@@ -49,7 +49,11 @@ case $key in
         case $PREFLIGHT_CASE in missing-linux) exit 1;; small-linux) value=1048576;; huge) value=999999999999999999999999999999;; esac;;
     *) exit 99;;
 esac
-printf '(bootloader) %s: %s\n' "$key" "$value" >&2
+if [[ $PREFLIGHT_CASE == whitespace ]]; then
+    printf '%s:  %s  \n' "$key" "$value" >&2
+else
+    printf '(bootloader) %s: %s\n' "$key" "$value" >&2
+fi
 [[ $PREFLIGHT_CASE != duplicate ]] || printf '(bootloader) %s: %s\n' "$key" "$value" >&2
 MOCK
 cat > "$fixture/bin/adb" <<'MOCK'
@@ -59,7 +63,9 @@ printf '%s\n' "$*" >> "$PREFLIGHT_LOG"
 if [[ $* == 'devices -l' ]]; then
     printf 'List of devices attached\n'
     case $PREFLIGHT_CASE in
-        adb) printf 'private-serial device product:uke model:private device:uke transport_id:7\n';;
+        adb|recovery)
+            state=device; [[ $PREFLIGHT_CASE != recovery ]] || state=recovery
+            printf 'private-serial %s product:uke model:private device:uke transport_id:7\n' "$state";;
         unauthorized) printf 'private-serial unauthorized transport_id:7\n';;
     esac
     exit 0
@@ -80,15 +86,45 @@ run_check() {
 }
 run_check 0 --offline
 [[ ! -s $PREFLIGHT_LOG ]]
+# Keep the sealed historical UUID pair inspectable, and verify the new name
+# selector against resealed VM evidence rather than accepting either blindly.
+cp "$pair/qemu/result.json" "$fixture/original-qemu"
+jq 'del(.wrong_filesystem_uuid_rejected) | .changed_filesystem_uuid_accepted=true | .wrong_filesystem_type_rejected=true | .duplicate_partition_name_rejected=true' "$fixture/original-qemu" > "$pair/qemu/result.json"
+name_manifest() {
+    jq --slurpfile result "$pair/qemu/result.json" --arg vm "$(sha256sum "$pair/qemu/result.json" | cut -d ' ' -f1)" \
+        '.profile.root_selector="PARTNAME-linux" | .profile.kernel_command_line="root=PARTLABEL=linux rw" |
+         .qemu_evidence={sha256:$vm,result:$result[0]}' "$fixture/original-manifest" > "$pair/manifest.json"
+    checksums
+}
+name_manifest
+run_check 0 --offline
+jq '.profile.kernel_command_line="root=UUID=03ea9569-c96d-cb08-0a64-53c6f816aa32 rw"' "$pair/manifest.json" > "$fixture/invalid-selector"
+mv "$fixture/invalid-selector" "$pair/manifest.json"
+checksums
+run_check 1 --offline
+for field in changed_filesystem_uuid_accepted wrong_filesystem_type_rejected duplicate_partition_name_rejected; do
+    cp "$pair/qemu/result.json" "$fixture/name-qemu"
+    jq --arg field "$field" '.[$field]=false' "$fixture/name-qemu" > "$pair/qemu/result.json"
+    name_manifest
+    run_check 1 --offline
+    cp "$fixture/name-qemu" "$pair/qemu/result.json"
+done
+cp "$fixture/original-qemu" "$pair/qemu/result.json"
+cp "$fixture/original-manifest" "$pair/manifest.json"
+checksums
 run_check 2
 jq -e '.transport=="unavailable"' "$fixture/result.json" >/dev/null
 PREFLIGHT_CASE=good run_check 0
 jq -e '.status=="bootloader-geometry-compatible-owner-checks-required" and .linux_bytes==3221225472' "$fixture/result.json" >/dev/null
+PREFLIGHT_CASE=whitespace run_check 0
+jq -e '.boot_b_bytes==100663296 and .linux_bytes==3221225472' "$fixture/result.json" >/dev/null
 for PREFLIGHT_CASE in multiple locked foreign slot-b fastbootd logical missing-linux small-linux small-boot duplicate huge unauthorized; do run_check 2; done
-PREFLIGHT_CASE=adb run_check 2
-jq -e '.transport=="adb" and .linux_physical_partition=="yes" and .linux_bytes==3221225472 and .blockers==["bootloader-fastboot-check-required"]' "$fixture/result.json" >/dev/null
-if rg -n 'private-serial|fixture-one|/home/|model:private' "$fixture/result.json"; then echo 'Private inventory leaked' >&2; exit 1; fi
-rg -F -- '-t 7 shell -T' "$PREFLIGHT_LOG" >/dev/null
+for PREFLIGHT_CASE in adb recovery; do
+    run_check 2
+    jq -e '.transport=="adb" and .linux_physical_partition=="yes" and .linux_bytes==3221225472 and .blockers==["bootloader-fastboot-check-required"]' "$fixture/result.json" >/dev/null
+    if rg -n 'private-serial|fixture-one|/home/|model:private' "$fixture/result.json"; then echo 'Private inventory leaked' >&2; exit 1; fi
+    rg -F -- '-t 7 shell -T' "$PREFLIGHT_LOG" >/dev/null
+done
 run_check 0 --offline --report "$fixture/report.json"
 [[ $(stat -c %a "$fixture/report.json") == 600 ]]
 run_check 1 --offline --report "$fixture/report.json"

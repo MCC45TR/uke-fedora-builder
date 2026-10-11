@@ -22,6 +22,8 @@ source)
     jq -S .source /job/inputs/kernel-manifest.json > /job/qualified-source.json
     cmp /job/prepared-source.json /job/qualified-source.json
     bash /kernel-recipe/src/boot/prepare-abl-source.sh "$source" /job/dt
+    bash /kernel-recipe/tests/boot-supplier-contract.sh "$source/drivers/regulator/qcom-rpmh-regulator-uke.c" \
+        "$source/drivers/iommu/arm/arm-smmu/arm-smmu-qcom.c"
     # The host test uses the exact same transform and vendored libfdt C code
     # as the kernel. It does not execute scripts from the source donor.
     gcc -std=gnu11 -O2 -Wall -Wextra -Werror -I "$source/scripts/dtc/libfdt" \
@@ -51,7 +53,11 @@ audit-initramfs)
     (cd /job/initramfs-root; gzip -cd /job/initramfs.cpio.gz | cpio -idm --quiet --no-absolute-filenames)
     [[ -s /job/initramfs-root/usr/lib/systemd/system/initrd-switch-root.service ]]
     [[ -L /job/initramfs-root/usr/lib/systemd/system/sysroot.mount.requires/uke-root-guard.service ]]
-    [[ -s /job/initramfs-root/etc/uke-boot-pair.uuid ]]
+    [[ ! -e /job/initramfs-root/etc/uke-boot-pair.uuid ]]
+    grep -F 'root=PARTLABEL=linux' /job/initramfs-root/etc/cmdline.d/*.conf
+    [[ -s /job/initramfs-root/usr/lib/systemd/system/uke-cdc-acm.service ]]
+    [[ -L /job/initramfs-root/usr/lib/systemd/system/initrd.target.wants/uke-cdc-shell.service ]]
+    [[ -s /job/initramfs-root/usr/lib/systemd/system/uke-cdc-shell.service.d/initrd.conf ]]
     [[ -x /job/initramfs-root/usr/libexec/uke-root-guard ]]
     for name in ufs_qcom phy_qcom_qmp_ufs dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke g_serial; do
         modinfo -b /job/initramfs-root -k "$release" "$name" >/dev/null
@@ -59,6 +65,14 @@ audit-initramfs)
     bash /builder/src/audit/check-target-payload.sh /job/initramfs-root
     bash /builder/src/audit/check-target-privacy.sh /job/initramfs-root
     bash /builder/src/audit/check-target-payload.sh /job/root
+    for unit in uke-usb-network uke-usb-network-shell; do
+        [[ -L /job/root/etc/systemd/system/multi-user.target.wants/$unit.service ]]
+    done
+    for unit in uke-cdc-acm uke-cdc-shell; do
+        [[ ! -e /job/root/etc/systemd/system/multi-user.target.wants/$unit.service ]]
+    done
+    cmp /job/root/usr/share/senemos/boot/uke/usb-network-managed.conf /job/root/etc/NetworkManager/conf.d/90-uke-usb-debug.conf
+    cmp /job/root/usr/share/senemos/boot/uke/uke-coresight-bringup.conf /job/root/usr/lib/modprobe.d/uke-coresight-bringup.conf
     bash /builder/src/audit/check-target-privacy.sh --namespace-policy /builder/configs/images/selinux-namespace-policy.json /job/root
     while IFS= read -r -d '' file; do
         if [[ $(od -An -tx1 -N4 "$file" | tr -d ' \n') == 7f454c46 ]]; then
@@ -77,14 +91,17 @@ kernel)
     cd "$source"
     scripts/config --file "$out/.config" --set-str INITRAMFS_SOURCE /job/initramfs.cpio.gz \
         --enable INITRAMFS_FORCE --enable CMDLINE_FORCE --disable CMDLINE_FROM_BOOTLOADER \
-        --enable QCOM_UKE_ABL_DT --set-str CMDLINE "$(jq -r .kernel_command_line "$profile")"
+        --enable QCOM_UKE_ABL_DT --enable GUNYAH_WATCHDOG \
+        --set-str CMDLINE "$(jq -r .kernel_command_line "$profile")"
     make O="$out" LOCALVERSION=-senemos-uke olddefconfig
     grep -Fx CONFIG_QCOM_UKE_ABL_DT=y "$out/.config"
+    grep -Fx CONFIG_GUNYAH_WATCHDOG=y "$out/.config"
     grep -Fx CONFIG_FB_SIMPLE=y "$out/.config"
     grep -Fx CONFIG_FRAMEBUFFER_CONSOLE=y "$out/.config"
     grep -Fx '# CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER is not set' "$out/.config"
-    grep '^CONFIG_' /job/inputs/base.config | grep -Ev '^CONFIG_(QCOM_UKE_ABL_DT|INITRAMFS_(SOURCE|FORCE|ROOT_UID|ROOT_GID|COMPRESSION_[A-Z0-9_]+)|CMDLINE|CMDLINE_FORCE|CMDLINE_FROM_BOOTLOADER)=' | sort > /job/base-module.config
-    grep '^CONFIG_' "$out/.config" | grep -Ev '^CONFIG_(QCOM_UKE_ABL_DT|INITRAMFS_(SOURCE|FORCE|ROOT_UID|ROOT_GID|COMPRESSION_[A-Z0-9_]+)|CMDLINE|CMDLINE_FORCE|CMDLINE_FROM_BOOTLOADER)=' | sort > /job/boot-module.config
+    # Built-in Gunyah watchdog handles the firmware timer; module bytes and exports still must match.
+    grep '^CONFIG_' /job/inputs/base.config | grep -Ev '^CONFIG_(QCOM_UKE_ABL_DT|GUNYAH_WATCHDOG|INITRAMFS_(SOURCE|FORCE|ROOT_UID|ROOT_GID|COMPRESSION_[A-Z0-9_]+)|CMDLINE|CMDLINE_FORCE|CMDLINE_FROM_BOOTLOADER)=' | sort > /job/base-module.config
+    grep '^CONFIG_' "$out/.config" | grep -Ev '^CONFIG_(QCOM_UKE_ABL_DT|GUNYAH_WATCHDOG|INITRAMFS_(SOURCE|FORCE|ROOT_UID|ROOT_GID|COMPRESSION_[A-Z0-9_]+)|CMDLINE|CMDLINE_FORCE|CMDLINE_FROM_BOOTLOADER)=' | sort > /job/boot-module.config
     cmp /job/base-module.config /job/boot-module.config
     diff -u /job/inputs/base.config "$out/.config" > /job/config-delta.txt || [[ $? == 1 ]]
     make O="$out" LOCALVERSION=-senemos-uke -j"$(cat /job/inputs/jobs)" Image modules dtbs

@@ -13,18 +13,26 @@ mkdir -p "$root" /job/tmp /job/empty-config
 tar --numeric-owner --same-owner --xattrs --xattrs-include='security.capability' -xf /job/inputs/prepared-root.tar -C "$root"
 packages=(/job/inputs/kernel/*.aarch64.rpm)
 [[ ${#packages[@]} == 4 ]]
+support=(/job/inputs/support/*.aarch64.rpm)
+[[ ${#support[@]} == 2 ]]
 rpmkeys --root "$root" --import /builder/configs/keys/uke-copr.asc
-for package in "${packages[@]}"; do
+for package in "${packages[@]}" "${support[@]}"; do
     rpmkeys --root "$root" --checksig "$package" | grep -F 'signatures OK'
 done
-rpm --root "$root" -Uvh --replacepkgs "${packages[@]}"
+rpm --root "$root" -Uvh --replacepkgs "${packages[@]}" "${support[@]}"
 rpm --root "$root" --restore senemos-uke-linux-kernel-mainline{,-core,-modules,-dtbs}
 rpm --root "$root" -V senemos-uke-linux-kernel-mainline{,-core,-modules,-dtbs}
+rpm --root "$root" --restore uke-boot-integration uke-esp32-cdc
+rpm --root "$root" -V uke-boot-integration uke-esp32-cdc
 rpm --root "$root" -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\n' | sort > /job/installed-rpms.tsv
 if cut -f1 /job/installed-rpms.tsv | grep -Ei 'python|pypy|libpython|^plasma-workspace$|^dolphin$'; then exit 1; fi
-uuid=$(cat /job/inputs/root-uuid)
-printf '%s\n' "$uuid" > "$root/etc/uke-boot-pair.uuid"
-printf 'UUID=%s / ext4 defaults 0 1\n' "$uuid" > "$root/etc/fstab"
+printf 'PARTLABEL=linux / ext4 defaults 0 1\n' > "$root/etc/fstab"
+profiles=$root/usr/share/senemos/boot/uke
+install -Dm644 "$profiles/machine-info" "$root/etc/machine-info"
+printf 'uke\n' > "$root/etc/hostname"
+install -Dm644 "$profiles/fastfetch.jsonc" "$root/etc/fastfetch/config.jsonc"
+install -Dm600 "$profiles/usb-network.nmconnection" "$root/etc/NetworkManager/system-connections/uke-usb-debug.nmconnection"
+install -Dm644 "$profiles/usb-network-managed.conf" "$root/etc/NetworkManager/conf.d/90-uke-usb-debug.conf"
 rm -f "$root/etc/systemd/system/sysinit.target.wants/debug-shell.service" \
     "$root/etc/systemd/system/multi-user.target.wants/uke-esp32-cdc-log.service" \
     "$root/etc/systemd/system/debug-shell.service.d/90-uke-core.conf"
@@ -32,6 +40,13 @@ ln -sfn /dev/null "$root/etc/systemd/system/getty@tty1.service"
 for unit in uke-screen-shell uke-cdc-shell uke-root-status; do
     install -Dm644 "/builder/src/boot-pair/$unit.service" "$root/usr/lib/systemd/system/$unit.service"
     mkdir -p "$root/etc/systemd/system/multi-user.target.wants"
+    if [[ $unit != uke-cdc-shell ]]; then
+        ln -sfn "/usr/lib/systemd/system/$unit.service" "$root/etc/systemd/system/multi-user.target.wants/$unit.service"
+    fi
+done
+rm -f "$root/etc/systemd/system/multi-user.target.wants/uke-cdc-shell.service" \
+    "$root/etc/systemd/system/multi-user.target.wants/uke-cdc-acm.service"
+for unit in uke-usb-network uke-usb-network-shell; do
     ln -sfn "/usr/lib/systemd/system/$unit.service" "$root/etc/systemd/system/multi-user.target.wants/$unit.service"
 done
 install -Dm755 /builder/src/boot-pair/screen-shell.sh "$root/usr/libexec/uke-screen-shell"
@@ -61,6 +76,7 @@ dracut --sysroot "$root" \
     --conf /dev/null --confdir /job/empty-config --tmpdir /job/tmp \
     --force --no-hostonly --no-hostonly-cmdline --no-early-microcode --gzip \
     --add uke-abl --kernel-cmdline "$(cat /job/inputs/kernel-cmdline)" \
+    --force-drivers 'ufs_qcom phy_qcom_qmp_ufs dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke i2c_qcom_geni gpi' \
     --filesystems ext4 --omit 'network plymouth crypt systemd-cryptsetup syslog lvm mdraid btrfs i18n' \
     /job/initramfs.cpio.gz "$release"
 [[ -s /job/initramfs.cpio.gz ]]

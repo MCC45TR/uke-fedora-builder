@@ -1,0 +1,10 @@
+[
+  {
+    "file": "uke-boot-integration-0.1.0-5.fc46.aarch64.rpm",
+    "sha256": "f76b4bf91a7e9caab2e4927a79a31ac4972091fa1d001e6d109c6610cfa8d28a"
+  },
+  {
+    "file": "uke-esp32-cdc-0.1.0-5.fc46.aarch64.rpm",
+    "sha256": "0cd7b70d7849f3b6d968ce7dbc7bccbde4b0d5b318920bb0352fc757f9bc1f3b"
+  }
+]

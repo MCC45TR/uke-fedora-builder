@@ -20,7 +20,7 @@ qmp() {
     while [[ $response == *'"event"'* ]]; do IFS= read -r -t 5 response <&3; done
     [[ $response == *'"return"'* ]]
 }
-for name in correct wrong-partname wrong-uuid; do
+for name in correct changed-uuid wrong-partname wrong-fstype duplicate-partname; do
     log=$out/$name.serial.log
     timeout --signal=TERM --kill-after=5s 240 qemu-system-aarch64 \
         -machine virt,gic-version=3 -cpu max -accel tcg,thread=single -m 1536 -smp 1 \
@@ -34,18 +34,18 @@ for name in correct wrong-partname wrong-uuid; do
     observed=0
     for ((i=0;i<210;++i)); do
         if [[ -s $log ]]; then
-            if [[ $name == correct ]] && grep -F UKE_FEDORA_EXT4_ROOT_READY "$log" >/dev/null &&
+            if [[ $name == correct || $name == changed-uuid ]] && grep -F UKE_FEDORA_EXT4_ROOT_READY "$log" >/dev/null &&
                grep -F 'pid1=/usr/lib/systemd/systemd' "$log" >/dev/null &&
                grep -F selinux=1 "$log" >/dev/null &&
                grep -F 'unit=uke-screen-shell ' "$log" | grep -F 'res=success' >/dev/null; then observed=1; break; fi
-            if [[ $name != correct ]] && grep -F UKE_ROOT_REJECTED "$log" >/dev/null; then observed=1; break; fi
+            if [[ $name != correct && $name != changed-uuid ]] && grep -F UKE_ROOT_REJECTED "$log" >/dev/null; then observed=1; break; fi
         fi
         kill -0 "$vm_pid" 2>/dev/null || break
         sleep 1
     done
     normalize "$log" > "$out/$name.status.txt"
     ((observed)) || { echo "Expected root result not observed: $name" >&2; exit 1; }
-    if [[ $name == correct ]]; then
+    if [[ $name == correct || $name == changed-uuid ]]; then
         grep -F UKE_ROOT_ADMITTED "$out/$name.status.txt" >/dev/null
         grep -F '/dev/vda1 ext4' "$out/$name.status.txt" >/dev/null
         grep -F 'pid1=/usr/lib/systemd/systemd' "$out/$name.status.txt" >/dev/null
@@ -75,6 +75,14 @@ for name in correct wrong-partname wrong-uuid; do
         sleep 5
         normalize "$log" > "$out/$name.status.txt"
         if grep -F UKE_FEDORA_EXT4_ROOT_READY "$out/$name.status.txt"; then echo 'Wrong root was admitted' >&2; exit 1; fi
+        grep -F UKE_PROBE_SNAPSHOT_BEGIN "$out/$name.status.txt" >/dev/null
+        grep -F 'UKE_PROBE_BUILD: boot-gunyah-wdt-v5' "$out/$name.status.txt" >/dev/null
+        grep -F 'UKE_PROBE_CMDLINE:' "$out/$name.status.txt" >/dev/null
+        grep -F UKE_PROBE_PROVIDER_ERRORS "$out/$name.status.txt" >/dev/null
+        grep -F UKE_PROBE_SNAPSHOT_END "$out/$name.status.txt" >/dev/null
+        if grep -Ei 'uke-root-guard.*(command not found|: not found)' "$out/$name.status.txt"; then
+            echo 'Root failure diagnostics require an absent command' >&2; exit 1
+        fi
         kill "$vm_pid" 2>/dev/null || true
         wait "$vm_pid" || true
         vm_pid=''
@@ -92,7 +100,9 @@ cat > "$out/result.json" <<JSON
   "selinux_enforcing": true,
   "local_tty_keyboard_command": true,
   "wrong_partition_name_rejected": true,
-  "wrong_filesystem_uuid_rejected": true,
+  "changed_filesystem_uuid_accepted": true,
+  "wrong_filesystem_type_rejected": true,
+  "duplicate_partition_name_rejected": true,
   "boot_tested": false,
   "hardware_tested": false
 }

@@ -1,5 +1,6 @@
 #!/bin/sh
 # Local development access deliberately enabled in this owner-test image.
+dmesg -n 4
 printf '\nFedora Rawhide on Uke — local development terminal\n'
 printf 'Kernel: '; uname -r
 printf 'Root: '; findmnt -n -o SOURCE,FSTYPE /

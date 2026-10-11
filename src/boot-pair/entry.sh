@@ -19,7 +19,7 @@ Usage: ./ukelinux.sh --build boot-pair --distro=fedora --device-dt FILE [options
 Outputs fedora_boot.img and system.img (Android sparse EXT4, explicit RAW/FILL
 coverage). Bootloader RAM/reservations are retained; embedded DT provider
 adaptation adds UFS, USB peripheral and a simplefb screen candidate. Root is
-admitted only when its image UUID and GPT partition name linux both match.
+admitted only from one physical GPT partition named linux containing ext4.
 No GPT changes, userdata writes, slot changes, flashing or init_boot/vendor_boot/
 dtbo replacement. Physical ABL/UFS/display/input acceptance remains owner-tested.
 HELP
@@ -35,7 +35,8 @@ pair_recipe_hash() {
         "$dir"/configs/images/selinux-namespace-policy.json \
         "$kernel"/src/boot/{uke-abl.c,prepare-abl-source.sh,sm7675-uke-ufs.dtso,sm7675-uke-usb2.dtso} \
         "$kernel"/src/boot/vendor/* \
-        "$kernel"/patches/boot/*.patch "$kernel"/tests/abl-dt-{check.cpp,contract.sh} | sha256sum | cut -d ' ' -f1
+        "$kernel"/patches/boot/*.patch "$kernel"/tests/abl-dt-{check.cpp,contract.sh} \
+        "$kernel"/tests/boot-supplier-contract.sh | sha256sum | cut -d ' ' -f1
 }
 pair_freeze_recipe() {
     local kernel=$1 recipe=$2
@@ -50,7 +51,8 @@ pair_freeze_recipe() {
         mkdir -p "$WORK/kernel-recipe/src" "$WORK/kernel-recipe/patches" "$WORK/kernel-recipe/tests"
         cp -a "$kernel/src/boot" "$WORK/kernel-recipe/src/"
         cp -a "$kernel/patches/boot" "$WORK/kernel-recipe/patches/"
-        cp -a "$kernel/tests/abl-dt-check.cpp" "$kernel/tests/abl-dt-contract.sh" "$WORK/kernel-recipe/tests/"
+        cp -a "$kernel/tests/abl-dt-check.cpp" "$kernel/tests/abl-dt-contract.sh" \
+            "$kernel/tests/boot-supplier-contract.sh" "$WORK/kernel-recipe/tests/"
     fi
     [[ $(pair_recipe_hash "$WORK/recipe" "$WORK/kernel-recipe") == "$recipe" ]] || die 'Source changed during recipe freeze'
     printf '%s\n' "$recipe" > "$WORK/inputs/recipe-sha256"
@@ -158,7 +160,7 @@ pair_main() {
     effective=$(jq -S --arg uuid "$uuid" \
         --arg stock "$(sha256sum "$stock" | cut -d ' ' -f1)" \
         '.root_uuid=$uuid | .stock_boot_sha256=$stock |
-         .kernel_command_line=("rdinit=/usr/lib/systemd/systemd root=UUID="+$uuid+" rw rootfstype=ext4 rootwait rd.retry=60 rd.timeout=65 rd.fstab=no rd.gpt-auto=no systemd.gpt_auto=no systemd.unit=multi-user.target senemos.debug=cdc-acm console=tty0 console=ttyAMA0 fbcon=map:0 fbcon=font:TER16x32 consoleblank=0 loglevel=7 panic=0 regulator_ignore_unused clk_ignore_unused pd_ignore_unused")' "$profile")
+         .kernel_command_line="rdinit=/usr/lib/systemd/systemd root=PARTLABEL=linux rw rootfstype=ext4 rootwait rd.retry=60 rd.timeout=65 rd.fstab=no rd.gpt-auto=no systemd.gpt_auto=no systemd.unit=multi-user.target senemos.debug=cdc-acm console=tty0 console=ttyAMA0 fbcon=map:0 fbcon=font:TER16x32 consoleblank=0 loglevel=7 panic=0 regulator_ignore_unused clk_ignore_unused pd_ignore_unused"' "$profile")
     WORK=$BUILDER/build/boot-pair/pair-${hash:0:16}
     if [[ -f $WORK/manifest.json ]]; then
         (cd "$WORK" || exit; sha256sum -c SHA256SUMS)
@@ -168,7 +170,8 @@ pair_main() {
                 '.kernel_sha256==$image and .test_script_sha256==$script and
                  .real_ext4_root_transition and .root_pid1_systemd and .selinux_enforcing and
                  .local_tty_keyboard_command and .wrong_partition_name_rejected and
-                 .wrong_filesystem_uuid_rejected and .boot_tested==false and .hardware_tested==false' \
+                 .changed_filesystem_uuid_accepted and .wrong_filesystem_type_rejected and
+                 .duplicate_partition_name_rejected and .boot_tested==false and .hardware_tested==false' \
                 "$WORK/qemu/result.json" >/dev/null || die 'Cached VM result is incomplete or belongs to different inputs'
             # The observer may have completed just before the host process
             # lost its receipt/final-manifest write. Its checked result is
@@ -186,7 +189,6 @@ pair_main() {
     mkdir -p "$WORK/recipe" "$WORK/kernel-recipe" "$WORK/inputs/kernel"
     pair_freeze_recipe "$kernel" "$recipe"
     printf '%s\n' "$effective" > "$WORK/inputs/profile.json"
-    jq -er .root_uuid "$WORK/inputs/profile.json" > "$WORK/inputs/root-uuid"
     jq -er .kernel_command_line "$WORK/inputs/profile.json" > "$WORK/inputs/kernel-cmdline"
     cp "$stock" "$WORK/inputs/stock-boot.img"
     cp "$artifact/build-manifest.json" "$WORK/inputs/kernel-manifest.json"
@@ -203,6 +205,12 @@ pair_main() {
         verify_cache "$kernel/referances/copr/11090323/$name" "$hash"
         cp "$kernel/referances/copr/11090323/$name" "$WORK/inputs/kernel/$name"
     done < <(jq -r '.[]|[.file,.sha256]|@tsv' "$BUILDER/configs/boot/uke-boot-pair-rpms.json")
+    mkdir -p "$WORK/inputs/support"
+    while IFS=$'\t' read -r name hash; do
+        local package=$BUILDER/../uke-linux-hardware-support/uke-boot/referances/copr/11108587/fedora-rawhide-aarch64/$name
+        verify_cache "$package" "$hash"
+        cp "$package" "$WORK/inputs/support/$name"
+    done < <(jq -r '.[]|[.file,.sha256]|@tsv' "$BUILDER/configs/boot/uke-boot-pair-support-rpms.json")
     mkdir -p "$WORK/inputs/host-rpms"
     while IFS=$'\t' read -r name hash; do
         verify_cache "$core/inputs/runtime/packages/$name" "$hash"

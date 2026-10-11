@@ -14,7 +14,8 @@ reject --kernel-cache
 reject --unknown
 (image_main --build boot-pair --offline --dry-run) | grep -F 'Two-image stock-ABL' >/dev/null
 (image_main --build=boot-pair --help) | grep -F system.img >/dev/null
-jq -e '.mode=="stock-abl-ext4-root" and .partition_changes==["boot_b","linux"] and .root_size_mib==3072 and .boot_tested==false and .hardware_tested==false' "$root/configs/boot/uke-boot-pair.json" >/dev/null
+jq -e '.mode=="stock-abl-ext4-root" and .root_selector=="PARTNAME-linux" and .partition_changes==["boot_b","linux"] and .root_size_mib==3072 and .boot_tested==false and .hardware_tested==false' "$root/configs/boot/uke-boot-pair.json" >/dev/null
+jq -e 'length==2 and ([.[].file]|sort)==["uke-boot-integration-0.1.0-5.fc46.aarch64.rpm","uke-esp32-cdc-0.1.0-5.fc46.aarch64.rpm"] and all(.[]; .sha256|test("^[a-f0-9]{64}$"))' "$root/configs/boot/uke-boot-pair-support-rpms.json" >/dev/null
 if rg -n '^\s*(fastboot|adb|dd .*of=/dev/|.*set-active)' "$root/src/boot-pair"; then echo 'Device mutation found' >&2; exit 1; fi
 # Resume must preserve the frozen recipe and reject tampering, including when
 # the development kernel has unrelated read-only Git objects below src/.
@@ -28,7 +29,7 @@ mkdir -p "$kernel/src/boot/vendor" "$kernel/src/upstream/.git/objects" "$kernel/
 touch "$kernel/src/boot/uke-abl.c" "$kernel/src/boot/prepare-abl-source.sh" \
     "$kernel/src/boot/sm7675-uke-ufs.dtso" "$kernel/src/boot/sm7675-uke-usb2.dtso" \
     "$kernel/src/boot/vendor/fdt_check.c" "$kernel/patches/boot/test.patch" \
-    "$kernel/tests/abl-dt-check.cpp" "$kernel/tests/abl-dt-contract.sh"
+    "$kernel/tests/abl-dt-check.cpp" "$kernel/tests/abl-dt-contract.sh" "$kernel/tests/boot-supplier-contract.sh"
 printf 'unrelated read-only source\n' > "$kernel/src/upstream/.git/objects/sentinel"
 chmod 444 "$kernel/src/upstream/.git/objects/sentinel"
 BUILDER=$root WORK=$fixture/job

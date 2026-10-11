@@ -111,13 +111,20 @@ delivery contains a 96 MiB boot image and a 556.23 MiB sparse system image
 representing a 3 GiB filesystem. Physical ABL, UFS, screen and input acceptance
 remain separate owner-test gates; no public binary release is claimed.
 See the [paired-image operator guide](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/testing/FEDORA-BOOT-PAIR.md)
-for coordinated UUIDs, the separate GPT `linux` prerequisite and rollback.
+for the root selector, separate GPT `linux` prerequisite and rollback.
 Do not substitute the older initramfs-only image for this root-capable pair.
+
+The October 11 recipe selects `root=PARTLABEL=linux`: exactly one physical
+GPT partition named `linux`, containing ext4. Its filesystem UUID is recorded
+as image metadata and is not an admission requirement. The historical October
+9 pair retains its original UUID contract and immutable receipts. The current
+initramfs also retains the local debug shell in emergency mode and reuses the
+CDC shell before root transition; early-initramfs CDC remains a separate physical gate.
 
 Before the owner's manual trial, run
 `./ukelinux.sh --check-device --pair DELIVERY_DIRECTORY` from the workspace.
 This verifies all nine delivery checksums, manifest/VM agreement, coordinated
-root UUID and 3 GiB sparse header, then performs bounded read-only inventory
+root-selection contract and 3 GiB sparse header, then performs bounded read-only inventory
 on one ADB or fastboot transport. Bootloader inventory checks Uke identity,
 slot A, unlock state, `boot_b`/`linux` capacity and a non-logical `linux` target.
 ADB can inspect physical-partition sysfs but still requires the bootloader
@@ -169,3 +176,32 @@ all 1,146 module architecture/vermagic/symbol checks, clean 13-patch SRPM
 preparation, and actual AArch64 upgrade/removal/fresh-install/removal tests.
 The Core filesystem recipe still pins the earlier qualified native 1.4 tuple;
 no new full Core composition or tablet boot is implied by these package checks.
+
+## First physical development console, 2026-10-11
+
+The separate stock-ABL pair profile now selects the unique physical
+`PARTLABEL=linux` EXT4 root, preserves the bootloader's RAM/reservations and
+adapts the reviewed UFS/USB suppliers. The owner observed a sustained screen
+TTY with the v5 Image plus scoped CoreSight autoload containment. Actual CDC,
+authenticated USB ECM SSH and a 16-MiB byte-matched round trip completed.
+The existing 64-GiB root was expanded without GPT changes. Wi-Fi, native GPU,
+touch, battery telemetry, USB host power and repeated cold boot remain open.
+
+The pair composer pins signed `uke-boot-integration` and `uke-esp32-cdc`
+0.1.0-5 from COPR build 11108587. It explicitly applies the owner-requested
+Xiaomi Pad 7 presentation and isolated USB debug profiles, including Fedora's
+required NetworkManager managed-device override. The root enables only the
+composite gadget units; serial-only units remain available as failure fallback
+and in the initramfs. This avoids scheduling conflicting root units together.
+Packages themselves enable no service and contain no credentials or SSH keys.
+
+The NVMEM reboot-reason overlay has native host trust-boundary tests and one
+physical `reboot bootloader` transition into bootloader fastboot. The matching
+candidate passed two RAM starts with automatic USB SSH; its `boot_b` write was
+read back byte-for-byte. Stock slot A and the existing root remain preserved.
+These results do not qualify unattended slot-B boot or all reboot modes.
+The original systemd command needs no wrapper. The ordinary COPR kernel RPM
+does not contain this embedded-initramfs stock-ABL boot profile, and DNF never
+writes `boot_b`. See the private
+[hardware audit](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/testing/FEDORA-HARDWARE-AUDIT-2026-10-11.md)
+for exact observed functions and remaining work.

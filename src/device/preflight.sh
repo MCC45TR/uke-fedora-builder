@@ -28,7 +28,7 @@ device_fastboot_value() {
         line=${line//$'\r'/}
         line=${line#'(bootloader) '}
         if [[ $line == "$key: "* ]]; then
-            value=${line#"$key: "}; ((count+=1))
+            read -r value <<< "${line#"$key:"}"; ((count+=1))
         fi
     done <<< "$raw"
     [[ $count == 1 ]] || return 1
@@ -66,7 +66,16 @@ device_pair_verify() {
         .profile.release=="rawhide" and .profile.root_size_mib==3072 and
         .profile.boot_partition_bytes==$boot_bytes and $boot_bytes==100663296 and
         (.profile.root_uuid|test("^[a-f0-9]{8}(-[a-f0-9]{4}){3}-[a-f0-9]{12}$")) and
-        (.profile.kernel_command_line|contains("root=UUID="+$uuid+" ")) and
+        (if .profile.root_selector=="PARTNAME-linux" then
+            (.profile.kernel_command_line|contains("root=PARTLABEL=linux ")) and
+            (.profile.kernel_command_line|contains("root=UUID=")|not) and
+            .qemu_evidence.result.changed_filesystem_uuid_accepted==true and
+            .qemu_evidence.result.wrong_filesystem_type_rejected==true and
+            .qemu_evidence.result.duplicate_partition_name_rejected==true
+         elif (.profile.root_selector // "UUID-and-PARTNAME-linux")=="UUID-and-PARTNAME-linux" then
+            (.profile.kernel_command_line|contains("root=UUID="+$uuid+" ")) and
+            .qemu_evidence.result.wrong_filesystem_uuid_rejected==true
+         else false end) and
         .sha256.boot==$boot and .sha256.system==$system and
         .checks.module_byte_match==1146 and .checks.no_python==true and .checks.privacy==true and
         .checks.sparse_roundtrip==true and .checks.full_sparse_logical_coverage==true and
@@ -75,7 +84,6 @@ device_pair_verify() {
         .qemu_evidence.result.root_pid1_systemd==true and .qemu_evidence.result.selinux_enforcing==true and
         .qemu_evidence.result.local_tty_keyboard_command==true and
         .qemu_evidence.result.wrong_partition_name_rejected==true and
-        .qemu_evidence.result.wrong_filesystem_uuid_rejected==true and
         .boot_tested==false and .hardware_tested==false and .flash_executed==false
         ' "$pair/manifest.json" >/dev/null || die 'Pair manifest or VM result is incompatible'
     # Read only the sparse header; the checksums bind the previously decoded
@@ -113,7 +121,7 @@ device_preflight_main() {
         if command -v adb >/dev/null 2>&1; then
             listing=$(timeout 8 adb devices -l 2>/dev/null) || listing=''
             while read -r serial row token; do
-                if [[ $row == device ]]; then
+                if [[ $row == device || $row == recovery ]]; then
                     ((adb_count+=1))
                     [[ $token =~ transport_id:([0-9]+) ]] && transport=${BASH_REMATCH[1]}
                 fi

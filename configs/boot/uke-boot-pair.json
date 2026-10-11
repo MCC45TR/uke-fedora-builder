@@ -46,7 +46,7 @@
   "root_size_mib": 3072,
   "core_prepared_root_sha256": "33a2343d17d1f4e588737aab704b93277e4bef4f4e6b3efe01341cc4a844ecd2",
   "root_tool_image": "9e787753723cc715b6d46fabb9f7b17ceb5195d269224a3f8262fd47a05833ad",
-  "root_selector": "UUID-and-PARTNAME-linux",
+  "root_selector": "PARTNAME-linux",
   "system_format": "android-sparse-raw-and-fill-only",
   "partition_changes": [
     "boot_b",

@@ -25,6 +25,11 @@ if SENEMOS_PRIVATE_HOST_HOME=$reject_env bash "$audit" --namespace-policy "$poli
 rm "$file"
 printf 'Relative source filename: src/%s/fixture/include.hpp\n' home > "$fixture/payload/usr/share/records/relative"
 bash "$audit" "$fixture/payload" >/dev/null
+printf 'fixture:x:1000:1000::/%s/fixture:/usr/bin/bash\n' home > "$fixture/payload/etc/passwd"
+bash "$audit" "$fixture/payload" >/dev/null
+printf 'Absolute build filename: /%s/fixture/source.cpp\n' home >> "$fixture/payload/etc/passwd"
+reject "$fixture/payload"
+rm "$fixture/payload/etc/passwd"
 printf 'Absolute build filename: \0/%s/fixture/include.hpp\0\n' home > "$fixture/payload/usr/share/records/absolute"
 reject "$fixture/payload"
 printf '%s\n' 'Privacy fixtures passed; immutable namespace exceptions do not admit modified files, foreign paths or host identity'
