@@ -28,4 +28,19 @@ for scenario in truncated dont-care trailing bad-size; do
     if "$binary" decode "$out/$scenario.img" "$out/rejected-$scenario.img"; then exit 1; fi
     [[ ! -e $out/rejected-$scenario.img ]]
 done
-echo 'Sparse roundtrip, no-overwrite, symlink/device and four malformed-input groups passed'
+# Check the 64-GiB logical boundary without allocating or writing 64 GiB.
+head -c 28 "$out/sparse.img" > "$out/limit.img"
+printf '\000\000\000\001' | dd of="$out/limit.img" bs=1 seek=16 conv=notrunc status=none
+printf '\001\000\000\000' | dd of="$out/limit.img" bs=1 seek=20 conv=notrunc status=none
+if "$binary" decode "$out/limit.img" "$out/rejected-limit.img" 2>"$out/limit.err"; then exit 1; fi
+grep -qx 'Short or failed I/O' "$out/limit.err"
+[[ ! -e $out/rejected-limit.img ]]
+printf '\001\000\000\001' | dd of="$out/limit.img" bs=1 seek=16 conv=notrunc status=none
+if "$binary" decode "$out/limit.img" "$out/rejected-over-limit.img" 2>"$out/over-limit.err"; then exit 1; fi
+grep -qx 'Invalid sparse bounds' "$out/over-limit.err"
+[[ ! -e $out/rejected-over-limit.img ]]
+truncate -s $((64*1024*1024*1024+4096)) "$out/oversized-raw.img"
+if "$binary" encode "$out/oversized-raw.img" "$out/rejected-oversized-raw.img"; then exit 1; fi
+[[ ! -e $out/rejected-oversized-raw.img ]]
+rm "$out/oversized-raw.img"
+echo 'Sparse roundtrip, output protection, malformed inputs and 64-GiB bounds passed'

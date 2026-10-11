@@ -183,6 +183,11 @@ no new full Core composition or tablet boot is implied by these package checks.
 
 ## First physical development console, 2026-10-11
 
+The host sparse codec accepts logical images up to 64 GiB for the existing
+Uke Linux partition. It includes sparse chunk overhead in the encoded input
+bound and still rejects DONT_CARE chunks, partial coverage, devices, symlinks
+and existing outputs. This limit does not authorize a partition write.
+
 The separate stock-ABL pair profile now selects the unique physical
 `PARTLABEL=linux` EXT4 root, preserves the bootloader's RAM/reservations and
 adapts the reviewed UFS/USB suppliers. The owner observed a sustained screen
