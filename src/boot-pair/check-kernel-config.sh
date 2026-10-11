@@ -6,6 +6,17 @@ scratch=$(mktemp -d)
 trap 'rm -rf "$scratch"' EXIT
 for index in 1 2; do
     file=${!index}
+    # Early TTY must survive either firmware scanout implementation.
+    grep -Fx CONFIG_FRAMEBUFFER_CONSOLE=y "$file" >/dev/null
+    grep -Fx '# CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER is not set' "$file" >/dev/null
+    if grep -Fx CONFIG_FB_SIMPLE=y "$file" >/dev/null; then
+        if grep -Eq '^CONFIG_DRM_SIMPLEDRM=[ym]$' "$file"; then exit 1; fi
+    else
+        if grep -Eq '^CONFIG_FB_SIMPLE=[ym]$' "$file"; then exit 1; fi
+        for required in CONFIG_DRM=y CONFIG_DRM_SIMPLEDRM=y CONFIG_DRM_FBDEV_EMULATION=y CONFIG_DRM_CLIENT_DEFAULT_FBDEV=y; do
+            grep -Fx "$required" "$file" >/dev/null
+        done
+    fi
     # These host probes are inert only in this C-only, debug-info-free ARM64 profile.
     for required in CONFIG_ARM64=y CONFIG_DEBUG_INFO_NONE=y CONFIG_RUSTC_VERSION=0 '# CONFIG_SAMPLES is not set'; do
         grep -Fx "$required" "$file" >/dev/null

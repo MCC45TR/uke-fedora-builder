@@ -12,6 +12,9 @@ CONFIG_CC_CAN_LINK=y
 CONFIG_PAHOLE_VERSION=0
 CONFIG_CLANG_VERSION=230102
 CONFIG_UFS=m
+CONFIG_FB_SIMPLE=y
+CONFIG_FRAMEBUFFER_CONSOLE=y
+# CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER is not set
 CONFIG_INITRAMFS_SOURCE=""
 CONFIG_CMDLINE=""
 CONFIG
@@ -31,5 +34,23 @@ for enabled in CONFIG_RUST=y CONFIG_DEBUG_INFO=y CONFIG_DEBUG_INFO_BTF=y CONFIG_
     reject
 done
 grep -v '^CONFIG_DEBUG_INFO_NONE=' "$fixture/good" > "$fixture/boot"
+reject
+cp "$fixture/base" "$fixture/legacy-base"
+cp "$fixture/good" "$fixture/legacy-boot"
+sed '/^CONFIG_FB_SIMPLE=/d' "$fixture/legacy-base" > "$fixture/base"
+sed '/^CONFIG_FB_SIMPLE=/d' "$fixture/legacy-boot" > "$fixture/boot"
+for required in CONFIG_DRM=y CONFIG_DRM_SIMPLEDRM=y CONFIG_DRM_FBDEV_EMULATION=y CONFIG_DRM_CLIENT_DEFAULT_FBDEV=y '# CONFIG_FB_SIMPLE is not set'; do
+    printf '%s\n' "$required" | tee -a "$fixture/base" >> "$fixture/boot"
+done
+check
+cp "$fixture/boot" "$fixture/drm-good"
+for required in DRM DRM_SIMPLEDRM DRM_FBDEV_EMULATION DRM_CLIENT_DEFAULT_FBDEV FRAMEBUFFER_CONSOLE; do
+    sed "s/^CONFIG_$required=y/CONFIG_$required=m/" "$fixture/drm-good" > "$fixture/boot"
+    reject
+done
+cp "$fixture/legacy-base" "$fixture/base"
+cp "$fixture/legacy-boot" "$fixture/boot"
+printf 'CONFIG_DRM_SIMPLEDRM=m\n' >> "$fixture/base"
+printf 'CONFIG_DRM_SIMPLEDRM=m\n' >> "$fixture/boot"
 reject
 echo 'Tool-probe acceptance and module/compiler/architecture/Rust/BTF refusal: passed'
