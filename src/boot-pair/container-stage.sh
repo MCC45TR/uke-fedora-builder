@@ -102,9 +102,7 @@ kernel)
     grep -Fx CONFIG_FRAMEBUFFER_CONSOLE=y "$out/.config"
     grep -Fx '# CONFIG_FRAMEBUFFER_CONSOLE_DEFERRED_TAKEOVER is not set' "$out/.config"
     # Built-in Gunyah watchdog handles the firmware timer; module bytes and exports still must match.
-    grep '^CONFIG_' /job/inputs/base.config | grep -Ev '^CONFIG_(QCOM_UKE_ABL_DT|GUNYAH_WATCHDOG|INITRAMFS_(SOURCE|FORCE|ROOT_UID|ROOT_GID|COMPRESSION_[A-Z0-9_]+)|CMDLINE|CMDLINE_FORCE|CMDLINE_FROM_BOOTLOADER)=' | sort > /job/base-module.config
-    grep '^CONFIG_' "$out/.config" | grep -Ev '^CONFIG_(QCOM_UKE_ABL_DT|GUNYAH_WATCHDOG|INITRAMFS_(SOURCE|FORCE|ROOT_UID|ROOT_GID|COMPRESSION_[A-Z0-9_]+)|CMDLINE|CMDLINE_FORCE|CMDLINE_FROM_BOOTLOADER)=' | sort > /job/boot-module.config
-    cmp /job/base-module.config /job/boot-module.config
+    bash /builder/src/boot-pair/check-kernel-config.sh /job/inputs/base.config "$out/.config"
     diff -u /job/inputs/base.config "$out/.config" > /job/config-delta.txt || [[ $? == 1 ]]
     make O="$out" LOCALVERSION=-senemos-uke -j"$(cat /job/inputs/jobs)" Image modules dtbs
     [[ $(make -s O="$out" LOCALVERSION=-senemos-uke kernelrelease) == "$release" ]]

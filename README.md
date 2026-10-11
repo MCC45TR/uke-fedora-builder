@@ -146,6 +146,9 @@ separate explicit profiles. Refreshed Android properties and matching OTA
 metadata do not establish actual installed firmware bytes. Native C++ packing, linked
 initramfs byte checks, module configuration/export checks and payload audits
 run locally; no Python packer or tablet Python runtime is introduced.
+The ARM64 configuration comparison permits the C user-link and pahole host
+probes to differ only with Rust, debug information/BTF and samples disabled.
+All module bytes and exported symbols still require exact equality.
 Other compiler jobs retain priority. `--dry-run`, `--offline` and `--self-test`
 are available. The script has no flashing or slot-control operation.
 
