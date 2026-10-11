@@ -2,7 +2,7 @@
 # Native/POSIX initramfs boundary: never fall back to Android or another EXT4 root.
 set -eu
 # Invoked indirectly by the EXIT trap.
-# shellcheck disable=SC2329
+# shellcheck disable=SC2317,SC2329
 root_probe_diagnostics() {
     status=$?
     [ "$status" -ne 0 ] || return 0
