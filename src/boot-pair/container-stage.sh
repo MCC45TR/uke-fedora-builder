@@ -59,7 +59,8 @@ audit-initramfs)
     [[ -L /job/initramfs-root/usr/lib/systemd/system/initrd.target.wants/uke-cdc-shell.service ]]
     [[ -s /job/initramfs-root/usr/lib/systemd/system/uke-cdc-shell.service.d/initrd.conf ]]
     [[ -x /job/initramfs-root/usr/libexec/uke-root-guard ]]
-    for name in ufs_qcom phy_qcom_qmp_ufs dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke g_serial; do
+    # g_serial requests ACM dynamically, so its module dependencies omit this function.
+    for name in ufs_qcom phy_qcom_qmp_ufs dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke g_serial usb_f_acm u_serial; do
         modinfo -b /job/initramfs-root -k "$release" "$name" >/dev/null
     done
     bash /builder/src/audit/check-target-payload.sh /job/initramfs-root

@@ -6,7 +6,7 @@ depends() { echo systemd; }
 installkernel() {
     instmods ufs_qcom phy_qcom_qmp_ufs dwc3 dwc3_qcom \
         phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke \
-        i2c_qcom_geni gpi g_serial usbhid hid_generic xhci_hcd xhci_plat_hcd
+        i2c_qcom_geni gpi g_serial usb_f_acm usbhid hid_generic xhci_hcd xhci_plat_hcd
 }
 install() {
     inst_multiple /bin/sh /usr/bin/bash /usr/sbin/modprobe /usr/bin/blkid /usr/bin/readlink /usr/bin/grep /usr/bin/sleep /usr/bin/cat /usr/bin/udevadm /usr/bin/mount /usr/bin/dmesg /usr/bin/tail /usr/bin/uke-boot-status
