@@ -126,7 +126,7 @@ kernel)
         zstd -dc "$installed" | cmp - /job/module-compare.ko
         count=$((count + 1))
     done < "$out/modules.order"
-    [[ $count == 1146 ]]
+    [[ $count == "$(jq -er .module_count /job/inputs/kernel-manifest.json)" ]]
     rm /job/module-compare.ko
     printf '%s\n' "$count" > /job/module-byte-match-count
     cp "$out/.config" /job/boot.config
@@ -146,7 +146,8 @@ kernel)
     rm /job/ramfs-inspection.elf /job/init-data.bin
     ;;
 compose)
-    [[ $(cat /job/module-byte-match-count) == 1146 ]]
+    count=$(cat /job/module-byte-match-count)
+    [[ $count == "$(jq -er .module_count /job/inputs/kernel-manifest.json)" ]]
     (cd /job; sha256sum -c pair-root.sha256)
     # Restore numeric owners/capabilities from the ARM64 archive, including
     # when a rootful Docker host needed chown for intermediate job access.
@@ -202,7 +203,8 @@ compose)
         --arg boot "$(sha256sum /job/fedora_boot.img | cut -d ' ' -f1)" \
         --arg system "$(sha256sum /job/system.img | cut -d ' ' -f1)" \
         --arg raw "$(sha256sum /job/system.raw.img | cut -d ' ' -f1)" \
-        '{schema_version:1,status:"host-validated-stock-ABL-pair-candidate",recipe_sha256:$recipe,profile:$profile[0],sha256:{boot:$boot,system:$system,decoded_ext4:$raw},checks:{source_preparation:true,base_patches:13,abl_adaptation_patch:1,embedded_initramfs_byte_match:true,module_byte_match:1146,android_v4_roundtrip:true,full_sparse_logical_coverage:true,sparse_roundtrip:true,all_inode_selinux_labels:true,ext4_readback:true,no_python:true,privacy:true},qemu_tested:false,boot_tested:false,hardware_tested:false,flash_executed:false}' > /job/manifest.json
+        --argjson modules "$count" --argjson patches "$(jq -er .patch_count "$profile")" \
+        '{schema_version:1,status:"host-validated-stock-ABL-pair-candidate",recipe_sha256:$recipe,profile:$profile[0],sha256:{boot:$boot,system:$system,decoded_ext4:$raw},checks:{source_preparation:true,base_patches:$patches,abl_adaptation_patch:1,embedded_initramfs_byte_match:true,module_byte_match:$modules,android_v4_roundtrip:true,full_sparse_logical_coverage:true,sparse_roundtrip:true,all_inode_selinux_labels:true,ext4_readback:true,no_python:true,privacy:true},qemu_tested:false,boot_tested:false,hardware_tested:false,flash_executed:false}' > /job/manifest.json
     (cd /job; sha256sum manifest.json >> SHA256SUMS; sha256sum -c SHA256SUMS)
     ;;
 qemu-prepare)
