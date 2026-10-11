@@ -15,7 +15,7 @@
 #include <vector>
 static constexpr uint32_t magic=0xed26ff3a, block=4096;
 static constexpr uint16_t raw=0xcac1, fill=0xcac2;
-static constexpr uint64_t limit=4ULL*1024*1024*1024;
+static constexpr uint64_t limit=64ULL*1024*1024*1024;
 static void require(bool value, const char *message) { if (!value) throw std::runtime_error(message); }
 static void io(int fd, void *buffer, size_t bytes, bool write) {
     auto *at=static_cast<unsigned char *>(buffer);
@@ -31,9 +31,9 @@ static uint32_t get(const unsigned char *p, unsigned bytes) {
 static void put(unsigned char *p,uint32_t value,unsigned bytes) {
     for (unsigned i=0;i<bytes;++i) p[i]=value>>(i*8);
 }
-static uint64_t size(int fd) {
+static uint64_t size(int fd,uint64_t maximum) {
     struct stat st {}; require(!fstat(fd,&st) && S_ISREG(st.st_mode) && st.st_size>0 &&
-                             uint64_t(st.st_size)<=limit,"Input must be a bounded regular file"); return st.st_size;
+                             uint64_t(st.st_size)<=maximum,"Input must be a bounded regular file"); return st.st_size;
 }
 static void chunk(int out,uint16_t type,uint32_t blocks,uint32_t payload) {
     std::array<unsigned char,12> header {};
@@ -104,7 +104,8 @@ int main(int argc,char **argv) {
         require(argc==4 && (std::string(argv[1])=="encode" || std::string(argv[1])=="decode"),
                 "Usage: android-sparse encode|decode INPUT NEW_OUTPUT");
         in=open(argv[2],O_RDONLY|O_NOFOLLOW|O_CLOEXEC); require(in>=0,"Cannot open regular input");
-        const auto bytes=size(in);
+        // One RAW chunk per block is the largest accepted sparse representation.
+        const auto bytes=size(in,std::string(argv[1])=="encode" ? limit : limit+(limit/block)*12+28);
         out=open(argv[3],O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0644);
         require(out>=0,"Output must be new"); created=true;
         if (std::string(argv[1])=="encode") encode(in,out,bytes); else decode(in,out,bytes);
