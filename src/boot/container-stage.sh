@@ -93,7 +93,7 @@ kernel)
     if [[ ! -f /job/base.config ]]; then
         verify "$out/.config" "$(jq -r .kernel_config_sha256 "$profile")"
         cp "$out/.config" /job/base.config
-        awk '$3=="vmlinux"' "$out/Module.symvers" | sort > /job/base-vmlinux.symvers
+        bash /builder/src/boot/vmlinux-exports.sh "$out/Module.symvers" > /job/base-vmlinux.symvers
     fi
     cp /job/base.config "$out/.config"
     export ARCH=arm64 LLVM=1 KBUILD_BUILD_USER=senemos KBUILD_BUILD_HOST=uke-builder
@@ -117,11 +117,11 @@ kernel)
             case $item in CONFIG_*=*) grep -Fx "$item" "$out/.config" >/dev/null;; esac
         done < "$fragment"
     done
-    make O="$out" LOCALVERSION=-senemos-uke -j"$(cat /job/inputs/jobs)" Image
+    make O="$out" LOCALVERSION=-senemos-uke -j"$(cat /job/inputs/jobs)" Image modules
     [[ $(make -s O="$out" LOCALVERSION=-senemos-uke kernelrelease) == "$release" ]]
     # These changes affect built-in startup only. Reuse of qualified modules
     # is admitted only if every exported core symbol CRC remains identical.
-    sort "$out/vmlinux.symvers" > /job/boot-vmlinux.symvers
+    bash /builder/src/boot/vmlinux-exports.sh "$out/Module.symvers" > /job/boot-vmlinux.symvers
     cmp /job/base-vmlinux.symvers /job/boot-vmlinux.symvers
     cp "$out/.config" /job/boot.config
     cp "$out/arch/arm64/boot/Image" /job/Image
