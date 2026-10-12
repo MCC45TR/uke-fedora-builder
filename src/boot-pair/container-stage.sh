@@ -36,6 +36,8 @@ source)
     g++ -std=c++20 -O2 -Wall -Wextra -Werror -I "$source/scripts/dtc/libfdt" \
         /kernel-recipe/tests/abl-dt-check.cpp /job/dt/uke-abl-host.o "${objects[@]}" -o /job/dt/abl-dt-check
     printf '%s\n' 'Qualified source preparation and stock-ABL patch applied; host transform compiled'
+    # The native root tool intentionally has no JSON parser; emit a checksummed catalog.
+    jq -r '"#archive-sha256 "+.archive_sha256, (.files[]|.sha256+"  "+.path)' /builder/configs/firmware/uke-adsp-early.json > /job/early-firmware.sha256
     ;;
 dt-test)
     [[ -s /private/live-fdt.dtb ]]
@@ -64,8 +66,15 @@ audit-initramfs)
         modinfo -b /job/initramfs-root -k "$release" "$name" >/dev/null
     done
     bash /builder/src/boot-pair/check-initramfs-modules.sh /job/initramfs-root /job/root "$release"
+    privacy=()
+    if [[ -s /job/inputs/early-firmware.tar ]]; then
+        cmp /job/early-firmware.sha256 <(jq -r '"#archive-sha256 "+.archive_sha256, (.files[]|.sha256+"  "+.path)' /builder/configs/firmware/uke-adsp-early.json)
+        bash /builder/src/boot-pair/check-early-firmware.sh /job/initramfs-root /job/early-firmware.sha256
+        # Preserve authenticated vendor blobs; exact hashes admit their OEM build paths only.
+        privacy=(--namespace-policy /builder/configs/firmware/uke-adsp-early.json)
+    fi
     bash /builder/src/audit/check-target-payload.sh /job/initramfs-root
-    bash /builder/src/audit/check-target-privacy.sh /job/initramfs-root
+    bash /builder/src/audit/check-target-privacy.sh "${privacy[@]}" /job/initramfs-root
     bash /builder/src/audit/check-target-payload.sh /job/root
     for unit in uke-usb-network uke-usb-network-shell; do
         [[ ! -e /job/root/etc/systemd/system/multi-user.target.wants/$unit.service ]]
@@ -75,10 +84,12 @@ audit-initramfs)
     done
     cmp /job/root/usr/share/senemos/boot/uke/usb-network-managed.conf /job/root/etc/NetworkManager/conf.d/90-uke-usb-debug.conf
     cmp /job/root/usr/share/senemos/boot/uke/uke-coresight-bringup.conf /job/root/usr/lib/modprobe.d/uke-coresight-bringup.conf
-    bash /builder/src/audit/check-target-privacy.sh --namespace-policy /builder/configs/images/selinux-namespace-policy.json /job/root
+    root_policy=/builder/configs/images/selinux-namespace-policy.json
     if [[ -s /job/inputs/early-firmware.tar ]]; then
-        bash /builder/src/boot-pair/check-early-firmware.sh /job/initramfs-root /builder/configs/firmware/uke-adsp-early.json
+        jq -s '{files:([.[].files[]])}' "$root_policy" /builder/configs/firmware/uke-adsp-early.json > /job/root-privacy-policy.json
+        root_policy=/job/root-privacy-policy.json
     fi
+    bash /builder/src/audit/check-target-privacy.sh --namespace-policy "$root_policy" /job/root
     while IFS= read -r -d '' file; do
         if [[ $(od -An -tx1 -N4 "$file" | tr -d ' \n') == 7f454c46 ]]; then
             if [[ -s /job/inputs/early-firmware.tar ]] && jq -e --arg path "${file#/job/initramfs-root/}" 'any(.files[]; .path==$path)' /builder/configs/firmware/uke-adsp-early.json >/dev/null; then
