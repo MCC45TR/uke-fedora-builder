@@ -60,14 +60,15 @@ rm -f "$root/etc/modules-load.d/uke-esp32.conf"
 printf 'g_serial\n' > "$root/etc/modules-load.d/uke-cdc.conf"
 early_firmware=()
 if [[ -s /job/inputs/early-firmware.tar ]]; then
-    manifest=/builder/configs/firmware/uke-adsp-early.json
-    [[ $(sha256sum /job/inputs/early-firmware.tar | cut -d ' ' -f1) == $(jq -r .archive_sha256 "$manifest") ]]
+    manifest=/job/early-firmware.sha256
+    [[ $(sha256sum /job/inputs/early-firmware.tar | cut -d ' ' -f1) == $(awk '$1=="#archive-sha256" {print $2}' "$manifest") ]]
     mkdir -p "$root/usr/lib/firmware"
     tar --no-same-owner -xf /job/inputs/early-firmware.tar -C "$root/usr/lib/firmware"
     bash /builder/src/boot-pair/check-early-firmware.sh "$root" "$manifest"
-    while IFS= read -r path; do
+    while read -r expected path; do
+        [[ $expected != \#* ]] || continue
         early_firmware+=(--include "$root/$path" "/$path")
-    done < <(jq -r '.files[].path' "$manifest")
+    done < "$manifest"
 fi
 chroot "$root" /usr/bin/depmod "$release"
 # Temporarily install the exact signed host assembly dependency closure in
