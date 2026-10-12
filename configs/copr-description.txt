@@ -1,66 +1,63 @@
 Senemos Uke — source builds and update channel
 
 Development RPM/SRPM hub for Xiaomi Pad 7 / POCO Pad X1 (Uke, SM7675).
-Enabled target: Fedora Rawhide AArch64.
+Enabled target: Fedora Rawhide AArch64. Source, package, emulation and physical
+results have separate acceptance gates; this channel certifies no complete port.
 
-Kernel 7.2.9-1.3: signed upstream source, seven attributed Uke adaptation
-patches, matching Image/DTB/1,146 modules. Native signed build 11075043 passed
-ABI/dependency, fresh-install, actual 1.2-to-1.3 upgrade and removal checks.
-UEFI firmware and physical tablet boot remain independent gates.
+Current physical status, 12 October 2026: matched RAM starts reach the owner's
+64 GiB EXT4 root, USB ECM SSH, automatic Wi-Fi SSH, DNS and synchronized time.
+Original Fedora Plasma/KWin 6.8.0 displays a camera-confirmed software Wayland
+desktop after signed Mesa COPR 11110126; rendering is llvmpipe. Manual rotation
+and restoration work. Native Adreno/video acceleration, touch, automatic
+rotation/brightness, sensor samples and battery telemetry remain open.
+Bluetooth has no HCI controller. NFC controller presence is unqualified.
 
-Recovery: uke-orangefox-recovery delivers the published, checksummed Global
-OS3 alpha IMG/ZIP and source/license/profile records as DNF-updated data.
-No flashing scriptlets, automatic ZIP installer or Android partition writes.
+Signed native kernel 7.2.9-1.18 passes matching early/runtime module, five generic
+VM and actual RAM-start checks. One private-firmware manual ADSP start reaches
+running, then a GPR domain mismatch requires a controlled stop. Automatic ADSP
+startup remains disabled. Corrected 1.20 COPR 11110928 passes signed payload,
+no-Python/privacy checks, all 1,144 native module byte comparisons and 13,792
+matching core export rows. Its new early tuple and physical GPR trial remain
+separate gates. The failed native 1.19 header contract is retained.
 
-Core and desktop policy metadata: console-first selection, explicit readiness
-records, no graphical session installed. The owner forbids cloning, forking or
-rebuilding KDE desktop applications. Use original distribution KDE packages.
-Plasma/Dolphin derivative source records and binary builds were withdrawn.
-Original KDE Python payloads currently block complete graphical admission.
+The stock-ABL Image embeds its own root-capable initramfs and requires matching
+early and installed modules. Ordinary DNF kernel updates never flash boot_b or
+select a slot. Stock A, full-hash-verified 1.17 boot_b, recovery and a consistent
+offline Core rollback are retained. Normal B and repeated cold starts remain
+unqualified. Battery telemetry is required before stress or power experiments;
+sleep and PowerDevil remain contained.
 
-Material Decoration: explicitly requested stable upstream C++/Qt6 plugin;
-signed native payload/ELF checks passed. Plymouth-uke: original optional theme
-data, sized by the renderer, without activation or initramfs regeneration.
+Core and original Fedora KDE prebuild tests are published with checksums,
+source/package identities and installation/rollback limits. Their clean public
+roots remain physically unflashed and unbooted. The different private owner
+root has separate physical readback and visible software KDE evidence.
+Never clone, fork or rebuild KDE applications as Uke variants. The owner permits
+Python only for original signed Fedora KDE dependencies; Core, early initramfs
+and project startup/services/tests retain their native policy.
 
-Twelve real source families have automatic builds. Five non-KDE native source
-families cover at-spi2-core, GStreamer, libaccounts-glib, libwacom and GNU
-libstdc++. Reviewed sources exclude optional Python tools. GNU C++ requires the
-complete original 6,100-symbol ABI and native smoke test; build 11077014 passed.
-The separate 52-input signed console selection passed offline fresh installation,
-actual metadata upgrade, full inherited-root audits and removal. Initial core
-installation explicitly allows the reviewed Fedora-to-COPR library vendor
-change. A historical 603-input desktop
-transaction passed bounded payload/lifecycle checks but its complete root
-failed on inherited Python debugger helpers; that root remains rejected.
+Signed uke-boot-integration/uke-esp32-cdc 0.1.0-7 passes actual DNF and bounded
+transport checks. Stock-ABL uses direct-PC ACM/ECM. The separate UEFI profile's
+ESP32-S3 HID/CDC, bridge and USB-host power require independent acceptance.
+Package installation activates no owner key, Wi-Fi profile or flashing.
+Recovery RPMs deliver the checksummed Global OS3 experimental alpha IMG/ZIP as
+data, without automatic flashing or Android storage changes. Optional native
+Material Decoration/Plymouth packages establish no hardware display support.
+Non-KDE source families retain complete ABI and dependency gates.
 
-GitHub push hooks and shared-source workflows request native builds. Daily
-kernel/Material/recovery trackers inspect eligible published stable releases.
-Unreviewed kernel versions stop before generic ARM64 fallback; recovery requires
-approved firmware/asset/source identities. Binary workers have network disabled.
+Kernel changes request one native build after validated main-branch CI through
+the existing encrypted hook. Branch pushes and documentation changes submit no
+kernel build. Healthy jobs are preserved; heavy jobs are queued. Daily stable
+tracking refuses unreviewed generic ARM64 fallback. Binary workers have network
+disabled. Fedora 45, openSUSE, native DEB and APK need separate validation.
 
-Hardware components share the uke-linux-hardware-support source repository
-and retain explicit admission gates.
-No firmware RPM until every Uke file has approved provenance, redistribution
-rights, hashes and matching kernel requests. Nabu geometry, firmware and
-hardware assumptions are not portable. No composed tablet image or physical
-support is certified by this channel.
+Firmware is private owner evaluation unless provenance, hashes, redistribution
+rights and matching requests are reviewed. No owner firmware, credentials,
+calibration or logs are public assets. Nabu geometry and firmware are not Uke
+inputs. Detailed engineering records remain in the private documentation repo.
 
-- [Package/update hub](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/PACKAGE-HUB.md)
-- [KDE application policy](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/KDE-APPLICATION-POLICY.md)
-- [Hardware support sources](https://github.com/MCC45TR/uke-linux-hardware-support)
-- [Fedora image releases](https://github.com/MCC45TR/uke-linux-images/releases)
+- [Per-function hardware status](https://github.com/MCC45TR/uke-linux)
 - [Kernel sources](https://github.com/MCC45TR/senemos-uke-kernel-mainline)
-- [Recovery delivery](https://github.com/MCC45TR/uke-linux-hardware-support/tree/main/uke-orangefox-packaging)
-- [Source and test records](https://github.com/MCC45TR/uke-fedora-builder/tree/main/reports)
-
-Fedora 45, openSUSE, native DEB and Alpine APK targets require separate validation.
-
-Detailed package and policy documents are in the private documentation
-repository; access is required. Public status is available on the Uke landing page.
-
-Core debug inputs: signed uke-boot-integration and uke-esp32-cdc 0.1.0-3
-(native build 11080676) passed actual release-1 to release-3 upgrade, subpackage
-installation and removal in isolated AArch64 userspace. The ESP32 is a USB
-device, the tablet a USB host. The Core profile uses HID VT2 input and a single
-real-root CDC journal writer. Packages enable no debug service by themselves.
-Physical enumeration and the owner's existing bridge firmware are unverified.
+- [Platform packages](https://github.com/MCC45TR/uke-linux-hardware-support)
+- [Image releases](https://github.com/MCC45TR/uke-linux-images/releases)
+- [Image builder](https://github.com/MCC45TR/uke-fedora-builder)
+- [Engineering records](https://github.com/MCC45TR/uke-linux-docs) (private)
