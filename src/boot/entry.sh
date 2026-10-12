@@ -52,7 +52,7 @@ boot_recipe_hash() {
     # QEMU observes the finished bytes separately and must not invalidate the
     # kernel cache when only its console parser changes.
     cat "$dir"/src/boot/* "$dir"/configs/boot/*.json "$dir"/tests/boot-contract.sh \
-        "$dir"/tests/boot-image-contract.sh "$dir"/manifests/boot-source-archives.json \
+        "$dir"/tests/boot-image-contract.sh "$dir"/tests/kernel-export-contract.sh "$dir"/manifests/boot-source-archives.json \
         "$dir"/src/image/host-lib.sh "$dir"/src/image/dracut/91uke-bringup/*.service \
         "$dir"/src/audit/*.sh | sha256sum | cut -d ' ' -f1
 }
@@ -180,7 +180,7 @@ boot_main() {
             (cd "$reuse" || exit; sha256sum -c SHA256SUMS) || die 'Boot cache checksum mismatch'
             verify_cache "$reuse/inputs/kernel-manifest.json" "$(jq -r .kernel_manifest_sha256 "$profile")"
             verify_cache "$reuse/base.config" "$(jq -r .kernel_config_sha256 "$profile")"
-            cmp "$reuse/base-vmlinux.symvers" <(awk '$3=="vmlinux"' "$kernel/build/fedora-rawhide/7.2.9/rpmbuild/kernel-out/Module.symvers" | sort) || die 'Reused base export table differs from the qualified kernel'
+            cmp "$reuse/base-vmlinux.symvers" <(bash "$BUILDER/src/boot/vmlinux-exports.sh" "$kernel/build/fedora-rawhide/7.2.9/rpmbuild/kernel-out/Module.symvers") || die 'Reused base export table differs from the qualified kernel'
             cmp "$reuse/inputs/applied-patches.txt" "$WORK/inputs/applied-patches.txt"
             jq -e '.checks.embedded_initramfs_byte_match and .checks.core_export_abi_match and .checks.applied_patch_count==13' "$reuse/manifest.json" >/dev/null || die 'Boot cache validation missing'
             cache_out=$reuse/kernel/build/fedora-rawhide/7.2.9/rpmbuild/kernel-out

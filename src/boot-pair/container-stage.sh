@@ -105,7 +105,7 @@ kernel)
     diff -u /job/inputs/base.config "$out/.config" > /job/config-delta.txt || [[ $? == 1 ]]
     make O="$out" LOCALVERSION=-senemos-uke -j"$(cat /job/inputs/jobs)" Image modules dtbs
     [[ $(make -s O="$out" LOCALVERSION=-senemos-uke kernelrelease) == "$release" ]]
-    sort "$out/vmlinux.symvers" > /job/boot-vmlinux.symvers
+    bash /builder/src/boot/vmlinux-exports.sh "$out/Module.symvers" > /job/boot-vmlinux.symvers
     cmp /job/inputs/base-vmlinux.symvers /job/boot-vmlinux.symvers
     # Module-byte equality is stronger than comparing zero CRCs when
     # MODVERSIONS is off. Every freshly built module must match its installed

@@ -21,5 +21,11 @@ Current image prerequisites and failed/corrected trials are in the
 [private engineering records](https://github.com/MCC45TR/uke-linux-docs).
 Local filesystem acceptance is recorded separately from untested tablet boot.
 
+Boot ABI receipts extract the core rows from the final Kbuild `Module.symvers`.
+Both boot stages rebuild modules before comparing those rows. A legacy
+`vmlinux.symvers` file can survive cache reuse and must not establish current
+exports. `tests/kernel-export-contract.sh` covers stale receipts, changed core
+symbols/CRCs and missing tables while allowing module-only export changes.
+
 See [Core image construction](IMAGES.md) for the locked runtime closure,
 ESP32 debug profile, local filesystem checks and unresolved device release gates.

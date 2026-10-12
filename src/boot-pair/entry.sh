@@ -29,8 +29,8 @@ pair_recipe_hash() {
     cat "$dir"/src/boot-pair/*.sh "$dir"/src/boot-pair/*.cpp "$dir"/src/boot-pair/*.service \
         "$dir"/src/boot-pair/dracut/* "$dir"/configs/boot/uke-boot-pair*.json \
         "$dir"/configs/keys/{uke-copr,fedora-46}.asc \
-        "$dir"/src/boot/boot-image.cpp "$dir"/tests/boot-image-contract.sh "$dir"/tests/android-sparse-contract.sh \
-        "$dir"/tests/boot-pair*.sh "$dir"/tests/kernel-config-contract.sh \
+        "$dir"/src/boot/boot-image.cpp "$dir"/src/boot/vmlinux-exports.sh "$dir"/tests/boot-image-contract.sh "$dir"/tests/android-sparse-contract.sh \
+        "$dir"/tests/boot-pair*.sh "$dir"/tests/kernel-config-contract.sh "$dir"/tests/kernel-export-contract.sh \
         "$dir"/src/image/host-lib.sh "$dir"/src/image/ext4-labels.cpp "$dir"/src/audit/*.sh \
         "$dir"/configs/images/selinux-namespace-policy.json \
         "$kernel"/src/boot/{uke-abl.c,prepare-abl-source.sh,sm7675-uke-ufs.dtso,sm7675-uke-usb2.dtso} \
