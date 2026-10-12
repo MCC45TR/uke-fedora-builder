@@ -5,8 +5,9 @@ After=uke-cdc-acm.service
 ConditionKernelCommandLine=senemos.debug=cdc-acm
 
 [Service]
-ExecStartPre=/usr/bin/uke-boot-status --cdc --require-tty --wait 15
-ExecStart=-/usr/bin/bash --noprofile --norc -i
+Type=exec
+# A switch-root stop can interrupt readiness; keep it in the main process.
+ExecStart=/bin/sh -ec '/usr/bin/uke-boot-status --cdc --require-tty --wait 15; exec /usr/bin/bash --noprofile --norc -i'
 StandardInput=tty-force
 StandardOutput=tty
 StandardError=tty
