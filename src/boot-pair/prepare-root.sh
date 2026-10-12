@@ -47,7 +47,7 @@ done
 rm -f "$root/etc/systemd/system/multi-user.target.wants/uke-cdc-shell.service" \
     "$root/etc/systemd/system/multi-user.target.wants/uke-cdc-acm.service"
 for unit in uke-usb-network uke-usb-network-shell; do
-    ln -sfn "/usr/lib/systemd/system/$unit.service" "$root/etc/systemd/system/multi-user.target.wants/$unit.service"
+    rm -f "$root/etc/systemd/system/multi-user.target.wants/$unit.service"
 done
 install -Dm755 /builder/src/boot-pair/screen-shell.sh "$root/usr/libexec/uke-screen-shell"
 install -Dm755 /builder/src/boot-pair/root-status.sh "$root/usr/libexec/uke-root-status"
@@ -58,6 +58,17 @@ mkdir -p "$root/etc/systemd/journald.conf.d"
 printf '[Journal]\nStorage=persistent\nSystemMaxUse=64M\nSystemMaxFileSize=8M\n' > "$root/etc/systemd/journald.conf.d/90-uke-bringup.conf"
 rm -f "$root/etc/modules-load.d/uke-esp32.conf"
 printf 'g_serial\n' > "$root/etc/modules-load.d/uke-cdc.conf"
+early_firmware=()
+if [[ -s /job/inputs/early-firmware.tar ]]; then
+    manifest=/builder/configs/firmware/uke-adsp-early.json
+    [[ $(sha256sum /job/inputs/early-firmware.tar | cut -d ' ' -f1) == $(jq -r .archive_sha256 "$manifest") ]]
+    mkdir -p "$root/usr/lib/firmware"
+    tar --no-same-owner -xf /job/inputs/early-firmware.tar -C "$root/usr/lib/firmware"
+    bash /builder/src/boot-pair/check-early-firmware.sh "$root" "$manifest"
+    while IFS= read -r path; do
+        early_firmware+=(--include "$root/$path" "/$path")
+    done < <(jq -r '.files[].path' "$manifest")
+fi
 chroot "$root" /usr/bin/depmod "$release"
 # Temporarily install the exact signed host assembly dependency closure in
 # this disposable native root. Remove it through RPM before target export.
@@ -76,8 +87,9 @@ dracut --sysroot "$root" \
     --conf /dev/null --confdir /job/empty-config --tmpdir /job/tmp \
     --force --no-hostonly --no-hostonly-cmdline --no-early-microcode --gzip \
     --add uke-abl --kernel-cmdline "$(cat /job/inputs/kernel-cmdline)" \
-    --force-drivers 'ufs_qcom phy_qcom_qmp_ufs dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke i2c_qcom_geni gpi' \
+    --force-drivers 'ufs_qcom phy_qcom_qmp_ufs qcom_battmgr dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke i2c_qcom_geni gpi ktz8866' \
     --filesystems ext4 --omit 'network plymouth crypt systemd-cryptsetup syslog lvm mdraid btrfs i18n' \
+    "${early_firmware[@]}" \
     /job/initramfs.cpio.gz "$release"
 [[ -s /job/initramfs.cpio.gz ]]
 rpm --root "$root" -e dracut kbd xkeyboard-config libxkbcommon

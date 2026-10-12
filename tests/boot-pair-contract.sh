@@ -4,6 +4,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 # shellcheck source=../src/image/core.sh
 # shellcheck disable=SC1091
 source "$root/src/image/core.sh"
+bash "$root/tests/early-firmware-contract.sh"
 reject() { if (image_main --build boot-pair "$@") >/dev/null 2>&1; then echo 'Invalid pair request accepted' >&2; exit 1; fi; }
 reject --distro debian --dry-run
 reject --release 45 --dry-run
