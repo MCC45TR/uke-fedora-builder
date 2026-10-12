@@ -6,6 +6,22 @@ Fedora Rawhide AArch64 build, package and update infrastructure for POCO Pad X1 
 
 ## Outputs
 
+The separate `experiment/el2-kvm` branch validates an existing KVM-enabled
+kernel with native guest execution. The [EL1/EL2 test record](reports/EL2-KVM-2026-10-12.json)
+is emulation evidence. A Uke EL2 flash image remains blocked until the installed
+firmware's EL2 transfer and ownership contract is established; the existing
+stock-ABL image is not renamed or advertised as an EL2 image.
+
+Build the native helper in the kernel repository's
+[EL2 experiment](https://github.com/MCC45TR/senemos-uke-kernel-mainline/tree/experiment/el2-kvm).
+Prepare a disposable fixture with
+`bash tests/el2-kvm-qemu-prepare.sh CANDIDATE AARCH64_PROBE OUTPUT`, using the
+existing host filesystem tools. Run
+`bash tests/el2-kvm-qemu.sh OUTPUT` in the pinned QEMU tool environment. The first
+fixture enters at EL1 and rejects KVM; the second enters at EL2 and requires a
+real KVM guest's matching MMIO exit. Both retain Fedora's enforcing SELinux.
+The added probe service exists only in the copied VM filesystem.
+
 - `senemos-uke-linux-kernel-mainline` RPMs with core, modules and DTB subpackages,
   plus the complete source RPM. Development headers are a later milestone.
 - Matching ARM64 Image, independent Uke DTB, modules, config and build manifest.
