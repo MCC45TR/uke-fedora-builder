@@ -33,6 +33,7 @@ pair_recipe_hash() {
         "$dir"/tests/boot-pair*.sh "$dir"/tests/kernel-config-contract.sh "$dir"/tests/kernel-export-contract.sh \
         "$dir"/src/image/host-lib.sh "$dir"/src/image/ext4-labels.cpp "$dir"/src/audit/*.sh \
         "$dir"/configs/images/selinux-namespace-policy.json \
+        "$dir"/configs/firmware/uke-adsp-early.json \
         "$kernel"/src/boot/{uke-abl.c,prepare-abl-source.sh,sm7675-uke-ufs.dtso,sm7675-uke-usb2.dtso} \
         "$kernel"/src/boot/vendor/* \
         "$kernel"/patches/boot/*.patch "$kernel"/tests/abl-dt-{check.cpp,contract.sh} \
@@ -198,6 +199,11 @@ pair_main() {
     cp "$kernel_cache/base-vmlinux.symvers" "$WORK/inputs/base-vmlinux.symvers"
     cp "$kernel_cache/inputs/kernel.spec" "$WORK/inputs/kernel.spec"
     cp -a "$kernel_cache/inputs/SOURCES" "$WORK/inputs/"
+    if jq -e '.early_adsp_firmware==true' "$WORK/inputs/profile.json" >/dev/null; then
+        local firmware=$kernel/referances/firmware/uke-os3.0.304.0-adsp-20261012.tar
+        verify_cache "$firmware" "$(jq -er .archive_sha256 "$BUILDER/configs/firmware/uke-adsp-early.json")"
+        cp --reflink=auto "$firmware" "$WORK/inputs/early-firmware.tar"
+    fi
     # Reflinks preserve existing accepted artifacts without another full copy.
     cp --reflink=auto "$core/prepared-root.tar" "$WORK/inputs/prepared-root.tar"
     while IFS=$'\t' read -r name hash; do

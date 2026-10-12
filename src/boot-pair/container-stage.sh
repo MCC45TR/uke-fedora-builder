@@ -68,7 +68,7 @@ audit-initramfs)
     bash /builder/src/audit/check-target-privacy.sh /job/initramfs-root
     bash /builder/src/audit/check-target-payload.sh /job/root
     for unit in uke-usb-network uke-usb-network-shell; do
-        [[ -L /job/root/etc/systemd/system/multi-user.target.wants/$unit.service ]]
+        [[ ! -e /job/root/etc/systemd/system/multi-user.target.wants/$unit.service ]]
     done
     for unit in uke-cdc-acm uke-cdc-shell; do
         [[ ! -e /job/root/etc/systemd/system/multi-user.target.wants/$unit.service ]]
@@ -76,8 +76,14 @@ audit-initramfs)
     cmp /job/root/usr/share/senemos/boot/uke/usb-network-managed.conf /job/root/etc/NetworkManager/conf.d/90-uke-usb-debug.conf
     cmp /job/root/usr/share/senemos/boot/uke/uke-coresight-bringup.conf /job/root/usr/lib/modprobe.d/uke-coresight-bringup.conf
     bash /builder/src/audit/check-target-privacy.sh --namespace-policy /builder/configs/images/selinux-namespace-policy.json /job/root
+    if [[ -s /job/inputs/early-firmware.tar ]]; then
+        bash /builder/src/boot-pair/check-early-firmware.sh /job/initramfs-root /builder/configs/firmware/uke-adsp-early.json
+    fi
     while IFS= read -r -d '' file; do
         if [[ $(od -An -tx1 -N4 "$file" | tr -d ' \n') == 7f454c46 ]]; then
+            if [[ -s /job/inputs/early-firmware.tar ]] && jq -e --arg path "${file#/job/initramfs-root/}" 'any(.files[]; .path==$path)' /builder/configs/firmware/uke-adsp-early.json >/dev/null; then
+                continue # The exact DSP payload was checked above; it is not AArch64 userspace.
+            fi
             readelf -h "$file" | grep -E 'Machine:.*AArch64' >/dev/null
         fi
     done < <(find /job/initramfs-root -type f -print0)
