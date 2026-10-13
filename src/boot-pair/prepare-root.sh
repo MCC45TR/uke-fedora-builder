@@ -59,7 +59,13 @@ printf '[Journal]\nStorage=persistent\nSystemMaxUse=64M\nSystemMaxFileSize=8M\n'
 rm -f "$root/etc/modules-load.d/uke-esp32.conf"
 printf 'g_serial\n' > "$root/etc/modules-load.d/uke-cdc.conf"
 early_firmware=()
+early_drivers=()
 if [[ -s /job/inputs/early-firmware.tar ]]; then
+    # The ADSP announces QRTR services during firmware startup. Load the
+    # transport and the in-kernel domain mapper before udev can start it.
+    # The previous trial lacked early ADSP services until a DSP restart;
+    # this ordering candidate still requires a fresh physical boot.
+    early_drivers=(qrtr_smd qcom_pd_mapper)
     manifest=/job/early-firmware.sha256
     [[ $(sha256sum /job/inputs/early-firmware.tar | cut -d ' ' -f1) == $(awk '$1=="#archive-sha256" {print $2}' "$manifest") ]]
     mkdir -p "$root/usr/lib/firmware"
@@ -88,7 +94,7 @@ dracut --sysroot "$root" \
     --conf /dev/null --confdir /job/empty-config --tmpdir /job/tmp \
     --force --no-hostonly --no-hostonly-cmdline --no-early-microcode --gzip \
     --add uke-abl --kernel-cmdline "$(cat /job/inputs/kernel-cmdline)" \
-    --force-drivers 'ufs_qcom phy_qcom_qmp_ufs qcom_battmgr dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke i2c_qcom_geni gpi ktz8866' \
+    --force-drivers "${early_drivers[*]} ufs_qcom phy_qcom_qmp_ufs qcom_battmgr dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke i2c_qcom_geni gpi ktz8866" \
     --filesystems ext4 --omit 'network plymouth crypt systemd-cryptsetup syslog lvm mdraid btrfs i18n' \
     "${early_firmware[@]}" \
     /job/initramfs.cpio.gz "$release"

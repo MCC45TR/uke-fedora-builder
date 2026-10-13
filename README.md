@@ -4,6 +4,15 @@ Fedora Rawhide AArch64 build, package and update infrastructure for POCO Pad X1 
 
 [Uke Linux](https://github.com/MCC45TR/uke-linux) · [Build architecture](docs/ARCHITECTURE.md) · [Test COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/) · [Releases](https://github.com/MCC45TR/uke-fedora-builder/releases)
 
+The owner's existing root reaches real Fedora, Wi-Fi SSH and the original KDE
+desktop through matched stock-ABL RAM starts. The 13 October 1.27 trial starts
+ADSP automatically, but charger services appear only after a controlled DSP
+restart. The early-firmware recipe now preloads QRTR transport and the native
+domain mapper before coldplug, and audits their actual initramfs order. This is
+a startup correction candidate; fresh automatic charger readiness is unverified.
+Historical host/VM records below retain their original dates and limits. Clean
+released roots, UEFI and dependable normal slot-B boot remain separate gates.
+
 ## Outputs
 
 - `senemos-uke-linux-kernel-mainline` RPMs with core, modules and DTB subpackages,
