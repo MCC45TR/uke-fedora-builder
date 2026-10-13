@@ -70,6 +70,13 @@ audit-initramfs)
     if [[ -s /job/inputs/early-firmware.tar ]]; then
         cmp /job/early-firmware.sha256 <(jq -r '"#archive-sha256 "+.archive_sha256, (.files[]|.sha256+"  "+.path)' /builder/configs/firmware/uke-adsp-early.json)
         bash /builder/src/boot-pair/check-early-firmware.sh /job/initramfs-root /job/early-firmware.sha256
+        for name in qrtr_smd qcom_pd_mapper; do
+            modinfo -b /job/initramfs-root -k "$release" "$name" >/dev/null
+        done
+        # Dracut processes these synchronous preloads before udev coldplug.
+        # Presence alone did not establish readiness in the rejected trial.
+        preloads=$(cat /job/initramfs-root/etc/cmdline.d/*.conf | sed -n 's/^rd.driver.pre=//p' | head -2)
+        [[ $preloads == $'qrtr_smd\nqcom_pd_mapper' ]]
         # Preserve authenticated vendor blobs; exact hashes admit their OEM build paths only.
         privacy=(--namespace-policy /builder/configs/firmware/uke-adsp-early.json)
     fi
