@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "policy": "Original signed Fedora namespace files with owner-approved KDE exceptions",
+  "policy": "Original signed Fedora namespace files with approved KDE exceptions",
   "source": "https://src.fedoraproject.org/",
   "files": [
     {
@@ -36,277 +36,277 @@
     {
       "path": "usr/bin/kioclient",
       "sha256": "2013c29e13f4d778fccf11997fff85b144d4679fed62736a6bdb0fe337937ed2",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/qt6/qml/QtTest/TestCase.qml",
       "sha256": "bfbcc47f8b5996720b0d136100da712e8447a6beb14e68f90138284c85b8811b",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/libksba.so.8.16.1",
       "sha256": "aef2c4d10e5947fb97380ce1935e0438a3433496e2751fac436e1b9f5c09f014",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/python3.15/pydoc_data/topics.pyc",
       "sha256": "21830c1082a5a993bbbc2d178d37469499eac686654b5127645d8aa9e78e31c7",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/python3.15/venv/scripts/common/Activate.ps1",
       "sha256": "eb8ce20f580877d300c4fed60a7f36daa18715d35c50bb3596d6995d023b4ffe",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/libsamba-hostconfig.so.0.0.1",
       "sha256": "7d7bab8d8db8fb2380d89ca12a429fd6e84185a7c9c6a49bf27a4b16a3d71c0d",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/libsmbconf.so.0.0.1",
       "sha256": "24820ec8b3d41a730815c45277517b5153d460e1a90b630456aeba9d2443d089",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/libgtk-3.so.0.2420.32",
       "sha256": "d1108f4c96d95cad721a413411a787b44373bdd14f8493253bf24bb849bf9eef",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/libKF6WidgetsAddons.so.6.31.0",
       "sha256": "ef4d7661229c640968d759191b948d6163bdb44aaca10f22e6f22dbca28694ff",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/lib64/libKF6BreezeIcons.so.6.31.0",
       "sha256": "f5693eb9d882a0042fd37442177ef6b4867de23ebd438615c9bb77eb0386846e",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/actions/16/pan-down-symbolic.svg",
       "sha256": "adf7e5d39d0384f50b9bf65bc0df0b316ae1a547930d862a50e1ee085bc5647f",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/actions/16/pan-end-symbolic.svg",
       "sha256": "33f56ac1efea051e7be33f8823ad6846a29b9fdacb3dcc8ff497eff6a9f2fe0c",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/actions/16/pan-start-symbolic.svg",
       "sha256": "fe838de8b681008e1cc747e631e41cf8940ff7826b92890fac0781911e8796a2",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/actions/16/pan-up-symbolic.svg",
       "sha256": "2f2b8d163cd1912bff695cdf7e9ca7861ea6acaee4d632e8b364d7f746bc6fc8",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/actions/16/selection-end-symbolic.svg",
       "sha256": "d5a6bc81a2a322f10c7cbf2d4e5816e6ab8e243381dfd116ba9f9b3d521ede3b",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/actions/16/selection-start-symbolic.svg",
       "sha256": "5de3b98b9e30428466093ebb4971750283300b6317e3e741530386782f2a0a66",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kdesvn.svg",
       "sha256": "027ea05a840df74a14d0ceef31d8580765f4990db8a24e68af4f3483cfc09144",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kgeography.svg",
       "sha256": "de484d0b45251bc3d20d6e10530e61a8cae96027932185b9414a30272ce5dbac",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/khangman.svg",
       "sha256": "8af44f69b02c7c042675a13b665e5ffe98427e5d1c58277cd682c015648a85b4",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kiten.svg",
       "sha256": "e846f9f5b9504e1be500c43e23fce0bdadfa4c9f4ad379606ff99535d79c646c",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kmahjongg.svg",
       "sha256": "b34178109f6a85186cf59d4be23d8916ef1607d97ed44351d07240bac89ed70a",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kmplot.svg",
       "sha256": "642c169d0b74668d4f256576757b378110374832e8c229363310a3221deb6b77",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kstars.svg",
       "sha256": "0d2637e63fd53a0624f7a5cdbdd1d80b150e9bce247f1a3c1d445183bb3e0802",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kteatime.svg",
       "sha256": "2086bf17b9dc2de379fe0085d464f1b47b9ee4878c5ebc7e53230d6acea69b77",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/kxstitch.svg",
       "sha256": "205cc21bb025788c17984d7e070e3e430dd849581be362f2c7fc70aad49a82fd",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/massif-visualizer.svg",
       "sha256": "d72137dd92f6902173cbe6340e219f28b0047e0900f1689efab492f7a6a3699b",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/apps/48/zanshin.svg",
       "sha256": "bd936d8f954bf6b3558a2006328a379317e9e3be353d28d452eecf31ca84cbd6",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/status/22/user-idle.svg",
       "sha256": "de738a348dfcb4217f0e94d1ded30621a84498da604156f6832efce4b1c9210d",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze-dark/status/24/user-idle.svg",
       "sha256": "56b2bd4fa82884da25e70b563a64a0c876a3e73153687ad4fddb6c1dd3c90e01",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/actions/16/pan-down-symbolic.svg",
       "sha256": "adf7e5d39d0384f50b9bf65bc0df0b316ae1a547930d862a50e1ee085bc5647f",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/actions/16/pan-end-symbolic.svg",
       "sha256": "33f56ac1efea051e7be33f8823ad6846a29b9fdacb3dcc8ff497eff6a9f2fe0c",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/actions/16/pan-start-symbolic.svg",
       "sha256": "fe838de8b681008e1cc747e631e41cf8940ff7826b92890fac0781911e8796a2",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/actions/16/pan-up-symbolic.svg",
       "sha256": "2f2b8d163cd1912bff695cdf7e9ca7861ea6acaee4d632e8b364d7f746bc6fc8",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/actions/16/selection-end-symbolic.svg",
       "sha256": "d5a6bc81a2a322f10c7cbf2d4e5816e6ab8e243381dfd116ba9f9b3d521ede3b",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/actions/16/selection-start-symbolic.svg",
       "sha256": "5de3b98b9e30428466093ebb4971750283300b6317e3e741530386782f2a0a66",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kdesvn.svg",
       "sha256": "027ea05a840df74a14d0ceef31d8580765f4990db8a24e68af4f3483cfc09144",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kgeography.svg",
       "sha256": "de484d0b45251bc3d20d6e10530e61a8cae96027932185b9414a30272ce5dbac",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/khangman.svg",
       "sha256": "8af44f69b02c7c042675a13b665e5ffe98427e5d1c58277cd682c015648a85b4",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kiten.svg",
       "sha256": "e846f9f5b9504e1be500c43e23fce0bdadfa4c9f4ad379606ff99535d79c646c",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kmahjongg.svg",
       "sha256": "b34178109f6a85186cf59d4be23d8916ef1607d97ed44351d07240bac89ed70a",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kmplot.svg",
       "sha256": "642c169d0b74668d4f256576757b378110374832e8c229363310a3221deb6b77",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kstars.svg",
       "sha256": "0d2637e63fd53a0624f7a5cdbdd1d80b150e9bce247f1a3c1d445183bb3e0802",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kteatime.svg",
       "sha256": "2086bf17b9dc2de379fe0085d464f1b47b9ee4878c5ebc7e53230d6acea69b77",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/kxstitch.svg",
       "sha256": "205cc21bb025788c17984d7e070e3e430dd849581be362f2c7fc70aad49a82fd",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/massif-visualizer.svg",
       "sha256": "d72137dd92f6902173cbe6340e219f28b0047e0900f1689efab492f7a6a3699b",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/apps/48/zanshin.svg",
       "sha256": "bd936d8f954bf6b3558a2006328a379317e9e3be353d28d452eecf31ca84cbd6",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/status/22/user-idle.svg",
       "sha256": "b4a6b017afeeb909b318ab51833a4f83f21d189ee5f46bfb133704934437a95d",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/icons/breeze/status/24/user-idle.svg",
       "sha256": "4e6f83422cb8d91df53809df119787abae13cc66949dc1db24a37333e118baa1",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/locale/en_GB/LC_MESSAGES/kioclient.mo",
       "sha256": "435ab6bfebce0c0d3fc9b9719dbcb82445ed6c9417aa930ce383187b6faedb91",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/pixmaps/fedora-logo-sprite.svg",
       "sha256": "1f8aa21e5d4171ab5263758252054bae21e546f9c26683f0e37f2eace9e3e394",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/kf6/kdoctools/customization/kde-chunk-online.xsl",
       "sha256": "f1ba924d1b3c3283dd0b8e6603d6d9f4e8401df03058d1582dde090b6385224a",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/kf6/kdoctools/customization/kde-chunk.xsl",
       "sha256": "d4897de2c2e702f633378d26ed45c688dddb978692d5400284ee815fa9afac49",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/kf6/kdoctools/customization/kde-nochunk.xsl",
       "sha256": "6e8067936c3709f38c02e09a4417c83b96651d63ff02dcfa858ef6ca276d15ce",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/kf6/kdoctools/customization/kde-web.xsl",
       "sha256": "083ddd06d29e5c55651fe0eaefadf90aedf568f5428cf92b861f376f45e04aae",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     },
     {
       "path": "usr/share/gdb/auto-load/usr/lib64/libpython3.15.so.1.0-gdb.py",
       "sha256": "e95edede95ab6c4298e163ac7140db90316bb7a1c842e54ced000c7bb9822642",
-      "purpose": "Owner-approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+      "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
     }
   ]
 }

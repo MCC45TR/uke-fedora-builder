@@ -1,6 +1,8 @@
 # Original Fedora KDE dependency admission
 
-The owner permits Python only in the original Fedora KDE dependency closure.
+The development KDE exception permits Python only in original Fedora KDE
+dependencies. This historical exception does not meet the Python-free release
+policy; a compliant KDE release remains blocked.
 Project startup, services and tests remain native or shell. Core and early
 initramfs retain their strict Python-free audit. KDE applications are never
 cloned, forked or rebuilt as Uke variants.
@@ -32,5 +34,5 @@ Wayland session does not prove Adreno acceleration, native panel control,
 touch, automatic rotation or light sensing. Public images additionally require
 privacy/identity/firmware provenance checks, complete filesystem readback,
 checksums, recovery instructions and the matching kernel/early-module tuple.
-Private owner credentials, keys, logs, calibration and firmware must not become
+Private credentials, keys, logs, calibration and firmware must not become
 release assets. The live root copy is not an offline filesystem snapshot.
