@@ -41,6 +41,8 @@ cat > /etc/fstab <<'FSTAB'
 LABEL=UKE_LINUX / ext4 defaults 0 1
 LABEL=UKE_ESP /boot/efi vfat umask=0077,nofail 0 2
 FSTAB
+cat /builder/configs/images/uke-persist.fstab >> /etc/fstab
+install -d -m700 /mnt/vendor/persist
 cat > /etc/selinux/config <<'SELINUX'
 SELINUX=enforcing
 SELINUXTYPE=targeted

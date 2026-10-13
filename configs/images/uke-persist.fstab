@@ -1,0 +1,2 @@
+# Keep OEM calibration private and prevent ext4 journal replay or automatic fsck.
+PARTLABEL=persist /mnt/vendor/persist ext4 ro,noload,nodev,nosuid,noexec,nofail,x-systemd.device-timeout=10s 0 0

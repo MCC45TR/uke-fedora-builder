@@ -34,6 +34,7 @@ pair_recipe_hash() {
         "$dir"/src/image/host-lib.sh "$dir"/src/image/ext4-labels.cpp "$dir"/src/audit/*.sh \
         "$dir"/configs/images/selinux-namespace-policy.json \
         "$dir"/configs/firmware/uke-adsp-early.json \
+        "$dir"/configs/images/uke-persist.fstab \
         "$kernel"/src/boot/{uke-abl.c,prepare-abl-source.sh,sm7675-uke-ufs.dtso,sm7675-uke-usb2.dtso} \
         "$kernel"/src/boot/vendor/* \
         "$kernel"/patches/boot/*.patch "$kernel"/tests/abl-dt-{check.cpp,contract.sh} \
