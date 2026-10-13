@@ -41,6 +41,10 @@ pair_freeze_recipe "$kernel" "$recipe"
 chmod 444 "$WORK/kernel-recipe/src/boot/uke-abl.c"
 pair_freeze_recipe "$kernel" "$recipe"
 [[ $(stat -c %a "$WORK/kernel-recipe/src/boot/uke-abl.c") == 444 ]]
+grep -Fx 'PARTLABEL=persist /mnt/vendor/persist ext4 ro,noload,nodev,nosuid,noexec,nofail,x-systemd.device-timeout=10s 0 0' "$WORK/recipe/configs/images/uke-persist.fstab"
+printf '# tamper\n' >> "$WORK/recipe/configs/images/uke-persist.fstab"
+if (pair_freeze_recipe "$kernel" "$recipe") >/dev/null 2>&1; then echo 'Tampered persist policy accepted' >&2; exit 1; fi
+cp "$BUILDER/configs/images/uke-persist.fstab" "$WORK/recipe/configs/images/uke-persist.fstab"
 printf 'tamper\n' >> "$WORK/recipe/src/boot-pair/root-status.sh"
 if (pair_freeze_recipe "$kernel" "$recipe") >/dev/null 2>&1; then echo 'Tampered frozen recipe accepted' >&2; exit 1; fi
 echo 'Pair CLI, scope, non-mutation and frozen-recipe resume contracts passed'
