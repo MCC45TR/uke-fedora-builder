@@ -31,6 +31,11 @@ if [[ ${*: -2} == 'sh -s' ]]; then
     cat >/dev/null
     [[ ${FOREIGN_IDENTITY:-0} == 0 ]] || exit 1
 fi
+if [[ ${FAIL_EARLY:-0} == 1 && ${*: -1} == *'uname -a;'* ]]; then
+    if [[ ${*: -1} == 'set -e; '* ]]; then bash -c 'set -e; false; true';
+    else bash -c 'false; true'; fi
+    exit $?
+fi
 echo 'Fixture observation'
 EOF
 chmod +x "$scratch/bin/fastboot" "$scratch/bin/ssh"
@@ -67,5 +72,10 @@ test "$(stat -c %a "$scratch/collection/kernel.log")" == 600
 if bash "$runner" collect fixture "$scratch/collection"; then exit 1; fi
 if FOREIGN_IDENTITY=1 bash "$runner" collect fixture "$scratch/foreign"; then exit 1; fi
 test ! -e "$scratch/foreign/kernel.log"
+code=0
+FAIL_EARLY=1 bash "$runner" collect fixture "$scratch/early-failure" || code=$?
+test "$code" == 2
+grep -qx $'startup\t1' "$scratch/early-failure/results.tsv"
+test -s "$scratch/early-failure/kernel.log"
 if grep -Eq '(^| )(flash|erase|set_active|reboot)( |$)' "$CALLS"; then exit 1; fi
 echo 'PASS: verified RAM boot, foreign/multiple-device refusal, corrupt/path rejection and private identity-gated collection; no physical transport used.'

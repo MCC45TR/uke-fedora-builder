@@ -84,21 +84,21 @@ EOF
     capture() {
         local name=$1 command=$2
         rc=0
-        timeout -k 2 30 "${remote[@]}" "$command" > "$output/$name.log" 2>&1 || rc=$?
+        timeout -k 2 30 "${remote[@]}" "set -e; $command" > "$output/$name.log" 2>&1 || rc=$?
         printf '%s\t%s\n' "$name" "$rc" >> "$output/results.tsv"
         ((rc==0)) || failures=1
     }
-    capture startup 'uname -a; cat /proc/cmdline; findmnt /; systemctl --no-pager --failed; systemctl --no-pager status uke-boot-guard.service; systemctl show uke-boot-guard.service -p Result -p ExecMainStatus -p ActiveState'
+    capture startup 'uname -a; cat /proc/cmdline; findmnt /; systemctl --no-pager --failed; systemctl show uke-boot-guard.service -p LoadState -p Result -p ExecMainStatus -p ActiveState'
     capture kernel 'dmesg --color=never'
     capture journal 'journalctl -b --no-pager -n 1800 -o short-monotonic'
     capture previous 'journalctl -b -1 --no-pager -n 500 -o short-monotonic'
     capture pstore 'find /sys/fs/pstore -maxdepth 1 -type f -exec cat {} +'
-    capture power 'for p in /sys/class/power_supply/*/uevent /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp /sys/devices/system/cpu/cpufreq/policy*/scaling_cur_freq /sys/class/devfreq/*/cur_freq; do test ! -f "$p" || { echo "$p"; timeout -k 1 2 cat "$p"; }; done'
-    capture display 'for p in /sys/class/drm/card*-*/status /sys/class/drm/card*-*/modes /sys/class/drm/card*-*/enabled /sys/class/backlight/*/brightness /sys/class/backlight/*/actual_brightness /sys/class/backlight/*/max_brightness /sys/class/backlight/*/bl_power; do test ! -f "$p" || { echo "$p"; timeout -k 1 2 cat "$p"; }; done; command -v modetest >/dev/null && timeout -k 2 8 modetest -c -p'
+    capture power 'for p in /sys/class/power_supply/*/uevent /sys/class/thermal/thermal_zone*/type /sys/class/thermal/thermal_zone*/temp /sys/devices/system/cpu/cpufreq/policy*/scaling_cur_freq /sys/class/devfreq/*/cur_freq; do if test -f "$p"; then echo "$p"; timeout -k 1 2 cat "$p"; fi; done'
+    capture display 'for p in /sys/class/drm/card*-*/status /sys/class/drm/card*-*/modes /sys/class/drm/card*-*/enabled /sys/class/backlight/*/brightness /sys/class/backlight/*/actual_brightness /sys/class/backlight/*/max_brightness /sys/class/backlight/*/bl_power; do if test -f "$p"; then echo "$p"; timeout -k 1 2 cat "$p"; fi; done; command -v modetest >/dev/null && timeout -k 2 8 modetest -c -p'
     capture input 'cat /proc/bus/input/devices; command -v libinput >/dev/null && timeout -k 2 8 libinput list-devices'
-    capture sensors 'findmnt /mnt/vendor/persist; systemctl --no-pager status uke-ssc-root.service uke-ssc-sensors.service iio-sensor-proxy.service; busctl --auto-start=no --timeout=3 --system introspect net.hadess.SensorProxy /net/hadess/SensorProxy'
-    capture usb 'for p in /sys/class/typec/*/data_role /sys/class/typec/*/power_role /sys/class/usb_role/*/role /sys/class/udc/*/state; do test ! -f "$p" || { echo "$p"; timeout -k 1 2 cat "$p"; }; done; command -v lsusb >/dev/null && lsusb -t'
-    capture sessions 'loginctl list-sessions --no-pager; for p in /sys/bus/platform/drivers/nvmem-reboot-mode/*/of_node; do test ! -e "$p" || readlink -f "$p"; done'
+    capture sensors 'findmnt /mnt/vendor/persist; systemctl show uke-ssc-root.service uke-ssc-sensors.service iio-sensor-proxy.service -p Id -p LoadState -p ActiveState -p SubState -p Result; busctl --auto-start=no --timeout=3 --system introspect net.hadess.SensorProxy /net/hadess/SensorProxy'
+    capture usb 'for p in /sys/class/typec/*/data_role /sys/class/typec/*/power_role /sys/class/usb_role/*/role /sys/class/udc/*/state; do if test -f "$p"; then echo "$p"; timeout -k 1 2 cat "$p"; fi; done; command -v lsusb >/dev/null && lsusb -t'
+    capture sessions 'loginctl list-sessions --no-pager; for p in /sys/bus/platform/drivers/nvmem-reboot-mode/*/of_node; do if test -e "$p"; then readlink -f "$p"; fi; done'
     (cd "$output" && sha256sum ./*.log results.tsv > SHA256SUMS)
     echo "Private collection completed; each command exit status is in results.tsv (nonzero is not hardware acceptance)."
     ((failures==0)) || return 2
