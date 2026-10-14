@@ -31,3 +31,9 @@ installation, display, touch, charging or hardware-virtualization acceptance.
 See the [hardware report](https://github.com/MCC45TR/uke-linux) for observed
 support and remaining work, and each COPR build page for source revisions,
 dependency versions and logs. Keep a tested recovery route before device trials.
+
+The custom `libstdc++` package targets runtime images. Fedora's compiler and
+`libstdc++-devel` packages require their exact Fedora runtime release, so a
+mixed development-toolchain transaction is not supported by this selection.
+DNF must retain that dependency check; a matching development stack needs
+separate packaging and validation.
