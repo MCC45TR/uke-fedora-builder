@@ -37,3 +37,17 @@ The custom `libstdc++` package targets runtime images. Fedora's compiler and
 mixed development-toolchain transaction is not supported by this selection.
 DNF must retain that dependency check; a matching development stack needs
 separate packaging and validation.
+
+Automatic rotation and ambient brightness preview:
+
+```sh
+sudo dnf install uke-adaptive-display
+```
+
+This selects SSC-enabled SensorProxy and native file transport for original
+desktop clients. Activation is explicit; installation leaves the integration
+target disabled. Matched device-local sensor firmware/configuration and a
+read-only factory calibration mount are required separately. Read the installed
+`ADAPTIVE-DISPLAY.md` before enabling `uke-adaptive-display.target`. Four-pose
+rotation, front-light discovery, lux response and desktop behavior require
+physical validation. Raw rear-light readings must not be treated as lux.
