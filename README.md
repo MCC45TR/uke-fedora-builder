@@ -12,7 +12,10 @@ software KDE and Wi-Fi SSH. The revised initramfs starts ADSP charger services
 and exposes battery readings in a fresh RAM boot. Repeated cold boots, normal
 slot-B startup and automatic charging still need testing.
 Finger input and ten simultaneous touch contacts also worked in the
-14 October tablet test; stylus and touch lifecycle checks remain open.
+14 October tablet test; stylus and touch lifecycle checks remain open. Power
+and volume buttons and manual backlight control also worked. Backlight
+adjustment is linear and difficult to use comfortably; a logarithmic curve is
+planned.
 
 Published Core and KDE prebuild roots have separate host/filesystem checks;
 those exact root images have not been booted on the tablet. Current device
