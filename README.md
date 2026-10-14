@@ -5,12 +5,14 @@ Kernel sources and RPM rules are maintained in the [Senemos repository](https://
 
 [Project status](https://github.com/MCC45TR/uke-linux) · [Architecture](docs/ARCHITECTURE.md) · [Development COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/) · [Image releases](https://github.com/MCC45TR/uke-linux-images/releases)
 
-## Status — 13 October 2026
+## Status — 14 October 2026
 
 Matched RAM boots reach the tablet console, the existing 64 GiB Fedora root,
 software KDE and Wi-Fi SSH. The revised initramfs starts ADSP charger services
 and exposes battery readings in a fresh RAM boot. Repeated cold boots, normal
 slot-B startup and automatic charging still need testing.
+Finger input and ten simultaneous touch contacts also worked in the
+14 October tablet test; stylus and touch lifecycle checks remain open.
 
 Published Core and KDE prebuild roots have separate host/filesystem checks;
 those exact root images have not been booted on the tablet. Current device
