@@ -307,6 +307,21 @@
       "path": "usr/share/gdb/auto-load/usr/lib64/libpython3.15.so.1.0-gdb.py",
       "sha256": "e95edede95ab6c4298e163ac7140db90316bb7a1c842e54ced000c7bb9822642",
       "purpose": "Approved unchanged original signed Fedora package example or authoring metadata; exact path and SHA-256 only"
+    },
+    {
+      "path": "usr/bin/fastfetch",
+      "sha256": "fa4f47101cd69e16717af8728ac66ca4fb7e0ee6e2773ea34c33c893366c6223",
+      "purpose": "Original Fastfetch Homebrew package-count detection uses the public Linuxbrew installation namespace"
+    },
+    {
+      "path": "usr/lib64/qt6/libexec/gn",
+      "sha256": "15d7742ef07df9e0658079ac155b9c66548ffbeed55dc1f313429edcc596056e",
+      "purpose": "Original Qt WebEngine GN executable contains upstream source-root and path-rebasing help examples"
+    },
+    {
+      "path": "usr/lib64/libkateprivate.so.26.08.2",
+      "sha256": "a0592fd3aeed7d5e5e7cf5ca0d647ff7b5a6884a79363885bab9a312994946df",
+      "purpose": "Original Kate library embeds a generic USER placeholder in the PATH configuration example"
     }
   ]
 }
