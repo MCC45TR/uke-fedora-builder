@@ -13,7 +13,7 @@ jobs:
       - name: Install host verification tools
         run: |
           sudo apt-get update
-          sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep device-tree-compiler g++ libext2fs-dev libselinux1-dev
+          sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep device-tree-compiler g++ libext2fs-dev libselinux1-dev cpio
       - name: Validate scripts and admission contracts
         run: |
           # SC2015 in older ShellCheck flags the intentional UUID-and-type
@@ -23,6 +23,7 @@ jobs:
           bash tests/image-contract.sh
           bash tests/boot-contract.sh
           bash tests/boot-pair-contract.sh
+          bash tests/alpha-root-variant-contract.sh
           bash tests/boot-pair-serial-contract.sh
           bash tests/initramfs-module-tuple.sh
           bash tests/kernel-config-contract.sh
