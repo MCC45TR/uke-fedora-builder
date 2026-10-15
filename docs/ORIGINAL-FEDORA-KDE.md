@@ -1,8 +1,8 @@
 # Original Fedora KDE dependency admission
 
-The development KDE exception permits Python only in original Fedora KDE
-dependencies. This historical exception does not meet the Python-free release
-policy; a compliant KDE release remains blocked.
+The 14 October 2026 exception permits the Fedora root to retain Python supplied
+by unmodified original Fedora desktop dependencies, including KDE and GStreamer
+helpers. File bytes must match separately verified signed original RPMs.
 Project startup, services and tests remain native or shell. Core and early
 initramfs retain their strict Python-free audit. KDE applications are never
 cloned, forked or rebuilt as Uke variants.
