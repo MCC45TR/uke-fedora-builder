@@ -22,10 +22,11 @@ those exact root images have not been booted on the tablet. Current device
 results come from a different development installation. See the
 [hardware table](https://github.com/MCC45TR/uke-linux#hardware-support).
 
-Core and early-initramfs payloads reject Python. Original Fedora KDE dependencies
-currently conflict with that target policy, so a compliant KDE release remains
-blocked. Project device helpers use native code or shell. KDE applications are
-not cloned, forked or rebuilt as Uke variants.
+Core and early-initramfs payloads reject Python. The Fedora root may retain
+Python supplied by unmodified original Fedora desktop dependencies, under the
+14 October exception. Those files must match separately verified signed RPMs.
+Project device helpers remain native code or shell. KDE applications are not
+cloned, forked or rebuilt as Uke variants.
 
 ## Build commands
 
