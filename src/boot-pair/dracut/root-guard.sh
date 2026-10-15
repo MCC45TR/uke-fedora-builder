@@ -37,7 +37,21 @@ root_probe_diagnostics() {
     exit "$status"
 }
 trap 'root_probe_diagnostics' EXIT
-selected=/dev/disk/by-partlabel/linux
+partlabel=''
+set -f
+# Kernel arguments are space-separated words; globbing stays disabled here.
+# shellcheck disable=SC2013
+for argument in $(cat /proc/cmdline); do
+    case "$argument" in
+        root=PARTLABEL=linux|root=PARTLABEL=userdata)
+            [ -z "$partlabel" ] || { echo 'UKE_ROOT_REJECTED: multiple root selectors' >&2; exit 1; }
+            partlabel=${argument#root=PARTLABEL=};;
+        root=*) echo 'UKE_ROOT_REJECTED: unsupported root selector' >&2; exit 1;;
+    esac
+done
+set +f
+[ -n "$partlabel" ] || { echo 'UKE_ROOT_REJECTED: missing root selector' >&2; exit 1; }
+selected=/dev/disk/by-partlabel/$partlabel
 read -r uptime _ < /proc/uptime
 started=${uptime%%.*}
 udevadm settle --timeout=40 || {
@@ -53,16 +67,16 @@ while [ "$attempt" -lt 45 ]; do
         while IFS='=' read -r key value; do
             case "$key" in PARTNAME) name=$value;; DEVNAME) device=$value;; esac
         done < "$metadata"
-        [ "$name" = linux ] || continue
+        [ "$name" = "$partlabel" ] || continue
         case "$(readlink -f "${metadata%/uevent}")" in
             */virtual/block/*)
-                echo 'UKE_ROOT_REJECTED: linux is not a physical partition' >&2; exit 1;;
+                echo "UKE_ROOT_REJECTED: $partlabel is not a physical partition" >&2; exit 1;;
         esac
         count=$((count + 1))
         candidate=/dev/$device
     done
     if [ "$count" -gt 1 ]; then
-        echo 'UKE_ROOT_REJECTED: multiple linux partitions' >&2; exit 1
+        echo "UKE_ROOT_REJECTED: multiple $partlabel partitions" >&2; exit 1
     fi
     if [ "$count" -eq 1 ] && [ -b "$candidate" ] && [ -e "$selected" ]; then
         [ "$(readlink -f "$selected")" = "$(readlink -f "$candidate")" ] || {
@@ -71,7 +85,10 @@ while [ "$attempt" -lt 45 ]; do
         [ "$(blkid -p -s TYPE -o value "$candidate")" = ext4 ] || {
             echo 'UKE_ROOT_REJECTED: unexpected filesystem identity' >&2; exit 1;
         }
-        echo 'UKE_ROOT_ADMITTED: unique physical linux partition contains ext4'
+        [ "$(blkid -p -s LABEL -o value "$candidate")" = UKE_LINUX ] || {
+            echo 'UKE_ROOT_REJECTED: unexpected filesystem label' >&2; exit 1;
+        }
+        echo "UKE_ROOT_ADMITTED: unique physical $partlabel partition contains UKE_LINUX ext4"
         exit 0
     fi
     attempt=$((attempt + 1))
@@ -79,5 +96,5 @@ while [ "$attempt" -lt 45 ]; do
     [ "$(( ${uptime%%.*} - started ))" -lt 45 ] || break
     sleep 1
 done
-echo 'UKE_ROOT_REJECTED: matching linux partition unavailable' >&2
+echo "UKE_ROOT_REJECTED: matching $partlabel partition unavailable" >&2
 exit 1
