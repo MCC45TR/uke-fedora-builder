@@ -1,0 +1,33 @@
+{
+  "schema_version": 1,
+  "device": "uke",
+  "architecture": "aarch64",
+  "distribution": "fedora",
+  "release": "rawhide",
+  "profile": "plasma-first-run",
+  "package_selection": {
+    "repository": "https://github.com/MCC45TR/uke-linux-hardware-support",
+    "commit": "b35ad5ec73f33f0c6faba454b04bb3541dc26592",
+    "path": "uke-desktop-metas/src/plasma.json",
+    "additional_packages": ["plasma-setup", "dnf5-plugins", "power-profiles-daemon", "sudo"]
+  },
+  "first_run": {
+    "package": "plasma-setup",
+    "precreated_user": false,
+    "root_password_locked": true,
+    "user_groups": ["wheel"],
+    "passwordless_sudo": false,
+    "regular_user_autologin": false
+  },
+  "copr": {
+    "project": "mcc45tr/uke-linux-test",
+    "chroot": "fedora-rawhide-aarch64",
+    "enabled": true,
+    "gpgcheck": true,
+    "key_fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E",
+    "native_dnf_plugin": true,
+    "kernel_updates": "blocked-until-matched-boot-module-payload"
+  },
+  "boot_tested": false,
+  "hardware_tested": false
+}

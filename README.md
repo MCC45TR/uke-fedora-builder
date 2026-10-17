@@ -5,6 +5,11 @@ Kernel sources and RPM rules are maintained in the [Senemos repository](https://
 
 [Project status](https://github.com/MCC45TR/uke-linux) · [Architecture](docs/ARCHITECTURE.md) · [Development COPR](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/) · [Image releases](https://github.com/MCC45TR/uke-linux-images/releases)
 
+The [Plasma first-run recipe](docs/PLASMA-FIRST-RUN.md) prepares the full original
+Fedora desktop selection, user-created accounts and the enabled development
+COPR. Offline checks are separate from first-run GUI and tablet acceptance;
+the currently published Alpha image is not replaced by this source change.
+
 ## Status — 14 October 2026
 
 Matched RAM boots reach the tablet console, the existing 64 GiB Fedora root,
