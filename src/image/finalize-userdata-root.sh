@@ -1,0 +1,82 @@
+#!/usr/bin/env bash
+# Offline host composer. Original Fedora desktop files are not rewritten.
+set -Eeuo pipefail
+root=/job/root
+[[ $# == 0 && -f /job/packages.complete && ! -L $root && ! -e /job/rootfs-frozen ]]
+[[ $(stat -c %u "$root/etc/passwd") == 0 ]]
+rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin \
+    plasma-discover-offline-updates plasma-discover-packagekit PackageKit \
+    glibc-all-langpacks ncurses dnf5-plugins shadow-utils sudo >/dev/null
+[[ -x $root/usr/bin/clear && -f $root/usr/lib/systemd/system/plasmalogin.service ]]
+if rpm --root "$root" -qa --qf '%{NAME}\n' | grep -E '(^sddm|-(debuginfo|debugsource)$|^gcc$|^gdb$|^clang$|^make$)'; then exit 1; fi
+awk -F: '$3>=1000 && $3!=65534 {bad=1; print "Unexpected human account: " $1 > "/dev/stderr"} END {exit bad}' "$root/etc/passwd"
+chroot "$root" /usr/sbin/usermod -L root
+grep -Eq '^root:(!|\*)' "$root/etc/shadow"
+chroot "$root" /usr/sbin/visudo -cf /etc/sudoers
+grep -Eq '^%wheel[[:space:]]+ALL=\(ALL\)[[:space:]]+ALL' "$root/etc/sudoers"
+if grep -rE '^[^#].*NOPASSWD' "$root/etc/sudoers" "$root/etc/sudoers.d"; then exit 1; fi
+mkdir -p "$root/etc/xdg" "$root/etc/rpm" "$root/etc/dnf" "$root/etc/yum.repos.d"
+chroot "$root" /usr/bin/kwriteconfig6 --file /etc/xdg/plasmasetuprc --group Accounts --key UserGroups wheel
+chroot "$root" /usr/bin/systemd-sysusers /usr/lib/sysusers.d/plasma-setup-sysuser.conf
+[[ ! -e $root/etc/plasma-setup-done ]]
+systemctl --root="$root" enable plasma-setup.service plasmalogin.service NetworkManager.service \
+    firewalld.service bluetooth.service chronyd.service
+systemctl --root="$root" set-default graphical.target
+systemctl --root="$root" mask debug-shell.service sshd.service NetworkManager-wait-online.service \
+    uke-cdc-shell.service uke-esp32-cdc-log.service uke-boot-guard.service
+[[ $(readlink "$root/etc/systemd/system/display-manager.service") == /usr/lib/systemd/system/plasmalogin.service ]]
+cat > "$root/etc/fstab" <<'FSTAB'
+PARTLABEL=userdata / f2fs defaults,noatime 0 0
+FSTAB
+cat /builder/configs/images/uke-persist.fstab >> "$root/etc/fstab"
+install -d -m700 "$root/mnt/vendor/persist"
+cat > "$root/etc/selinux/config" <<'SELINUX'
+SELINUX=enforcing
+SELINUXTYPE=targeted
+SELINUX
+printf '%%_install_langs all\n' > "$root/etc/rpm/macros.uke-languages"
+install -m644 /job/inputs/uke-copr.asc "$root/etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr"
+cat > "$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux.repo" <<'REPO'
+[copr:copr.fedorainfracloud.org:mcc45tr:uke-linux]
+name=Uke Linux
+baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux/fedora-rawhide-$basearch/
+enabled=1
+type=rpm-md
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr
+skip_if_unavailable=False
+priority=50
+includepkgs=senemos-uke-linux-kernel-mainline*,uke-*,kde-plasma-uke-meta,libstdc++,mesa-*,libssc*,iio-sensor-proxy
+REPO
+# A candidate must not install a new kernel without its qualified slot writer.
+cat > "$root/etc/dnf/dnf.conf" <<'DNF'
+[main]
+install_weak_deps=False
+allow_vendor_change=False
+installonly_limit=3
+excludepkgs=kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,senemos-uke-linux-kernel-mainline*
+DNF
+printf 'LANG=en_US.UTF-8\n' > "$root/etc/locale.conf"
+printf 'localhost\n' > "$root/etc/hostname"
+printf '127.0.0.1 localhost\n::1 localhost\n' > "$root/etc/hosts"
+printf '# Managed by NetworkManager\n' > "$root/etc/resolv.conf"
+find "$root/etc/ssh" -maxdepth 1 -name 'ssh_host_*' -type f -delete
+find "$root/var/log" "$root/var/cache" "$root/tmp" "$root/var/tmp" -mindepth 1 -depth -delete
+find "$root/root" -mindepth 1 -name '.*history' -type f -delete
+for file in etc/machine-id var/lib/dbus/machine-id var/lib/systemd/random-seed; do
+    [[ ! -d $root/$file ]]
+    if [[ -e $root/$file || -L $root/$file ]]; then unlink "$root/$file"; fi
+done
+: > "$root/etc/machine-id"
+mkdir -p "$root/var/lib/dbus" "$root/usr/share/uke"
+ln -s /etc/machine-id "$root/var/lib/dbus/machine-id"
+install -m644 /builder/configs/images/userdata-rawhide.json "$root/usr/share/uke/image-profile.json"
+printf 'userdata-f2fs-20261018-rc1\n' > "$root/usr/share/uke/image-finalized"
+for tree in dev proc sys run; do
+    if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then
+        echo 'Mounted runtime tree refused during offline finalization' >&2; exit 1
+    fi
+    find "$root/$tree" -mindepth 1 -depth -delete
+done
+echo 'Fresh Plasma Setup, locked root, PLM, offline updates and stable COPR configured; kernel activation remains gated.'

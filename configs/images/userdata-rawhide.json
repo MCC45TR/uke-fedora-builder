@@ -1,0 +1,40 @@
+{
+  "schema_version": 1,
+  "device": "uke",
+  "architecture": "aarch64",
+  "distribution": "fedora",
+  "release": "rawhide",
+  "profile": "plasma-userdata-release-candidate",
+  "root_partition": "userdata",
+  "root_filesystem": "f2fs",
+  "root_label": "UKE_LINUX",
+  "secure_boot": false,
+  "copr": {
+    "project": "mcc45tr/uke-linux",
+    "key_fingerprint": "30DFB81A724CE0762F9DF77F844A293E5068FAFE"
+  },
+  "desktop_source_commit": "e12f72a83cfd40bdd2436c3de270e8c796ccf5f2",
+  "desktop_source_path": "uke-desktop-metas/src/plasma.json",
+  "additional_packages": [
+    "plasma-setup", "kde-settings-plasmalogin", "ncurses", "less", "which",
+    "findutils", "diffutils", "iproute", "iputils", "procps-ng", "psmisc",
+    "usbutils", "pciutils", "util-linux", "file", "zstd", "xz", "unzip",
+    "sudo", "shadow-utils", "NetworkManager-wifi", "bluez", "chrony",
+    "power-profiles-daemon", "f2fs-tools", "selinux-policy-targeted",
+    "policycoreutils", "kbd", "ibus", "ibus-libpinyin", "ibus-hangul",
+    "ibus-anthy", "ibus-chewing", "ibus-m17n", "google-noto-sans-fonts",
+    "google-noto-sans-cjk-fonts", "google-noto-color-emoji-fonts"
+  ],
+  "rpm_install_languages": "all",
+  "install_weak_dependencies": false,
+  "omit_documentation": true,
+  "root_password_locked": true,
+  "precreated_human_user": false,
+  "oem_firmware_included": false,
+  "device_private_data_included": false,
+  "firmware_provisioning": "Required from the installed device before first boot; not yet qualified",
+  "deferred_until_firmware_provisioning": ["uke-ssc-fileservice", "uke-adaptive-display"],
+  "automatic_kernel_activation": false,
+  "installation_tested": false,
+  "hardware_tested": false
+}

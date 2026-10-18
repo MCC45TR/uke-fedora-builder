@@ -33,6 +33,12 @@ Python supplied by unmodified original Fedora desktop dependencies, under the
 Project device helpers remain native code or shell. KDE applications are not
 cloned, forked or rebuilt as Uke variants.
 
+The [18 October userdata F2FS preparation](docs/USERDATA-PREPARATION.md) uses
+Plasma Login Manager, preserved translations and the `uke-linux` COPR channel.
+Its offline payload preparation is separate from OrangeFox installation,
+firmware provisioning and physical acceptance. Automatic userdata kernel-slot
+activation remains gated; this does not replace the published Alpha installer.
+
 ## Build commands
 
 Run image commands from the [Uke workspace](https://github.com/MCC45TR/uke-linux):

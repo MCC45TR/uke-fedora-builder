@@ -1,0 +1,38 @@
+#!/usr/bin/env bash
+# Host-only: original signed Fedora bytes or exact, separately proven SELinux outputs.
+set -Eeuo pipefail
+[[ $# == 4 ]]
+root=$(realpath "$1") original=$(realpath "$2") proof=$(realpath "$3") output=$4
+[[ $root != "$original" && -d $root && -d $original && -d $proof ]]
+work=$(mktemp -d)
+trap 'find "$work" -depth -delete' EXIT
+status=0
+# The single-quoted Windows regular expression intentionally ends in backslashes.
+# shellcheck disable=SC1003
+rg -a -l --hidden --no-ignore --pcre2 \
+    -e '(?<![A-Za-z0-9_./-])/home/[^/:\s\x00]+/' \
+    -e '(?<![A-Za-z0-9_./-])/Users/[^/\s\x00]+/' \
+    -e 'C:\\Users\\' "$root" > "$work/paths" || status=$?
+[[ $status == 0 || $status == 1 ]]
+while IFS= read -r path; do
+    relative=${path#"$root/"}
+    [[ $relative != "$path" && ! -L $path && -f $path ]]
+    if [[ -n ${SENEMOS_PRIVATE_HOST_HOME:-} ]] && rg -a -q -F -- "${SENEMOS_PRIVATE_HOST_HOME}/" "$path"; then
+        echo 'Actual private host path rejected' >&2; exit 1
+    fi
+    provenance='original-signed-fedora-rpm'
+    if ! cmp -s "$path" "$original/$relative"; then
+        case "$relative" in
+            etc/selinux/targeted/contexts/files/file_contexts.bin|etc/selinux/targeted/contexts/files/file_contexts.homedirs.bin|etc/selinux/targeted/contexts/files/file_contexts|etc/selinux/targeted/contexts/files/file_contexts.homedirs|var/lib/selinux/targeted/active/file_contexts|var/lib/selinux/targeted/active/file_contexts.homedirs)
+                cmp "$path" "$proof/${relative##*/}"
+                provenance='verified-original-fedora-policy-with-signed-uke-power-profile-context'
+                ;;
+            *) printf 'Unverified namespace file rejected: %s\n' "$relative" >&2; exit 1;;
+        esac
+    fi
+    hash=$(sha256sum "$path" | cut -d ' ' -f1)
+    jq -nc --arg path "$relative" --arg sha256 "$hash" --arg provenance "$provenance" \
+        '{path:$path,sha256:$sha256,provenance:$provenance}' >> "$work/entries"
+done < "$work/paths"
+jq -s '{schema_version:1,policy:"Exact signed Fedora namespace bytes and separately verified SELinux outputs; private host paths remain rejected",files:sort_by(.path)}' \
+    "$work/entries" > "$output"
