@@ -113,6 +113,11 @@ qualified. The current native updater still refuses userdata. Installed
 offline-update components do not establish automatic boot-slot updating or
 rollback of the shared root filesystem.
 
+The same frozen payload can be exported as separate sparse userdata and boot
+images with the [host-only fastboot exporter](USERDATA-FASTBOOT.md). This changes
+the distribution format; firmware provisioning and physical acceptance remain
+required, and the 14 GiB filesystem is not automatically grown by that export.
+
 After the recovery continuation, validate firmware provisioning, userdata boot,
 Plasma Setup account creation, login, application offline updates and recovery
 under interruption. Android restoration requires its original boot stack and
