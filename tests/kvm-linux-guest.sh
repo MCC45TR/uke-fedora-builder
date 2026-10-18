@@ -17,8 +17,9 @@ for cpus in 1 2; do
         -kernel "$kernel" -initrd "$initrd" \
         -append "console=ttyAMA0 rdinit=/init panic=1 -- $cpus" \
         > "$out/guest-$cpus.qemu.log" 2>&1
-    grep -Fx "UKE_KVM_LINUX_PASS cpus=$cpus timer=pass migration=pass" "$out/guest-$cpus.serial.log"
-    if grep -F UKE_KVM_LINUX_FAIL "$out/guest-$cpus.serial.log"; then exit 1; fi
+    tr -d '\r' < "$out/guest-$cpus.serial.log" > "$out/guest-$cpus.serial.txt"
+    grep -Fx "UKE_KVM_LINUX_PASS cpus=$cpus timer=pass migration=pass" "$out/guest-$cpus.serial.txt"
+    if grep -F UKE_KVM_LINUX_FAIL "$out/guest-$cpus.serial.txt"; then exit 1; fi
 done
 jq -n --arg host_kernel "$(uname -r)" \
     --arg kernel_sha256 "$(sha256sum "$kernel" | cut -d ' ' -f1)" \
