@@ -71,7 +71,7 @@ recipe_hash() {
         "$dir"/src/image/*.sh "$dir"/src/image/*.cpp "$dir"/src/audit/*.sh \
         "$dir"/src/image/dracut/91uke-bringup/* \
         "$dir"/manifests/images/core-*.json "$dir"/configs/images/transactions/*.json \
-        "$dir/configs/images/selinux-namespace-policy.json" "$dir/configs/build-rules.json" \
+        "$dir/configs/images/selinux-namespace-policy.json" "$dir/configs/images/uke-persist.fstab" "$dir/configs/build-rules.json" \
         "$dir"/configs/keys/*.asc | sha256sum | cut -d ' ' -f1
 }
 image_main() {

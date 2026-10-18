@@ -27,6 +27,8 @@ rpm --root "$root" -V uke-boot-integration uke-esp32-cdc
 rpm --root "$root" -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{ARCH}\n' | sort > /job/installed-rpms.tsv
 if cut -f1 /job/installed-rpms.tsv | grep -Ei 'python|pypy|libpython|^plasma-workspace$|^dolphin$'; then exit 1; fi
 printf 'PARTLABEL=linux / ext4 defaults 0 1\n' > "$root/etc/fstab"
+cat /builder/configs/images/uke-persist.fstab >> "$root/etc/fstab"
+install -d -m700 "$root/mnt/vendor/persist"
 profiles=$root/usr/share/senemos/boot/uke
 install -Dm644 "$profiles/machine-info" "$root/etc/machine-info"
 printf 'uke\n' > "$root/etc/hostname"
@@ -47,7 +49,7 @@ done
 rm -f "$root/etc/systemd/system/multi-user.target.wants/uke-cdc-shell.service" \
     "$root/etc/systemd/system/multi-user.target.wants/uke-cdc-acm.service"
 for unit in uke-usb-network uke-usb-network-shell; do
-    ln -sfn "/usr/lib/systemd/system/$unit.service" "$root/etc/systemd/system/multi-user.target.wants/$unit.service"
+    rm -f "$root/etc/systemd/system/multi-user.target.wants/$unit.service"
 done
 install -Dm755 /builder/src/boot-pair/screen-shell.sh "$root/usr/libexec/uke-screen-shell"
 install -Dm755 /builder/src/boot-pair/root-status.sh "$root/usr/libexec/uke-root-status"
@@ -58,6 +60,24 @@ mkdir -p "$root/etc/systemd/journald.conf.d"
 printf '[Journal]\nStorage=persistent\nSystemMaxUse=64M\nSystemMaxFileSize=8M\n' > "$root/etc/systemd/journald.conf.d/90-uke-bringup.conf"
 rm -f "$root/etc/modules-load.d/uke-esp32.conf"
 printf 'g_serial\n' > "$root/etc/modules-load.d/uke-cdc.conf"
+early_firmware=()
+early_drivers=()
+if [[ -s /job/inputs/early-firmware.tar ]]; then
+    # The ADSP announces QRTR services during firmware startup. Load the
+    # transport and the in-kernel domain mapper before udev can start it.
+    # The previous trial lacked early ADSP services until a DSP restart;
+    # this ordering candidate still requires a fresh physical boot.
+    early_drivers=(qrtr_smd qcom_pd_mapper)
+    manifest=/job/early-firmware.sha256
+    [[ $(sha256sum /job/inputs/early-firmware.tar | cut -d ' ' -f1) == $(awk '$1=="#archive-sha256" {print $2}' "$manifest") ]]
+    mkdir -p "$root/usr/lib/firmware"
+    tar --no-same-owner -xf /job/inputs/early-firmware.tar -C "$root/usr/lib/firmware"
+    bash /builder/src/boot-pair/check-early-firmware.sh "$root" "$manifest"
+    while read -r expected path; do
+        [[ $expected != \#* ]] || continue
+        early_firmware+=(--include "$root/$path" "/$path")
+    done < "$manifest"
+fi
 chroot "$root" /usr/bin/depmod "$release"
 # Temporarily install the exact signed host assembly dependency closure in
 # this disposable native root. Remove it through RPM before target export.
@@ -76,8 +96,9 @@ dracut --sysroot "$root" \
     --conf /dev/null --confdir /job/empty-config --tmpdir /job/tmp \
     --force --no-hostonly --no-hostonly-cmdline --no-early-microcode --gzip \
     --add uke-abl --kernel-cmdline "$(cat /job/inputs/kernel-cmdline)" \
-    --force-drivers 'ufs_qcom phy_qcom_qmp_ufs dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke i2c_qcom_geni gpi' \
+    --force-drivers "${early_drivers[*]} ufs_qcom phy_qcom_qmp_ufs qcom_battmgr dwc3_qcom phy_msm_snps_eusb2_uke repeater_qti_pmic_eusb2_uke i2c_qcom_geni gpi ktz8866" \
     --filesystems ext4 --omit 'network plymouth crypt systemd-cryptsetup syslog lvm mdraid btrfs i18n' \
+    "${early_firmware[@]}" \
     /job/initramfs.cpio.gz "$release"
 [[ -s /job/initramfs.cpio.gz ]]
 rpm --root "$root" -e dracut kbd xkeyboard-config libxkbcommon

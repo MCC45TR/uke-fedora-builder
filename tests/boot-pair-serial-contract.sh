@@ -20,3 +20,29 @@ for text in unrealrootok realrootokextra 'echo realrootok > /dev/ttyAMA0' realro
     if tty_command_observed "$fixture/reject"; then echo 'Non-command marker accepted' >&2; exit 1; fi
 done
 echo 'Serial CSI/OSC/DCS, shared login line and marker-rejection fixtures passed'
+
+# Exercise the installed command with controlled readiness and shell endpoints.
+cat > "$fixture/ready" <<'SH'
+#!/bin/sh
+printf 'ready\n' >> "$CALLS"
+exit "$READY_RESULT"
+SH
+cat > "$fixture/shell" <<'SH'
+#!/bin/sh
+printf 'shell\n' >> "$CALLS"
+SH
+chmod +x "$fixture/ready" "$fixture/shell"
+command=$(sed -n 's/^ExecStart=//p' "$root/src/boot-pair/uke-cdc-shell.service")
+command=${command//\/usr\/bin\/uke-boot-status/$fixture/ready}
+command=${command//\/usr\/bin\/bash/$fixture/shell}
+export CALLS=$fixture/calls READY_RESULT=0
+bash -c "$command"
+printf 'ready\nshell\n' > "$fixture/expected"
+cmp "$fixture/expected" "$CALLS"
+: > "$CALLS"
+READY_RESULT=19
+if bash -c "$command"; then echo 'Failed readiness launched a shell' >&2; exit 1; else status=$?; fi
+[[ $status == 19 ]]
+printf 'ready\n' > "$fixture/expected"
+cmp "$fixture/expected" "$CALLS"
+echo 'CDC main-process readiness: success execs the shell; failure preserves its error and prevents shell startup'

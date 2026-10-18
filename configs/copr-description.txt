@@ -1,63 +1,30 @@
-Senemos Uke — source builds and update channel
+Senemos Linux for Xiaomi Pad 7 / POCO Pad X1
 
-Development RPM/SRPM hub for Xiaomi Pad 7 / POCO Pad X1 (Uke, SM7675).
-Enabled target: Fedora Rawhide AArch64. Source, package, emulation and physical
-results have separate acceptance gates; this channel certifies no complete port.
+Development packages for the Qualcomm SM7675 platform (device code: uke).
+Target: Fedora Rawhide AArch64. Updated: 14 October 2026.
 
-Current physical status, 12 October 2026: matched RAM starts reach the owner's
-64 GiB EXT4 root, USB ECM SSH, automatic Wi-Fi SSH, DNS and synchronized time.
-Original Fedora Plasma/KWin 6.8.0 displays a camera-confirmed software Wayland
-desktop after signed Mesa COPR 11110126; rendering is llvmpipe. Manual rotation
-and restoration work. Native Adreno/video acceleration, touch, automatic
-rotation/brightness, sensor samples and battery telemetry remain open.
-Bluetooth has no HCI controller. NFC controller presence is unqualified.
+This repository provides the Senemos kernel, boot integration, hardware-support
+metadata, reviewed native runtime libraries and optional desktop components.
+The separate KVM package is experimental; it does not establish EL2 boot or
+working hardware virtualization. KDE applications come from Fedora.
 
-Signed native kernel 7.2.9-1.18 passes matching early/runtime module, five generic
-VM and actual RAM-start checks. One private-firmware manual ADSP start reaches
-running, then a GPR domain mismatch requires a controlled stop. Automatic ADSP
-startup remains disabled. Corrected 1.20 COPR 11110928 passes signed payload,
-no-Python/privacy checks, all 1,144 native module byte comparisons and 13,792
-matching core export rows. Its new early tuple and physical GPR trial remain
-separate gates. The failed native 1.19 header contract is retained.
+Recovery RPMs deliver checksummed preview images and source/license records as
+data. Package installation never flashes Android partitions or selects a boot
+slot. ZIP installation and recovery compatibility require their own checks.
 
-The stock-ABL Image embeds its own root-capable initramfs and requires matching
-early and installed modules. Ordinary DNF kernel updates never flash boot_b or
-select a slot. Stock A, full-hash-verified 1.17 boot_b, recovery and a consistent
-offline Core rollback are retained. Normal B and repeated cold starts remain
-unqualified. Battery telemetry is required before stress or power experiments;
-sleep and PowerDevil remain contained.
+Build results establish package status. Hardware support, stability, charging
+and power management are tracked separately in the public hardware report.
+RPM versions follow upstream versions with numeric release counters; device
+identifiers remain in device package names. Python-based upstream build tools
+are confined to build workers and excluded from project target payloads.
 
-Core and original Fedora KDE prebuild tests are published with checksums,
-source/package identities and installation/rollback limits. Their clean public
-roots remain physically unflashed and unbooted. The different private owner
-root has separate physical readback and visible software KDE evidence.
-Never clone, fork or rebuild KDE applications as Uke variants. The owner permits
-Python only for original signed Fedora KDE dependencies; Core, early initramfs
-and project startup/services/tests retain their native policy.
+Sources and current status:
+- [Project and hardware report](https://github.com/MCC45TR/uke-linux)
+- [Hardware support packages](https://github.com/MCC45TR/uke-linux-hardware-support)
+- [Kernel](https://github.com/MCC45TR/senemos-uke-kernel-mainline)
+- [Recovery](https://github.com/MCC45TR/orangefox_device_xiaomi_uke)
+- [Fedora images](https://github.com/MCC45TR/uke-linux-images/releases)
 
-Signed uke-boot-integration/uke-esp32-cdc 0.1.0-7 passes actual DNF and bounded
-transport checks. Stock-ABL uses direct-PC ACM/ECM. The separate UEFI profile's
-ESP32-S3 HID/CDC, bridge and USB-host power require independent acceptance.
-Package installation activates no owner key, Wi-Fi profile or flashing.
-Recovery RPMs deliver the checksummed Global OS3 experimental alpha IMG/ZIP as
-data, without automatic flashing or Android storage changes. Optional native
-Material Decoration/Plymouth packages establish no hardware display support.
-Non-KDE source families retain complete ABI and dependency gates.
-
-Kernel changes request one native build after validated main-branch CI through
-the existing encrypted hook. Branch pushes and documentation changes submit no
-kernel build. Healthy jobs are preserved; heavy jobs are queued. Daily stable
-tracking refuses unreviewed generic ARM64 fallback. Binary workers have network
-disabled. Fedora 45, openSUSE, native DEB and APK need separate validation.
-
-Firmware is private owner evaluation unless provenance, hashes, redistribution
-rights and matching requests are reviewed. No owner firmware, credentials,
-calibration or logs are public assets. Nabu geometry and firmware are not Uke
-inputs. Detailed engineering records remain in the private documentation repo.
-
-- [Per-function hardware status](https://github.com/MCC45TR/uke-linux)
-- [Kernel sources](https://github.com/MCC45TR/senemos-uke-kernel-mainline)
-- [Platform packages](https://github.com/MCC45TR/uke-linux-hardware-support)
-- [Image releases](https://github.com/MCC45TR/uke-linux-images/releases)
-- [Image builder](https://github.com/MCC45TR/uke-fedora-builder)
-- [Engineering records](https://github.com/MCC45TR/uke-linux-docs) (private)
+This is a development repository. Preserve a tested Android/recovery fallback
+and use packages only with their matching kernel, modules, device tree and
+firmware requirements.

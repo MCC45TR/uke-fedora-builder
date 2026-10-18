@@ -1,97 +1,53 @@
-Enable this development repository on **Fedora Rawhide AArch64**:
+For **Fedora Rawhide AArch64** on Xiaomi Pad 7 / POCO Pad X1:
 
 ```sh
 sudo dnf copr enable mcc45tr/uke-linux-test
-```
-
-Install or update the Uke kernel package set:
-
-```sh
 sudo dnf install senemos-uke-linux-kernel-mainline
-sudo dnf upgrade senemos-uke-linux-kernel-mainline
+sudo dnf upgrade --refresh
 ```
 
-The meta package resolves the matching core, modules and DTBs. Files are under
-`/usr/lib/modules/7.2.9-senemos-uke/`; module indexes are updated with POSIX
-scriptlets. The source-lock manifest identifies upstream source, patches and
-configs. No Android partition write or default boot selection occurs.
+The kernel meta package installs matching core, module and device-tree packages.
+Keep that set together. DNF installs files; it does not flash `boot_b`, write
+Android partitions or change the active boot slot. Kernel ABI directory names
+are independent of RPM release numbers and must match the loaded kernel.
 
-Install or update **recovery image delivery** separately:
+Recovery preview delivery is optional:
 
 ```sh
 sudo dnf install uke-orangefox-recovery
-sudo dnf upgrade uke-orangefox-recovery
 ```
 
-Delivered IMG/ZIP and manifest/source/license/checksum records are under
-`/usr/share/senemos/recovery/uke/RPM_VERSION/`. The RPM has no scriptlets,
-service, flashing operation or automatic ZIP installer. DNF updates files;
-device evaluation is a separate, explicitly authorized procedure. The initial
-`12.0~alpha1.20260930` images retain Global OS3.0.303.0.WOZMIXM scope. The stock
-OS2 inventory does not prove compatibility. Read each installed lock/manifest
-and the exact release's installation/rollback document before evaluation.
+Files are installed below `/usr/share/senemos/recovery/uke/`. Read the installed
+`DELIVERY.md`, `INSTALL.md`, `release-lock.json` and source offer before testing.
+The v003 IMG uses the installed Android boot stack and is not a `fastboot boot`
+image. Its ZIP installer is unavailable. Installing or updating this RPM performs
+no flashing and does not certify compatibility with the current firmware.
 
-The repository signs RPMs with its COPR project key. Independently observed key
-fingerprint: `DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E`. Verify source RPMs,
-package identities and build logs rather than treating a package label as
-hardware support. Preserve stock early firmware and the recovery route.
+Use Fedora's original KDE applications. Inspect DNF transactions before accepting
+changes to runtime libraries; these development builds preserve the upstream
+library package names and interfaces. A successful COPR build is separate from
+installation, display, touch, charging or hardware-virtualization acceptance.
 
-For local signed-source builds:
+See the [hardware report](https://github.com/MCC45TR/uke-linux) for observed
+support and remaining work, and each COPR build page for source revisions,
+dependency versions and logs. Keep a tested recovery route before device trials.
+
+The custom `libstdc++` package targets runtime images. Fedora's compiler and
+`libstdc++-devel` packages require their exact Fedora runtime release, so a
+mixed development-toolchain transaction is not supported by this selection.
+DNF must retain that dependency check; a matching development stack needs
+separate packaging and validation.
+
+Automatic rotation and ambient brightness preview:
 
 ```sh
-git clone --recurse-submodules https://github.com/MCC45TR/uke-linux.git
-cd uke-linux
-./senemos-uke-kernel/senemos.sh --build 7.2.9 --distro=fedora --test
-./senemos-uke-kernel/senemos.sh --build latest --distro=fedora
-./senemos-uke-kernel/senemos.sh --help
+sudo dnf install uke-adaptive-display
 ```
 
-`lastest` is a `latest` alias. Offline builds reuse verified caches and prepared
-containers. The script installs missing official host prerequisites, limits
-resources and queues behind active native/recovery work. Other target formats
-and unreviewed stable versions fail explicitly. See the
-[package/update hub](https://github.com/MCC45TR/uke-linux-docs/blob/main/docs/PACKAGE-HUB.md)
-for all component repositories and their readiness gates.
-
-COPR/package, emulated userspace and physical tablet acceptance remain separate.
-
-Console selection packages are also available:
-
-```sh
-sudo dnf install --allow-vendor-change uke-core-meta
-sudo dnf upgrade uke-core-meta
-```
-
-Release 2 passed bounded package lifecycle tests and refuses Python interpreter
-dependencies. The complete inherited base failed its file audit on optional
-libstdc++ Python GDB helpers. Release 3 requires the source-built GNU C++ runtime
-and passed independent complete-console-root acceptance in isolated AArch64
-userspace: all 52 selected inputs, offline fresh installation, actual earlier
-console metadata upgrade and removal. The initial installation
-explicitly allows the reviewed library's vendor to change from Fedora to this
-signed COPR; ordinary interpreter conflicts and dependency checks remain active.
-Consult the current
-[test records](https://github.com/MCC45TR/uke-fedora-builder/tree/main/reports)
-before treating a root as an admitted target image.
-
-`uke-desktop-metas` release 3 carries readiness/policy data and installs no
-graphical session. KDE applications must come from the original distribution;
-cloning, forking or rebuilding them as Uke variants is prohibited. Derivative
-Plasma/Dolphin COPR source records and binaries were withdrawn. Original KDE
-Python payloads currently block complete graphical admission. Do not bypass
-either requirement with nodeps, solver overrides or manual RPM-owned file
-deletion. Optional `plymouth-uke` delivers theme data without activation. The
-explicitly requested upstream Material Decoration plugin is independently
-built and audited; rendering and Uke display/session validation remain open.
-
-`xiaomi-uke-firmware` is not admitted until file-level source/license/hash and
-kernel-request gates pass. Initial hardware component repositories are listed
-in the package catalog; they do not advertise unsupported binaries.
-
-The signed `uke-boot-integration` and `uke-esp32-cdc` packages are Core image
-inputs and remain inactive after installation. The explicit development image
-selects tablet USB host / ESP32 USB device roles, HID input on VT2 and one CDC
-journal writer after switch-root. Native COPR 11080676 and signed release-1 to
-release-3 lifecycle checks passed. The existing bridge firmware, enabled Uke
-USB/UFS DT, UEFI handoff and physical boot remain unverified. See the
-[Core composition guide](https://github.com/MCC45TR/uke-fedora-builder/blob/main/docs/IMAGES.md).
+This selects SSC-enabled SensorProxy and native file transport for original
+desktop clients. Activation is explicit; installation leaves the integration
+target disabled. Matched device-local sensor firmware/configuration and a
+read-only factory calibration mount are required separately. Read the installed
+`ADAPTIVE-DISPLAY.md` before enabling `uke-adaptive-display.target`. Four-pose
+rotation, front-light discovery, lux response and desktop behavior require
+physical validation. Raw rear-light readings must not be treated as lux.
