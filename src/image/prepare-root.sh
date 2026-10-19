@@ -38,7 +38,7 @@ mkdir -p /boot/efi /etc/dracut.conf.d /etc/selinux /var/lib/dbus
 install -m644 /usr/share/senemos/boot/uke/fstab.template /etc/fstab
 # Filesystem identities survive partition resizing and fastboot partition names.
 cat > /etc/fstab <<'FSTAB'
-LABEL=UKE_LINUX / ext4 defaults 0 1
+LABEL=UKE_LINUX / ext4 defaults,noatime,errors=remount-ro 0 1
 LABEL=UKE_ESP /boot/efi vfat umask=0077,nofail 0 2
 FSTAB
 cat /builder/configs/images/uke-persist.fstab >> /etc/fstab

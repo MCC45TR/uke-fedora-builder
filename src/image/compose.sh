@@ -32,7 +32,7 @@ bash /builder/src/audit/check-target-privacy.sh --namespace-policy /builder/conf
 [[ -L $root/etc/systemd/system/sysinit.target.wants/debug-shell.service ]]
 grep -F 'StandardOutput=journal' "$root/etc/systemd/system/debug-shell.service.d/90-uke-core.conf"
 [[ $(readlink "$root/etc/systemd/system/default.target") == /usr/lib/systemd/system/multi-user.target ]]
-grep -Fx 'LABEL=UKE_LINUX / ext4 defaults 0 1' "$root/etc/fstab"
+grep -Fx 'LABEL=UKE_LINUX / ext4 defaults,noatime,errors=remount-ro 0 1' "$root/etc/fstab"
 grep -Fx 'LABEL=UKE_ESP /boot/efi vfat umask=0077,nofail 0 2' "$root/etc/fstab"
 mkdir "$work/initramfs-root"
 gzip -cd "$initrd" | (cd "$work/initramfs-root"; cpio -id --quiet --no-absolute-filenames)
