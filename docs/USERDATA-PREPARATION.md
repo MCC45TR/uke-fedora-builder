@@ -69,7 +69,7 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    installed Image, verifies every module digest, extracts the embedded initramfs
    using its System.map and audits the actual extracted payload.
 5. Record every installed payload package's origin with `query-userdata-origins.sh`
-   in the native host container. The two RPM key records are separate from the
+   in the native host container. RPM public-key records are separate from the
    package count; query-time exclusions must not hide the installed kernel tuple.
    Independently verify original Fedora RPM signatures and extract their payloads
    using `audit-original-fedora.sh`. Byte-check permitted original Fedora Python
