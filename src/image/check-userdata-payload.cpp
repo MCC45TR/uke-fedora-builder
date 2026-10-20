@@ -106,7 +106,10 @@ void boot(const char *path,const char *hash) {
     need(!std::memcmp(p,"ANDROID!",8) && le32(p+20)==1584 && le32(p+40)==4,"Expected Android boot v4");
     need(le32(p+12)==0 && le32(p+1580)==0,"Ramdisk/signature fields must be empty");
     need(le32(p+8)>=64 && le32(p+8)<=boot_bytes-4096,"Kernel exceeds the boot image");
-    need(std::memchr(p+44,0,1536) && !std::strcmp(reinterpret_cast<const char*>(p+44),"senemos.root=userdata"),"Expected the exact userdata root selector");
+    need(std::memchr(p+44,0,1536),"Unterminated boot command line");
+    const std::string command(reinterpret_cast<const char*>(p+44));
+    need(command=="senemos.root=userdata" || command=="senemos.root=userdata msm.o82_vrr_test_min_hz=30",
+         "Expected the exact userdata root selector and reviewed VRR policy");
     need(le32(p+4096+56)==0x644d5241,"Expected a raw ARM64 Image");
     stream.digest.check(hash);
 }

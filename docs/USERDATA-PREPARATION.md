@@ -1,5 +1,13 @@
 # Fedora userdata F2FS preparation
 
+The current correction retains the previously delivered filesystem. Use
+`install-userdata-device-packages.sh` to update the existing root through the
+normal signed test COPR, then `patch-userdata-f2fs.sh` to update its verified
+regular-file baseline without formatting. OpenSSH is installed but disabled;
+only the test COPR is configured. Original Fedora repository definitions remain
+in their RPM-owned vendor directory. The instructions below retain the initial
+composition record; a fresh composition is not the current update mechanism.
+
 Date: 20 October 2026. Environment: Fedora Rawhide AArch64 RPM composition and
 offline host/VM validation for Xiaomi Pad 7 / POCO Pad X1 (`uke`). No tablet
 installation or new hardware acceptance is established by this recipe.

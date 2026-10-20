@@ -23,10 +23,10 @@ while IFS= read -r path; do
     provenance='original-signed-fedora-rpm'
     if ! cmp -s "$path" "$original/$relative"; then
         case "$relative" in
-            usr/lib/firmware/*)
+            usr/lib/firmware/*|usr/share/uke-sensors/*)
                 [[ ! -L $private/$relative && $(realpath "$private/$relative") == "$private/"* ]]
                 cmp "$path" "$private/$relative"
-                provenance='exact-device-matched-private-rpm-firmware'
+                provenance='exact-verified-firmware-rpm'
                 ;;
             etc/selinux/targeted/contexts/files/file_contexts.bin|etc/selinux/targeted/contexts/files/file_contexts.homedirs.bin|etc/selinux/targeted/contexts/files/file_contexts|etc/selinux/targeted/contexts/files/file_contexts.homedirs|var/lib/selinux/targeted/active/file_contexts|var/lib/selinux/targeted/active/file_contexts.homedirs)
                 cmp "$path" "$proof/${relative##*/}"

@@ -3,9 +3,10 @@
 set -Eeuo pipefail
 [[ $# == 0 && -f /job/device-packages.complete && ! -e /job/rootfs-frozen ]]
 root=/job/root original=/job/original-fedora proof=/job/audit/selinux-recompiled
-rpm_file=/job/inputs/public-rpms/uke-power-profile-backend-0.1.0-4.fc46.aarch64.rpm
+backend=$(rpm --root "$root" -q uke-power-profile-backend --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}')
+rpm_file=/job/inputs/current-copr/$backend.rpm
 mkdir -p /job/audit/policy-keydb /job/audit/policy-rpm "$proof"
-rpmkeys --dbpath /job/audit/policy-keydb --import /job/inputs/uke-copr.asc
+rpmkeys --dbpath /job/audit/policy-keydb --import /job/inputs/uke-copr-test.asc
 rpmkeys --dbpath /job/audit/policy-keydb --checksig "$rpm_file"
 rpm2cpio "$rpm_file" > /job/audit/policy-rpm.cpio
 (cd /job/audit/policy-rpm; cpio -idmu --quiet --no-absolute-filenames < ../policy-rpm.cpio)

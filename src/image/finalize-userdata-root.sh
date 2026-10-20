@@ -7,7 +7,7 @@ root=/job/root
 rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin \
     senemos-uke-linux-kernel-mainline-singleboot \
     plasma-discover-offline-updates plasma-discover-packagekit PackageKit \
-    glibc-all-langpacks ncurses dnf5-plugins shadow-utils sudo >/dev/null
+    glibc-all-langpacks ncurses dnf5-plugins shadow-utils sudo openssh-server >/dev/null
 [[ -x $root/usr/bin/clear && -f $root/usr/lib/systemd/system/plasmalogin.service ]]
 if rpm --root "$root" -qa --qf '%{NAME}\n' | grep -E '(^sddm|-(debuginfo|debugsource)$|^gcc$|^gdb$|^clang$|^make$)'; then exit 1; fi
 awk -F: '$3>=1000 && $3!=65534 {bad=1; print "Unexpected human account: " $1 > "/dev/stderr"} END {exit bad}' "$root/etc/passwd"
@@ -17,13 +17,20 @@ chroot "$root" /usr/sbin/visudo -cf /etc/sudoers
 grep -Eq '^%wheel[[:space:]]+ALL=\(ALL\)[[:space:]]+ALL' "$root/etc/sudoers"
 if grep -rE '^[^#].*NOPASSWD' "$root/etc/sudoers" "$root/etc/sudoers.d"; then exit 1; fi
 mkdir -p "$root/etc/xdg" "$root/etc/rpm" "$root/etc/dnf" "$root/etc/yum.repos.d"
+install -d -m755 "$root/etc/uke-control"
+printf 'test\n' > "$root/etc/uke-control/channel"
+chmod 644 "$root/etc/uke-control/channel"
 chroot "$root" /usr/bin/kwriteconfig6 --file /etc/xdg/plasmasetuprc --group Accounts --key UserGroups wheel
 chroot "$root" /usr/bin/systemd-sysusers /usr/lib/sysusers.d/plasma-setup-sysuser.conf
 [[ ! -e $root/etc/plasma-setup-done ]]
 systemctl --root="$root" enable plasma-setup.service plasmalogin.service NetworkManager.service \
-    firewalld.service bluetooth.service chronyd.service
+    firewalld.service bluetooth.service chronyd.service upower.service
+systemctl --root="$root" unmask sshd.service
+systemctl --root="$root" unmask sshd.socket
+systemctl --root="$root" disable sshd.service sshd.socket
+systemctl --root="$root" disable nftables.service
 systemctl --root="$root" set-default graphical.target
-systemctl --root="$root" mask debug-shell.service sshd.service NetworkManager-wait-online.service \
+systemctl --root="$root" mask debug-shell.service NetworkManager-wait-online.service \
     uke-cdc-shell.service uke-esp32-cdc-log.service uke-boot-guard.service
 [[ $(readlink "$root/etc/systemd/system/display-manager.service") == /usr/lib/systemd/system/plasmalogin.service ]]
 cat > "$root/etc/fstab" <<'FSTAB'
@@ -35,24 +42,18 @@ cat > "$root/etc/selinux/config" <<'SELINUX'
 SELINUX=enforcing
 SELINUXTYPE=targeted
 SELINUX
+# Verify the RPM-populated offline policy store before generating filesystem labels.
+chroot "$root" /usr/bin/semodule -l > /job/audit/selinux-modules.txt
+grep -Fxq uke-ssc /job/audit/selinux-modules.txt
+grep -Fxq uke-power-profile /job/audit/selinux-modules.txt
 printf '%%_install_langs all\n' > "$root/etc/rpm/macros.uke-languages"
-install -m644 /job/inputs/uke-copr.asc "$root/etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr"
 [[ $(gpg --show-keys --with-colons /job/inputs/uke-copr-test.asc | awk -F: '$1=="fpr" {print $10; exit}') == DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E ]]
 install -m644 /job/inputs/uke-copr-test.asc "$root/etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test"
 rpm --root "$root" --import /job/inputs/uke-copr-test.asc
-cat > "$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux.repo" <<'REPO'
-[copr:copr.fedorainfracloud.org:mcc45tr:uke-linux]
-name=Uke Linux
-baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux/fedora-rawhide-$basearch/
-enabled=1
-type=rpm-md
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr
-skip_if_unavailable=False
-priority=50
-includepkgs=senemos-uke-linux-kernel-mainline*,uke-*,kde-plasma-uke-meta,libstdc++,mesa-*,libssc*,iio-sensor-proxy
-REPO
+# A channel switch is an explicit uke-control operation after installation.
+stable_repo=$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux.repo
+[[ ! -L $stable_repo ]]
+if [[ -f $stable_repo ]]; then rm -- "$stable_repo"; fi
 cat > "$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux-test.repo" <<'REPO'
 [copr:copr.fedorainfracloud.org:mcc45tr:uke-linux-test]
 name=Uke Linux Test
@@ -64,27 +65,15 @@ repo_gpgcheck=0
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test
 skip_if_unavailable=False
 priority=40
-includepkgs=senemos-uke-linux-kernel-mainline*,uke-*,kde-plasma-uke-meta,libstdc++,mesa-*,libssc*,iio-sensor-proxy
-
-[uke-userdata-kernel-candidate]
-name=Uke userdata kernel candidate 2026-10-20
-baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux-test:custom:userdata-20261020/fedora-rawhide-$basearch/
-enabled=1
-type=rpm-md
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test
-skip_if_unavailable=False
-priority=30
-includepkgs=senemos-uke-linux-kernel-mainline-core,senemos-uke-linux-kernel-mainline-modules,senemos-uke-linux-kernel-mainline-dtbs,senemos-uke-linux-kernel-mainline-boot
+includepkgs=senemos-uke-linux-kernel-mainline*,uke-*
 REPO
-# A candidate must not install a new kernel without its qualified slot writer.
+# The matched slot writer validates every kernel transaction before activation.
 cat > "$root/etc/dnf/dnf.conf" <<'DNF'
 [main]
 install_weak_deps=False
 allow_vendor_change=False
 installonly_limit=3
-excludepkgs=kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,senemos-uke-linux-kernel-mainline*
+excludepkgs=kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource
 DNF
 printf 'LANG=en_US.UTF-8\n' > "$root/etc/locale.conf"
 printf 'localhost\n' > "$root/etc/hostname"

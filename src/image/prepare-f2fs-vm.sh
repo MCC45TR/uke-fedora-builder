@@ -12,7 +12,7 @@ dracut --force --no-hostonly --no-hostonly-cmdline --no-early-microcode \
     --conf /dev/null --confdir /job/vm/empty-conf \
     --kmoddir /host/usr/lib/modules/"$release" --kver "$release" --gzip \
     --add-drivers 'f2fs 9p 9pnet_virtio virtio_blk virtio_pci' \
-    --install 'bash mount modprobe mkdir grep sha256sum mkfs.f2fs fsck.f2fs resize.f2fs tar setfiles sync umount logger getfattr awk sort cmp realpath cat stty' \
+    --install 'bash mount modprobe mkdir grep sha256sum mkfs.f2fs fsck.f2fs resize.f2fs tar setfiles sync umount logger getfattr awk sort cmp realpath cat stty rsync rm blkid fstrim zstd' \
     --include /job/vm/init /uke-compose-init \
     --include /job/vm/metadata-manifest /uke-metadata-manifest \
     --omit 'network network-manager network-legacy plymouth crypt systemd-cryptsetup syslog lvm mdraid btrfs i18n' \

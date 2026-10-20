@@ -32,10 +32,21 @@ if grep -Fq 'uke.f2fs-xattr-audit=1' /proc/cmdline; then
     echo b > /proc/sysrq-trigger
     exit 1
 fi
-[[ -f /share/rootfs.tar && -f /share/rootfs.tar.sha256 ]]
-(cd /share; sha256sum -c rootfs.tar.sha256)
+archive=rootfs.tar
+[[ ! -f /share/rootfs.tar.zst ]] || archive=rootfs.tar.zst
+[[ -f /share/$archive && -f /share/$archive.sha256 ]]
+(cd /share; sha256sum -c "$archive.sha256")
 grow=0
-if grep -Fq 'uke.f2fs-grow=1' /proc/cmdline; then
+patch=0
+if grep -Fq 'uke.f2fs-patch=1' /proc/cmdline; then
+    ! grep -Fq 'uke.f2fs-grow=1' /proc/cmdline
+    [[ -s /share/fsuuid.expected ]]
+    [[ $(blkid -s TYPE -o value /dev/vda) == f2fs ]]
+    [[ $(blkid -s LABEL -o value /dev/vda) == UKE_LINUX ]]
+    [[ $(blkid -s UUID -o value /dev/vda) == "$(cat /share/fsuuid.expected)" ]]
+    patch=1
+    fsck.f2fs -f /dev/vda
+elif grep -Fq 'uke.f2fs-grow=1' /proc/cmdline; then
     grow=1
     fsck.f2fs -f /dev/vda
     resize.f2fs /dev/vda
@@ -45,18 +56,33 @@ fi
 mount -t f2fs /dev/vda /target
 # File labels are generated from this root's original Fedora policy.
 contexts=/target/etc/selinux/targeted/contexts/files/file_contexts
-if (( ! grow )); then
+if (( patch )); then
+    [[ ! -e /target/.uke-staged-root && ! -L /target/.uke-staged-root ]]
+    mkdir -m700 /target/.uke-staged-root
     tar --extract --numeric-owner --same-owner --acls --xattrs --xattrs-include=security.capability \
-        -f /share/rootfs.tar -C /target
+        -f "/share/$archive" -C /target/.uke-staged-root
+    # Stage on the existing disk; only changed files replace their old inodes.
+    rsync -aHAXc --numeric-ids --delete --exclude=/.uke-staged-root/ \
+        /target/.uke-staged-root/ /target/
+    rm -rf -- /target/.uke-staged-root
+    setfiles -F -r /target "$contexts" /target
+elif (( ! grow )); then
+    tar --extract --numeric-owner --same-owner --acls --xattrs --xattrs-include=security.capability \
+        -f "/share/$archive" -C /target
     setfiles -F -r /target "$contexts" /target
 fi
 [[ -s $contexts ]]
 tar --compare --numeric-owner --acls --xattrs --xattrs-include=security.capability \
-    -f /share/rootfs.tar -C /target
+    -f "/share/$archive" -C /target
 setfiles -n -v -r /target "$contexts" /target > /run/relabel-check.log
 [[ ! -s /run/relabel-check.log ]]
 /uke-metadata-manifest /target /run/xattrs.actual.tsv
 cmp /share/xattrs.expected.tsv /run/xattrs.actual.tsv
+if (( patch )); then
+    [[ $(blkid -s UUID -o value /dev/vda) == "$(cat /share/fsuuid.expected)" ]]
+    sync
+    fstrim /target
+fi
 sync
 umount /target
 fsck.f2fs -f /dev/vda

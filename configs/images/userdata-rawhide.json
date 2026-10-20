@@ -11,7 +11,10 @@
   "secure_boot": false,
   "copr": {
     "project": "mcc45tr/uke-linux-test",
-    "key_fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E"
+    "key_fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E",
+    "enabled_projects": [
+      "mcc45tr/uke-linux-test"
+    ]
   },
   "desktop_source_commit": "e12f72a83cfd40bdd2436c3de270e8c796ccf5f2",
   "desktop_source_path": "uke-desktop-metas/src/plasma.json",
@@ -53,7 +56,10 @@
     "google-noto-sans-fonts",
     "google-noto-sans-cjk-fonts",
     "google-noto-color-emoji-fonts",
-    "ddcutil"
+    "ddcutil",
+    "openssh-server",
+    "nftables",
+    "firewalld"
   ],
   "rpm_install_languages": "all",
   "install_weak_dependencies": false,
@@ -62,11 +68,30 @@
   "precreated_human_user": false,
   "oem_firmware_included": true,
   "device_private_data_included": true,
-  "firmware_provisioning": "Private local RPMs matched to the current tablet; not redistributable",
+  "firmware_provisioning": "Signed COPR generic firmware and separately retained device-private touch reference",
   "deferred_until_firmware_provisioning": [],
-  "automatic_kernel_activation": false,
+  "automatic_kernel_activation": true,
   "installation_tested": false,
   "hardware_tested": false,
-  "kernel_release": "7.2.11-14",
-  "kernel_package": "senemos-uke-linux-kernel-mainline-singleboot"
+  "kernel_release": "7.2.11-16",
+  "kernel_package": "senemos-uke-linux-kernel-mainline-singleboot",
+  "ssh": {
+    "installed": true,
+    "enabled": false,
+    "masked": false
+  },
+  "oem_runtime_inputs": {
+    "required": true,
+    "release": "OS3.0.304.0.WOZMIXM",
+    "oem_manifest_sha256": "142c0e89e4773efc1f6da386a3e0620bc492cffe55f0f23a546e55c2682c5733",
+    "firmware_manifest_sha256": "65449894c0ad3a98b37d725834b1922d602a8a88f8feb2ef25c6e37da7620609",
+    "touch_panel": "csot",
+    "touch_reference_policy": "Preserve the previously qualified device-local reference; never import one from the reusable OEM archive.",
+    "rpm_sha256": {
+      "uke-firmware-3.0.304.0-2.fc46.noarch.rpm": "dcaee7cf34079abd42f8b9569c382c5883257f982fca13aa1cea8846b0104cf5"
+    },
+    "firmware_nevra": "uke-firmware-3.0.304.0-2.fc46.noarch"
+  },
+  "kernel_activation_policy": "guarded-userdata-updater",
+  "boot_ab_qualified": false
 }

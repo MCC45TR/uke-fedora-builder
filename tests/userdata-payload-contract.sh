@@ -16,6 +16,8 @@ printf '\101\122\115\144' | dd of=Image bs=1 seek=56 conv=notrunc status=none
 "$codec" create Image userdata.img userdata
 boot_hash=$(sha256sum userdata.img | cut -d ' ' -f1)
 "$check" root.img.zst 536870912 "$root_hash" userdata.img "$boot_hash"
+"$codec" create Image userdata-vrr.img userdata-vrr
+"$check" root.img.zst 536870912 "$root_hash" userdata-vrr.img "$(sha256sum userdata-vrr.img | cut -d ' ' -f1)"
 reject() { if "$check" "$@" > refused.log 2>&1; then echo 'Invalid payload admitted' >&2; exit 1; fi; }
 reject root.img.zst 536870912 "$(printf '%064d' 0)" userdata.img "$boot_hash"
 reject root.img.zst 536875008 "$root_hash" userdata.img "$boot_hash"
