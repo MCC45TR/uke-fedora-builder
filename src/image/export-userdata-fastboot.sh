@@ -29,7 +29,7 @@ boot_sha=$(jq -er '.boot.sha256' "$manifest")
     $(sha256sum "$boot" | cut -d ' ' -f1) == "$boot_sha" ]]
 command -v simg2img >/dev/null
 mkdir -m755 "$destination" "$destination/checks"
-work=$(mktemp -d "$job/fastboot-verify.XXXXXX")
+work=$(mktemp -d "${TMPDIR:-$job}/fastboot-verify.XXXXXX")
 trap 'find "$work" -depth -delete' EXIT
 g++ -std=c++17 -O2 -Wall -Wextra -Werror "$repo/src/boot-pair/android-sparse.cpp" -o "$work/android-sparse"
 "$work/android-sparse" encode "$raw" "$destination/userdata.img" > "$destination/checks/sparse-encode.txt"
