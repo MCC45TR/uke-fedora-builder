@@ -57,6 +57,21 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    digest verification and the exact device comparison. Install touch driver/data
    in one dependency-checked transaction; no dummy provider or dependency bypass
    is permitted. This device-matched image is private and must not be redistributed.
+   The Global 304 integration additionally requires `inputs/oem-rpms/` with the
+   one `xiaomi-uke-firmware` data RPM and `SHA256SUMS`, plus `inputs/oem-runtime-source.json`
+   and `inputs/local-firmware-candidates.json` from the firmware component.
+   `configs/images/userdata-rawhide.json` pins both source manifests, the exact NEVRA
+   and RPM archive hash. Rebuilt archives require a reviewed profile update.
+   The installer then calls `install-oem-runtime.sh` for a repository-disabled,
+   dependency-checked transaction. Only this additional data RPM uses local digest
+   admission; public package signature checks remain mandatory.
+   Existing CSOT firmware/configuration and the qualified private touch reference
+   are retained. The original sensor target and Bluetooth address helper are
+   enabled through their existing resource conditions, without starting them
+   during composition. TM remains an unselected panel candidate.
+   Six legacy generic data RPMs are replaced by this one package; the existing
+   private touch data package remains. No new application or service is added.
+   The four OEM touch assets are retained under `qcom/uke/touch/{csot,tm}`.
 3. Run `finalize-userdata-root.sh`. Regenerate hwdb with a recorded native host
    `systemd-hwdb --root=/job/root update`; the emulated tool must not leave an
    empty database. Run `audit-userdata-policy-sources.sh` to prove that generated
@@ -68,6 +83,11 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    `audit-userdata-kernel.sh`. The latter compares both boot containers with the
    installed Image, verifies every module digest, extracts the embedded initramfs
    using its System.map and audits the actual extracted payload.
+   The root audit also requires `oem-runtime.complete` and verifies all 215
+   active OEM/pinned inputs and four packaged touch assets (219 paths), the exact
+   known-missing SSC references and private touch-reference mode. It rejects
+   mismatched bytes or symlinked inputs; a
+   successful composition is not physical firmware qualification.
 5. Record every installed payload package's origin with `query-userdata-origins.sh`
    in the native host container. The two RPM key records are separate from the
    package count; query-time exclusions must not hide the installed kernel tuple.
@@ -77,7 +97,8 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    Project helpers and early userspace remain Python-free. Run privacy checks
    with an exact, proven namespace policy from `review-userdata-namespaces.sh`:
    `ROOT ORIGINAL_FEDORA SELINUX_PROOF OUTPUT_JSON VERIFIED_PRIVATE_RPM_TREE`.
-   The final argument is a separate extraction of those device-matched archives;
+   The final argument is a separate extraction of the verified private archives,
+   including the unified source-pinned OEM RPM applied over the legacy proof tree;
    only byte-identical firmware can retain an OEM build namespace. Actual private
    host paths remain rejected, including inside an otherwise matching firmware.
    No unverified path is admitted merely because it looks like a distro example.

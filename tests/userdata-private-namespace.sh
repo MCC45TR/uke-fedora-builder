@@ -14,7 +14,7 @@ review() {
         "$work/policy" "$work/result.json" "$work/private"
 }
 review
-jq -e '.files|length==1 and .[0].provenance=="exact-device-matched-private-rpm-firmware"' "$work/result.json" >/dev/null
+jq -e '.files|length==1 and .[0].provenance=="verified-private-rpm-firmware"' "$work/result.json" >/dev/null
 printf 'changed\n' >> "$target"
 if review >/dev/null 2>&1; then exit 1; fi
 cp "$expected" "$target"

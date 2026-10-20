@@ -40,6 +40,12 @@ for name in regulatory.db regulatory.db.p7s; do
     cmp "$root/usr/lib/firmware/$name" "/job/original-fedora/usr/lib/firmware/$name"
 done
 [[ -s $root/var/lib/uke-touch/normal.bin && -s $root/var/lib/uke-touch/reference.bin && -s $root/var/lib/uke-touch/config.ini ]]
+[[ -f /job/oem-runtime.complete ]]
+bash /builder/src/image/audit-oem-runtime.sh "$root" /job/inputs/oem-runtime-source.json \
+    /job/inputs/local-firmware-candidates.json /job/audit/oem-runtime-inputs.json
+for service in uke-adaptive-display.target uke-bluetooth-address.service uke-touchscreen.service; do
+    [[ $(systemctl --root="$root" is-enabled "$service") == enabled ]]
+done
 if rpm --root "$root" -qa --qf '%{NAME}\n' | grep -E '(^sddm|-(debuginfo|debugsource)$|^gcc$|^gdb$|^clang$|^make$|^uke-cdc-debug$|^uke-esp32-cdc$|^uke-boot-recovery$|^senemos-uke-linux-kernel-mainline-up)'; then exit 1; fi
 if grep -rE 'nabu-linux' "$root/etc/yum.repos.d"; then exit 1; fi
 grep -Fq 'name=Uke Linux Test' "$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux-test.repo"

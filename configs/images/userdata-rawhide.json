@@ -62,11 +62,23 @@
   "precreated_human_user": false,
   "oem_firmware_included": true,
   "device_private_data_included": true,
-  "firmware_provisioning": "Private local RPMs matched to the current tablet; not redistributable",
+  "firmware_provisioning": "Pinned local firmware RPM and previously qualified device-local touch data; not redistributable",
   "deferred_until_firmware_provisioning": [],
   "automatic_kernel_activation": false,
   "installation_tested": false,
   "hardware_tested": false,
   "kernel_release": "7.2.11-14",
-  "kernel_package": "senemos-uke-linux-kernel-mainline-singleboot"
+  "kernel_package": "senemos-uke-linux-kernel-mainline-singleboot",
+  "oem_runtime_inputs": {
+    "required": true,
+    "release": "OS3.0.304.0.WOZMIXM",
+    "oem_manifest_sha256": "142c0e89e4773efc1f6da386a3e0620bc492cffe55f0f23a546e55c2682c5733",
+    "firmware_manifest_sha256": "65449894c0ad3a98b37d725834b1922d602a8a88f8feb2ef25c6e37da7620609",
+    "touch_panel": "csot",
+    "touch_reference_policy": "Preserve the previously qualified device-local reference; never import one from the reusable OEM archive.",
+    "rpm_sha256": {
+      "xiaomi-uke-firmware-3.0.304.0-1.local.fc46.noarch.rpm": "e7af953b77963ecb511f9e13bbde5e2bf2084b78dc9a375d00e211aaaad1159c"
+    },
+    "firmware_nevra": "xiaomi-uke-firmware-3.0.304.0-1.local.fc46.noarch"
+  }
 }

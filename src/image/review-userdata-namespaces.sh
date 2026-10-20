@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Host-only: exact original Fedora, device-matched private RPMs and policy outputs.
+# Host-only: exact original Fedora, verified private RPMs and policy outputs.
 set -Eeuo pipefail
 [[ $# == 5 ]]
 root=$(realpath "$1") original=$(realpath "$2") proof=$(realpath "$3") output=$4 private=$(realpath "$5")
@@ -26,7 +26,7 @@ while IFS= read -r path; do
             usr/lib/firmware/*)
                 [[ ! -L $private/$relative && $(realpath "$private/$relative") == "$private/"* ]]
                 cmp "$path" "$private/$relative"
-                provenance='exact-device-matched-private-rpm-firmware'
+                provenance='verified-private-rpm-firmware'
                 ;;
             etc/selinux/targeted/contexts/files/file_contexts.bin|etc/selinux/targeted/contexts/files/file_contexts.homedirs.bin|etc/selinux/targeted/contexts/files/file_contexts|etc/selinux/targeted/contexts/files/file_contexts.homedirs|var/lib/selinux/targeted/active/file_contexts|var/lib/selinux/targeted/active/file_contexts.homedirs)
                 cmp "$path" "$proof/${relative##*/}"
@@ -39,5 +39,5 @@ while IFS= read -r path; do
     jq -nc --arg path "$relative" --arg sha256 "$hash" --arg provenance "$provenance" \
         '{path:$path,sha256:$sha256,provenance:$provenance}' >> "$work/entries"
 done < "$work/paths"
-jq -s '{schema_version:1,policy:"Exact signed Fedora, device-matched private firmware and verified SELinux bytes; private host paths remain rejected",files:sort_by(.path)}' \
+jq -s '{schema_version:1,policy:"Exact signed Fedora, verified private firmware RPMs and verified SELinux bytes; private host paths remain rejected",files:sort_by(.path)}' \
     "$work/entries" > "$output"

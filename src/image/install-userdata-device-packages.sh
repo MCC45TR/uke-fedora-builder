@@ -39,6 +39,7 @@ command=(dnf5 --use-host-config --installroot="$root" --releasever=rawhide
     --setopt=tsflags=nodocs --setopt=excludepkgs='*-debuginfo,*-debugsource,kernel,kernel-core,kernel-modules*,sddm*')
 "${command[@]}" -y install "${private[@]}" "${public[@]}" kde-plasma-uke-meta ddcutil > /job/logs/device-install.log 2>&1
 "${command[@]}" check > /job/logs/device-dependency-check.log 2>&1
+bash /builder/src/image/install-oem-runtime.sh
 rpm --root "$root" --restore -a
 rpm --root "$root" -qa --qf '%{NAME}\t%{EPOCHNUM}\t%{VERSION}\t%{RELEASE}\t%{ARCH}\t%{SOURCERPM}\n' |
     LC_ALL=C sort > /job/installed-rpms.tsv
