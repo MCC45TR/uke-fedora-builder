@@ -1,75 +1,74 @@
-# Fedora userdata fastboot images
+# Uke userdata test images
 
-18 October 2026 · Xiaomi Pad 7 / POCO Pad X1 (`uke`) · Fedora Rawhide AArch64
+20 October 2026 · Uke / SM7675 · Fedora Rawhide AArch64 · original Fedora Plasma.
+This private test image includes the firmware and touch data matched to the
+current tablet. Do not upload or redistribute the system image. No existing
+account, password, SSH key or Wi-Fi connection is copied into the fresh root.
 
-These are host-verified test images from the prepared userdata payload. They
-still require validated device-local OEM firmware and touchscreen provisioning
-before activation. This export does not supply that unfinished provisioning
-route or establish a successful tablet boot.
+The installed kernel profile is `senemos-uke-linux-kernel-mainline-singleboot`
+7.2.11-14. Its exact signed core, modules, DTBs and boot bundle are shared with
+the ordinary mainline profile; the singleboot selection targets `userdata`,
+while the ordinary profile targets `linux`. The test COPR repository is enabled.
 
-| File | Format and target |
+| File | Target and contents |
 |---|---|
-| `userdata.img` | Android sparse v1; expands to a 14 GiB F2FS filesystem labelled `UKE_LINUX` on `userdata` |
-| `boot.img` | 96 MiB Android boot v4; kernel 7.2.10-31, `senemos.root=userdata` |
-| `SHA256SUMS` | Checksums for the images and accompanying records |
-| `manifest.json` | Source commits, original payload metadata, hashes and validation limits |
+| `system.img` / `userdata.img` | Identical Android sparse F2FS root image; flash to **userdata** |
+| `boot.img` | Android boot v4, kernel 7.2.11-14, explicit userdata root selector |
+| `SHA256SUMS` | Image and record checksums |
+| `manifest.json` | Exact artifacts, source and validation limits |
+| `rollback/boot_b-before-refresh.img` | Read-back backup of the current Linux boot B |
 
-## Manual flashing
+Flashing userdata destroys the existing Android userdata filesystem and user
+data. Back up needed files first. The root filesystem is 14 GiB; this test image
+does not automatically grow it to the full partition. Userdata must be at least
+15,032,385,536 bytes and boot B at least 100,663,296 bytes. GPT is not changed.
+The existing separate `linux` partition is not an installation target.
 
-Flashing userdata destroys the existing Android/userdata filesystem and its
-user data. Back up needed data and preserve a working recovery/stock boot route
-first. Use an unlocked Uke bootloader and current Android platform-tools.
-Keep the images on the host. The userdata partition must be at least
-15,032,385,536 bytes; the selected boot partition must be at least 100,663,296
-bytes. This export does not repartition storage.
-
-Verify the extracted files on the host:
+Use current Android platform-tools and verify the files before manual writes:
 
 ```sh
 sha256sum -c SHA256SUMS
-```
-
-Inspect the intended slot and capacity before any manual write:
-
-```sh
 fastboot getvar product
 fastboot getvar current-slot
 fastboot getvar partition-size:userdata
+fastboot getvar partition-size:boot_b
 ```
 
-Check the size of `boot_a` or `boot_b` for that selected slot. After the
-device-local provisioning requirement is satisfied, the requested write syntax
-from the directory containing these files is:
+Only after confirming the Uke device, capacities and intended slot B:
 
 ```sh
-fastboot flash userdata userdata.img
-fastboot flash boot boot.img
+fastboot flash userdata system.img
+fastboot flash boot_b boot.img
+fastboot set_active b
+fastboot reboot
 ```
 
-With no `--slot` override, `boot` means the current active slot. Confirm that it
-is the slot intended for replacement; these commands do not preserve that slot's
-existing boot image. They do not select another slot or update both slots.
-Do not use `fastboot -w` or format userdata afterwards: that would erase Fedora.
-The sparse image explicitly supplies every logical block with RAW/FILL chunks;
-it has no DONT_CARE chunks. Fastboot can split sparse transfers according to the
-device's reported download limit. The actual Uke transfer remains untested.
+Do not run `fastboot -w` or format userdata after flashing: it would erase Fedora.
+Boot A is not written, but replacing userdata also removes Android's existing
+user data. This is a manual test image, not a recovery-flashable installer.
 
-## Remaining validation
+First boot starts original Plasma Setup. Create the account and connect Wi-Fi.
+Root password login is locked and no human account is preset. Plasma Setup
+creates an administrator in `wheel`; Plasma Login Manager provides subsequent
+logins. All packaged translations, glibc locale data and the selected multilingual
+fonts/input methods are retained. Some upstream translations may be incomplete.
+SSH starts disabled; enable it locally if remote testing is required:
 
-The filesystem is 14 GiB even on a larger partition. Automatic growth is not
-implemented here; the remaining space requires a qualified offline F2FS resize.
-Firmware/touch provisioning, actual ABL root-selector forwarding, first boot,
-Plasma Setup, hardware operation and Android restoration remain untested.
-Secure Boot is off. Automatic kernel activation remains held until the userdata
-A/B writer and failed-boot fallback are qualified. Other prepared-root settings
-are recorded in `manifest.json`.
+```sh
+sudo systemctl unmask sshd.service
+sudo systemctl enable --now sshd.service
+```
 
-The existing C++ sparse encoder was reused without modification. Independent
-AOSP `simg2img` expansion must match the original 14 GiB image's exact size and
-SHA-256 before export succeeds. No fastboot operation runs in the exporter.
-To reproduce from the completed preparation directory, run
-`bash src/image/export-userdata-fastboot.sh JOB`; it requires a new `JOB/fastboot`
-directory and the verified original delivery. The exporter is host-only.
+CDC remains manual through `sudo uke-control set cdc on`. Automatic kernel
+activation is held while userdata slot updating and fallback remain unqualified.
+To return to the retained Linux root, restore the saved boot B manually:
 
-Format and command references: [AOSP sparse format](https://android.googlesource.com/platform/system/core/+/refs/heads/main/libsparse/sparse_format.h)
-and [AOSP fastboot implementation](https://android.googlesource.com/platform/system/core/+/refs/heads/main/fastboot/fastboot.cpp).
+```sh
+fastboot flash boot_b rollback/boot_b-before-refresh.img
+fastboot set_active b
+fastboot reboot
+```
+
+Host package, filesystem/metadata, sparse decode and boot/Image checks do not
+establish physical boot, ABL root-selector forwarding or hardware acceptance.
+Recovery installation and filesystem growth are later stages.

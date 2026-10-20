@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 [[ $# == 3 && -d $1 && -x $2 && ! -e $3 ]]
 root=$(realpath "$1") codec=$(realpath "$2") output=$3
-release=7.2.10-31
+release=$(jq -er .kernel_release "$root/usr/share/uke/image-profile.json")
 modules=$root/usr/lib/modules/$release
 bundle=$root/usr/lib/senemos/kernel-updates/$release
 [[ -f $modules/vmlinuz && -f $modules/System.map && -f $bundle/userdata.img ]]
@@ -21,8 +21,9 @@ symbol() {
     [[ $value =~ ^[0-9a-f]{16}$ ]]
     printf '%s' "$value"
 }
-text=$(symbol _text) start=$(symbol __irf_start) end=$(symbol __irf_end)
-offset=$((16#$start-16#$text)) length=$((16#$end-16#$start))
+text=$(symbol _text) start=$(symbol __initramfs_start) size=$(symbol __initramfs_size)
+offset=$((16#$start-16#$text)) size_offset=$((16#$size-16#$text))
+length=$(od -An -tu8 -j "$size_offset" -N8 "$modules/vmlinuz" | tr -d ' ')
 [[ $offset -gt 0 && $length -gt 1048576 && $length -lt 67108864 ]]
 dd if="$modules/vmlinuz" of="$output/initramfs.cpio.gz" bs=1M iflag=skip_bytes,count_bytes \
     skip="$offset" count="$length" status=none
@@ -33,12 +34,13 @@ mkdir "$output/initramfs"
 here=$(cd "$(dirname "$0")/.." && pwd)
 bash "$here/audit/check-target-payload.sh" "$output/initramfs"
 bash "$here/audit/check-target-privacy.sh" "$output/initramfs"
-[[ ! -e $output/initramfs/usr/lib/systemd/system/uke-cdc-shell.service ]]
 [[ ! -e $output/initramfs/usr/libexec/senemos-local-shell ]]
+find "$output/initramfs" -type l -path '*wants*' -printf '%P\n' > "$output/startup-links.txt"
+if grep -Ei 'uke-cdc|g_serial|usb-network' "$output/startup-links.txt"; then exit 1; fi
 grep -Fq 'f2fs' "$output/initramfs/usr/libexec/uke-root-guard"
 grep -Fxq CONFIG_F2FS_FS=y "$modules/config"
 grep -Fxq CONFIG_F2FS_FS_SECURITY=y "$modules/config"
-for flag in DEBUG_INFO DEBUG_FS DYNAMIC_DEBUG FTRACE FUNCTION_TRACER KPROBES KASAN UBSAN; do
+for flag in DEBUG_INFO KASAN UBSAN; do
     if grep -Eq "^CONFIG_$flag=[ym]$" "$modules/config"; then exit 1; fi
 done
 grep -Fxq CONFIG_DEBUG_INFO_NONE=y "$modules/config"

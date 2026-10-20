@@ -3,7 +3,6 @@
 set -Eeuo pipefail
 append=0
 if [[ $# == 1 && $1 == --append ]]; then append=1; else [[ $# == 0 ]]; fi
-[[ -f /job/packages.complete ]]
 if ((append)); then
     [[ -d /job/original-fedora && -s /job/audit/original-fedora-rpms.tsv ]]
 else

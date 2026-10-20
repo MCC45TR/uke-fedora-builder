@@ -42,7 +42,12 @@ blkid -p -o export "$work/userdata.raw" | sed -n '/^\(TYPE\|LABEL\|BLOCK_SIZE\)=
 grep -qx TYPE=f2fs "$destination/checks/filesystem.txt"
 grep -qx LABEL=UKE_LINUX "$destination/checks/filesystem.txt"
 cp --reflink=auto "$boot" "$destination/boot.img"
+ln "$destination/userdata.img" "$destination/system.img"
 [[ $(sha256sum "$destination/boot.img" | cut -d ' ' -f1) == "$boot_sha" ]]
+[[ -f $job/rollback/boot_b-before-refresh.img && ! -L $job/rollback/boot_b-before-refresh.img ]]
+(cd "$job/rollback"; sha256sum -c SHA256SUMS)
+mkdir "$destination/rollback"
+cp --reflink=auto "$job/rollback/boot_b-before-refresh.img" "$job/rollback/SHA256SUMS" "$destination/rollback/"
 cp "$job/delivery/checks/boot-header.json" "$destination/checks/boot-header.json"
 cp "$repo/docs/USERDATA-FASTBOOT.md" "$destination/README.md"
 jq -n --slurpfile prepared "$manifest" \
@@ -53,14 +58,14 @@ jq -n --slurpfile prepared "$manifest" \
     --argjson sparse_bytes "$(stat -c %s "$destination/userdata.img")" \
     '{schema_version:1,created:$created,artifact_kind:"unqualified-fastboot-images",device:"uke",
       prepared_payload:$prepared[0],exporter_commit:$exporter,
-      userdata:{file:"userdata.img",format:"android-sparse-v1",block_bytes:4096,
+      userdata:{file:"system.img",alias:"userdata.img",target_partition:"userdata",format:"android-sparse-v1",block_bytes:4096,
         bytes:$sparse_bytes,sha256:$sparse_sha,raw_bytes:$prepared[0].root.raw_bytes,
         raw_sha256:$prepared[0].root.raw_sha256,dont_care_chunks:0,automatic_filesystem_growth:false},
       boot:($prepared[0].boot + {file:"boot.img"}),
       validation:{independent_decoder:"AOSP simg2img",decoder_binary_sha256:$decoder,
         codec_source_sha256:$codec,expanded_size_and_sha256_match:true,f2fs_identity_readback:true,
         boot_identical_to_prepared_payload:true,device_flash_tested:false,physical_boot_tested:false},
-      operation_scope:"Manual userdata and current-slot boot flashing only; no device operation performed by export."}' \
+      operation_scope:"Manual userdata and boot_b flashing only; preserve boot_a; no device operation performed by export."}' \
     > "$destination/manifest.json"
 (cd "$destination"; find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > "$work/SHA256SUMS")
 mv "$work/SHA256SUMS" "$destination/SHA256SUMS"

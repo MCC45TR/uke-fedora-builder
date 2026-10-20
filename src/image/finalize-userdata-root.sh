@@ -5,6 +5,7 @@ root=/job/root
 [[ $# == 0 && -f /job/packages.complete && ! -L $root && ! -e /job/rootfs-frozen ]]
 [[ $(stat -c %u "$root/etc/passwd") == 0 ]]
 rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin \
+    senemos-uke-linux-kernel-mainline-singleboot \
     plasma-discover-offline-updates plasma-discover-packagekit PackageKit \
     glibc-all-langpacks ncurses dnf5-plugins shadow-utils sudo >/dev/null
 [[ -x $root/usr/bin/clear && -f $root/usr/lib/systemd/system/plasmalogin.service ]]
@@ -36,6 +37,9 @@ SELINUXTYPE=targeted
 SELINUX
 printf '%%_install_langs all\n' > "$root/etc/rpm/macros.uke-languages"
 install -m644 /job/inputs/uke-copr.asc "$root/etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr"
+[[ $(gpg --show-keys --with-colons /job/inputs/uke-copr-test.asc | awk -F: '$1=="fpr" {print $10; exit}') == DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E ]]
+install -m644 /job/inputs/uke-copr-test.asc "$root/etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test"
+rpm --root "$root" --import /job/inputs/uke-copr-test.asc
 cat > "$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux.repo" <<'REPO'
 [copr:copr.fedorainfracloud.org:mcc45tr:uke-linux]
 name=Uke Linux
@@ -48,6 +52,31 @@ gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr
 skip_if_unavailable=False
 priority=50
 includepkgs=senemos-uke-linux-kernel-mainline*,uke-*,kde-plasma-uke-meta,libstdc++,mesa-*,libssc*,iio-sensor-proxy
+REPO
+cat > "$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux-test.repo" <<'REPO'
+[copr:copr.fedorainfracloud.org:mcc45tr:uke-linux-test]
+name=Uke Linux Test
+baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux-test/fedora-rawhide-$basearch/
+enabled=1
+type=rpm-md
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test
+skip_if_unavailable=False
+priority=40
+includepkgs=senemos-uke-linux-kernel-mainline*,uke-*,kde-plasma-uke-meta,libstdc++,mesa-*,libssc*,iio-sensor-proxy
+
+[uke-userdata-kernel-candidate]
+name=Uke userdata kernel candidate 2026-10-20
+baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux-test:custom:userdata-20261020/fedora-rawhide-$basearch/
+enabled=1
+type=rpm-md
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test
+skip_if_unavailable=False
+priority=30
+includepkgs=senemos-uke-linux-kernel-mainline-core,senemos-uke-linux-kernel-mainline-modules,senemos-uke-linux-kernel-mainline-dtbs,senemos-uke-linux-kernel-mainline-boot
 REPO
 # A candidate must not install a new kernel without its qualified slot writer.
 cat > "$root/etc/dnf/dnf.conf" <<'DNF'
@@ -72,11 +101,11 @@ done
 mkdir -p "$root/var/lib/dbus" "$root/usr/share/uke"
 ln -s /etc/machine-id "$root/var/lib/dbus/machine-id"
 install -m644 /builder/configs/images/userdata-rawhide.json "$root/usr/share/uke/image-profile.json"
-printf 'userdata-f2fs-20261018-rc1\n' > "$root/usr/share/uke/image-finalized"
+printf 'userdata-f2fs-20261020-device-test\n' > "$root/usr/share/uke/image-finalized"
 for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then
         echo 'Mounted runtime tree refused during offline finalization' >&2; exit 1
     fi
     find "$root/$tree" -mindepth 1 -depth -delete
 done
-echo 'Fresh Plasma Setup, locked root, PLM, offline updates and stable COPR configured; kernel activation remains gated.'
+echo 'Fresh Plasma Setup, locked root, PLM, offline updates and test COPR configured; kernel activation remains gated.'
