@@ -1,6 +1,6 @@
 # Fedora userdata F2FS preparation
 
-Date: 18 October 2026. Environment: Fedora Rawhide AArch64 RPM composition and
+Date: 20 October 2026. Environment: Fedora Rawhide AArch64 RPM composition and
 offline host/VM validation for Xiaomi Pad 7 / POCO Pad X1 (`uke`). No tablet
 installation or new hardware acceptance is established by this recipe.
 
@@ -14,22 +14,25 @@ console tools including `clear`. Documentation and weak dependencies are omitted
 Root is locked and there is no ordinary pre-created user. The original Setup
 service creates the first account before the display manager starts.
 
-The installed device repository is `mcc45tr/uke-linux`. Its package allowlist
-keeps ordinary KDE applications on their original Fedora packages. Candidate
-kernel 7.2.10-31 and installation-profile 0.1.0-30 are selected explicitly from
-the isolated `uke-linux:custom:userdata-rc1` build results. This does not promote
-them to the main channel. Source packages, signing keys and archive hashes must
-be retained with the build record.
+The test repository `mcc45tr/uke-linux-test` is enabled, with the stable repository
+as a fallback. Their package allowlists keep ordinary KDE applications on their
+original Fedora packages. The singleboot profile 7.2.11-14 and matching common
+kernel tuple are selected from COPR11178622 and the isolated kernel build11178536.
+Installation-profile 0.1.0-30 supplies the first-boot classifier. Source packages,
+signing keys and archive hashes must be retained with the build record.
 
 One kernel Image supports both root profiles. The userdata boot-v4 container
 adds `senemos.root=userdata`; the Linux container uses the existing default.
-There is no separate `-up` RPM family. F2FS, security labels, xattrs and ACLs are
+`senemos-uke-linux-kernel-mainline-singleboot` selects userdata while sharing the
+exact signed core, modules, DTBs and boot bundle with the ordinary mainline
+profile. F2FS, security labels, xattrs and ACLs are
 built into the kernel. The first system boot classifies the actual mounted
 physical root, writes the root-owned installation marker and masks its own
 oneshot. Login-account changes do not re-run it.
 
-Secure Boot is off. Kernel debug instrumentation, debug packages and development
-shell services are excluded or disabled. Existing board handoff settings remain necessary and
+Secure Boot is off. Debug packages and development shell startup are excluded or
+disabled; required kernel development diagnostics remain in the candidate.
+Existing board handoff settings remain necessary and
 are not newly qualified power-management behavior.
 
 ## Host stages
@@ -42,16 +45,18 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
 1. Supply reviewed Fedora 46/COPR public keys, `compose.repo` and the package
    list under `/job/inputs`. Run `compose-userdata-root.sh solve`, then `install`.
    The container RPM macro must request all languages before the transaction.
-2. Download the stable device packages with
-   `download-userdata-device-packages.sh`. Obtain the exact candidate RPMs from
-   COPR builds 11167317 and 11167080. Run
+2. Stage the exact reviewed public device RPMs and kernel tuple in
+   `/job/inputs/public-rpms`, with a SHA256SUMS inventory. Preserve their source
+   archives; the boot-status22 correction is COPR11178594. Stage the seven
+   private firmware/data RPMs separately, with archive hashes, exact RPM file
+   metadata and installed-file comparison against the current tablet. Run
    `install-userdata-device-packages.sh`; it verifies local signatures, pins the
    matching kernel tuple and checks dependencies. Do not install SRPMs or debug
    integration subpackages into the target.
-   `uke-ssc-fileservice` and `uke-adaptive-display` are delivered as deferred
-   signed RPMs: their real OEM firmware-file dependencies cannot be satisfied
-   by the public root. Install them after validated device-local provisioning;
-   no dummy provider or dependency bypass is permitted.
+   Public signatures remain mandatory. Historical unsigned local archives require
+   digest verification and the exact device comparison. Install touch driver/data
+   in one dependency-checked transaction; no dummy provider or dependency bypass
+   is permitted. This device-matched image is private and must not be redistributed.
 3. Run `finalize-userdata-root.sh`. Regenerate hwdb with a recorded native host
    `systemd-hwdb --root=/job/root update`; the emulated tool must not leave an
    empty database. Run `audit-userdata-policy-sources.sh` to prove that generated
@@ -70,7 +75,11 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    using `audit-original-fedora.sh`. Byte-check permitted original Fedora Python
    helpers with `src/audit/check-target-payload.sh --original-kde-payload`.
    Project helpers and early userspace remain Python-free. Run privacy checks
-   with an exact, proven namespace policy from `review-userdata-namespaces.sh`.
+   with an exact, proven namespace policy from `review-userdata-namespaces.sh`:
+   `ROOT ORIGINAL_FEDORA SELINUX_PROOF OUTPUT_JSON VERIFIED_PRIVATE_RPM_TREE`.
+   The final argument is a separate extraction of those device-matched archives;
+   only byte-identical firmware can retain an OEM build namespace. Actual private
+   host paths remain rejected, including inside an otherwise matching firmware.
    No unverified path is admitted merely because it looks like a distro example.
 6. Only after those checks pass, record `root-audit.complete`. Build the native
    composition initramfs with `prepare-f2fs-vm.sh` and invoke
