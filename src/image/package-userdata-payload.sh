@@ -5,7 +5,7 @@ set -Eeuo pipefail
 job=$(realpath "$1") builder_commit=$2
 repo=$(cd "$(dirname "$0")/../.." && pwd)
 [[ $(git -C "$repo" rev-parse HEAD) == "$builder_commit" ]]
-for flag in f2fs-image.complete f2fs-xattr-audit.complete root-audit.complete; do [[ -f $job/$flag ]]; done
+for flag in f2fs-image.complete f2fs-xattr-audit.complete f2fs-readonly-audit.complete f2fs-fsck-readonly.complete root-audit.complete; do [[ -f $job/$flag ]]; done
 release=$(jq -er .kernel_release "$repo/configs/images/userdata-rawhide.json")
 bundle=$job/root/usr/lib/senemos/kernel-updates/$release
 [[ $(readlink "$job/root/usr/lib/senemos/default-boot.img") == kernel-updates/$release/userdata.img ]]
@@ -38,7 +38,8 @@ jq -n --arg date "$(date -u +%F)" --arg release "$release" --arg builder "$build
       root_locked:true,precreated_human_account:false,credentials_included:false,automatic_kernel_activation:false,
       physical_boot_tested:false,recovery_installation_tested:false,hardware_tested:false,
       validation:{signed_public_packages:true,private_archives_match_live_device:true,full_f2fs_contents_and_metadata:true,
-        explicit_xattr_and_acl_readback:true,selinux_label_readback:true,fsck_f2fs:true},
+        explicit_xattr_and_acl_readback:true,selinux_label_readback:true,fsck_f2fs:true,
+        readonly_metadata_remount:true,fsck_dry_run_unchanged:true},
       continuation:"Manual userdata/boot test; recovery installer and filesystem growth remain separate."}' > "$destination/payload.json"
 # SHA256SUMS is explicitly excluded from the input inventory.
 # shellcheck disable=SC2094

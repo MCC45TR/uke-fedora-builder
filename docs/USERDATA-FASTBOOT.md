@@ -9,6 +9,7 @@ The installed kernel profile is `senemos-uke-linux-kernel-mainline-singleboot`
 7.2.11-14. Its exact signed core, modules, DTBs and boot bundle are shared with
 the ordinary mainline profile; the singleboot selection targets `userdata`,
 while the ordinary profile targets `linux`. The test COPR repository is enabled.
+Native audio remains disabled in this candidate.
 
 | File | Target and contents |
 |---|---|
