@@ -26,16 +26,16 @@ file=/job/inputs/oem-rpms/$nevra.rpm
 [[ -f $file && $(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$file") == "$nevra" ]]
 [[ -z $(rpm -qp --scripts "$file") ]]
 if rpm -qp --requires "$file" | grep -Ei 'python|pypy|libpython'; then exit 1; fi
-rpmkeys --define '_pkgverify_level digest' --checksig "${packages[@]}" > /job/logs/oem-rpm-digests.log
-# Only this locally built, source-pinned data RPM uses digest admission.
+rpmkeys --root "$root" --define '_pkgverify_level signature' --checksig "${packages[@]}" > /job/logs/oem-rpm-signatures.log
+# The canonical public firmware RPM requires signatures as well as archive pins.
 dnf5 --use-host-config --installroot="$root" --releasever=rawhide --disable-repo='*' \
-    --setopt=excludepkgs= --setopt=localpkg_gpgcheck=False --setopt=install_weak_deps=False \
+    --setopt=excludepkgs= --setopt=localpkg_gpgcheck=True --setopt=install_weak_deps=False \
     -y install "${packages[@]}" > /job/logs/oem-install.log 2>&1
 dnf5 --use-host-config --installroot="$root" --releasever=rawhide --disable-repo='*' \
     --setopt=excludepkgs= check > /job/logs/oem-dependency-check.log 2>&1
 # DNF creates an empty runtime directory even for an offline installroot.
 if [[ -d $root/run/dnf && ! -L $root/run/dnf ]]; then rmdir "$root/run/dnf"; fi
-banned='^(uke-local-(gpu-firmware|sensor-data|bluetooth-firmware)|uke-owner-(adsp-firmware|wpss-firmware|wlan-board|wlan-regdb))$'
+banned='^(xiaomi-uke-firmware|uke-local-(gpu-firmware|sensor-data|bluetooth-firmware)|uke-owner-(adsp-firmware|wpss-firmware|wlan-board|wlan-regdb))$'
 if rpm --root "$root" -qa --qf '%{NAME}\n' | grep -E "$banned"; then exit 1; fi
 [[ $(rpm --root "$root" -q "${nevra%.noarch}" --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}') == "$nevra" ]]
 [[ $(sha256sum "$reference" | cut -d ' ' -f1) == "$reference_sha" ]]

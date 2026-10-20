@@ -58,13 +58,16 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    in one dependency-checked transaction; no dummy provider or dependency bypass
    is permitted. This device-matched image is private and must not be redistributed.
    The Global 304 integration additionally requires `inputs/oem-rpms/` with the
-   one `xiaomi-uke-firmware` data RPM and `SHA256SUMS`, plus `inputs/oem-runtime-source.json`
+   one signed `uke-firmware` data RPM from the `uke-hw` COPR source family and
+   `SHA256SUMS`, plus `inputs/oem-runtime-source.json`
    and `inputs/local-firmware-candidates.json` from the firmware component.
    `configs/images/userdata-rawhide.json` pins both source manifests, the exact NEVRA
    and RPM archive hash. Rebuilt archives require a reviewed profile update.
    The installer then calls `install-oem-runtime.sh` for a repository-disabled,
-   dependency-checked transaction. Only this additional data RPM uses local digest
-   admission; public package signature checks remain mandatory.
+   dependency-checked transaction. The canonical firmware RPM requires a trusted
+   signature as well as the pinned archive hash; DNF local-package signature
+   verification remains enabled for this transaction. Historical local prototype
+   archives remain separate rollback inputs, not substitutes for signed output.
    Existing CSOT firmware/configuration and the qualified private touch reference
    are retained. The original sensor target and Bluetooth address helper are
    enabled through their existing resource conditions, without starting them

@@ -62,7 +62,7 @@
   "precreated_human_user": false,
   "oem_firmware_included": true,
   "device_private_data_included": true,
-  "firmware_provisioning": "Pinned local firmware RPM and previously qualified device-local touch data; not redistributable",
+  "firmware_provisioning": "Pinned signed COPR firmware RPM and previously qualified device-local touch data; the combined image remains private",
   "deferred_until_firmware_provisioning": [],
   "automatic_kernel_activation": false,
   "installation_tested": false,
@@ -77,8 +77,8 @@
     "touch_panel": "csot",
     "touch_reference_policy": "Preserve the previously qualified device-local reference; never import one from the reusable OEM archive.",
     "rpm_sha256": {
-      "xiaomi-uke-firmware-3.0.304.0-1.local.fc46.noarch.rpm": "e7af953b77963ecb511f9e13bbde5e2bf2084b78dc9a375d00e211aaaad1159c"
+      "uke-firmware-3.0.304.0-1.fc46.noarch.rpm": "22bd79fe30a0290bdeebabe49afbfa9f2c4aadfb22efa46a738b89601f9b7869"
     },
-    "firmware_nevra": "xiaomi-uke-firmware-3.0.304.0-1.local.fc46.noarch"
+    "firmware_nevra": "uke-firmware-3.0.304.0-1.fc46.noarch"
   }
 }
