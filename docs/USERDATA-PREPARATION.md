@@ -83,9 +83,11 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    target `sefcontext_compile`. Remove unmounted bootstrap runtime-tree contents;
    the final root does not carry the install transaction's `/dev/null` stub.
 4. Run `audit-userdata-root.sh`, `audit-languages`, and
-   `audit-userdata-kernel.sh`. The latter compares both boot containers with the
+   `audit-userdata-kernel.sh ROOT CODEC JOB/audit/kernel`. The latter compares both boot containers with the
    installed Image, verifies every module digest, extracts the embedded initramfs
-   using its System.map and audits the actual extracted payload.
+   using its System.map and audits the actual extracted payload. Its
+   `growth-policy.json` binds the enabled growth mechanism to the filesystem,
+   selected release and Image digest; packaging requires that exact receipt.
 5. Record every installed payload package's origin with `query-userdata-origins.sh`
    in the native host container. RPM public-key records are separate from the
    package count; query-time exclusions must not hide the installed kernel tuple.
@@ -102,12 +104,15 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
 6. Only after those checks pass, record `root-audit.complete`. Build the native
    composition initramfs with `prepare-f2fs-vm.sh` and invoke
    `create-userdata-f2fs.sh JOB NATIVE_VM_CONTAINER`. It creates a 14 GiB regular
-   F2FS image labelled `UKE_LINUX`, preserves numeric ownership, ACLs and file
+   image of the profile's explicit filesystem, labelled `UKE_LINUX`, preserves numeric ownership, ACLs and file
    capabilities, applies the target SELinux policy, compares all archived files
    and metadata, explicitly compares capabilities/ACLs with `getfattr`, checks
    labels again and runs fsck. GNU tar's compare mode alone does not detect a
    missing capability; the separate manifest is required. The VM has no network and
    attaches only that newly created regular image, never a host disk.
+   The historical script filenames remain compatible with the F2FS workflow.
+   `audit-userdata-filesystem.sh` performs the separate read-only VM audit;
+   `patch-userdata-f2fs.sh` explicitly remains F2FS-only.
 7. Verify the compressed root and userdata boot payload with the native C++
    checker. Record expanded/compressed sizes, SHA-256, source commits, RPM list,
    key identities and validation limits in the delivery manifest. The Zstandard
@@ -134,16 +139,46 @@ would overwrite that same storage, validate capacity and F2FS compatibility,
 resize the new filesystem, verify write readback and record recovery progress.
 The payload does not define or authorize a new partition layout.
 
-Automatic kernel installation is held in DNF until the userdata slot writer,
-both slot directions, success acknowledgement and failed-boot fallback are
-qualified. The current native updater still refuses userdata. Installed
-offline-update components do not establish automatic boot-slot updating or
-rollback of the shared root filesystem.
+DNF retains all selected and declared rollback kernel tuples with
+`installonly_limit=0`. Automatic kernel activation stays disabled until both
+slot directions, success acknowledgement and failed-boot fallback are qualified.
+The packaged userdata updater checks installed bundles and physical slot
+identity; its presence does not establish automatic recovery or rollback of the
+shared root filesystem.
 
 The same frozen payload can be exported as separate sparse userdata and boot
 images with the [host-only fastboot exporter](USERDATA-FASTBOOT.md). This changes
 the distribution format; firmware provisioning and physical acceptance remain
-required, and the 14 GiB filesystem is not automatically grown by that export.
+required. The exporter does not operate a device. The delivered manifest records
+the audited first-boot growth mechanism independently of kernel activation.
+
+## Filesystem selection and growth
+
+22 October 2026. The default source profile selects F2FS and signed kernel
+`7.2.12-6`. EXT4, XFS and Btrfs use the same explicit `root_filesystem` field.
+Changing that field prepares a new filesystem; it never converts an installed
+root. Non-F2FS profiles require the new `uke-kernel-update(root-filesystem-v2)`
+capability, an embedded v2 root-selector note and built-in support in every
+selected or retained kernel. Existing v1 kernels are refused for those profiles.
+That future kernel/hardware package set is not yet published.
+
+| Filesystem | Growth in the prepared installation | Completion |
+|---|---|---|
+| F2FS | Original fsck/resize tools in initramfs, before root is mounted | Read-only capacity check on later boots; no fsck or resize when full |
+| EXT4 / XFS | Original systemd-growfs on the proven mounted root, before login | Atomic completion record skips the service on later boots |
+| Btrfs | Same systemd-growfs path; single physical device, top-level root only | Same completion record; multidevice and subvolume roots refused |
+
+Growth uses the existing userdata partition's capacity without changing GPT.
+A failed operation does not create a completion record. Fresh image composition
+clears the generated installation's completion record; ordinary DNF updates do
+not. This is separate from first-run account creation and boot-slot acceptance.
+
+Host VM tests created each of the four filesystems at 1 GiB and grew it to
+2 GiB, preserving files, ACLs, capabilities, SELinux labels and UUIDs. Read-only
+checks left each whole-image hash unchanged. Native checker tests include
+ASan/UBSan and reject wrong filesystem geometry and missing v2 notes. These
+tests used an original Fedora x86_64 kernel and synthetic ARM64 boot metadata;
+they do not establish Uke boot or repeated-boot acceptance for the new formats.
 
 After the recovery continuation, validate firmware provisioning, userdata boot,
 Plasma Setup account creation, login, application offline updates and recovery

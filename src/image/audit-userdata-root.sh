@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Offline host container stage. No service or desktop session is started.
 set -Eeuo pipefail
+source /builder/src/image/filesystem-policy.sh
+filesystem=$(userdata_profile_filesystem /builder/configs/images/userdata-rawhide.json)
 trap 'printf "Offline root audit failed at line %s\n" "$LINENO" >&2' ERR
 require_no_match() {
     local rc=0
@@ -15,10 +17,11 @@ rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin
     uke-installation-profile uke-kernel-update uke-touchscreen uke-bluetooth \
     uke-kde-plasma-meta openssh-server nftables firewalld selinux-policy-targeted \
     uke-core-meta uke-control uke-firmware uke-front-color uke-charge-control uke-offline-charge \
-    uke-battery-observer uke-fastfetch-config > /job/audit/required-packages.txt
+    uke-battery-observer fastfetch > /job/audit/required-packages.txt
 release=$(jq -er .kernel_release /builder/configs/images/userdata-rawhide.json)
 [[ $(rpm --root "$root" -q senemos-uke-linux-kernel-mainline-singleboot --qf '%{VERSION}-%{RELEASE}') == "$release.fc46" ]]
-if rpm --root "$root" -q senemos-uke-linux-kernel-mainline >/dev/null 2>&1; then exit 1; fi
+[[ $(rpm --root "$root" -q senemos-uke-linux-kernel-mainline --qf '%{VERSION}-%{RELEASE}') == "$release.fc46" ]]
+if rpm --root "$root" -q uke-fastfetch-config >/dev/null 2>&1; then exit 1; fi
 [[ $(readlink "$root/usr/lib/senemos/default-boot.img") == kernel-updates/$release/userdata.img ]]
 awk -F: '$3>=1000 && $3!=65534 {bad=1} END {exit bad}' "$root/etc/passwd"
 grep -Eq '^root:(!|\*)' "$root/etc/shadow"
@@ -33,7 +36,9 @@ done
 [[ $(systemctl --root="$root" is-enabled sshd.socket || true) == disabled ]]
 [[ ! -L $root/etc/systemd/system/sshd.service || $(readlink "$root/etc/systemd/system/sshd.service") != /dev/null ]]
 [[ -x $root/usr/sbin/nft && -x $root/usr/sbin/firewalld ]]
-jq -e '.modules | index("physicaldisk") != null' "$root/etc/fastfetch/config.jsonc" >/dev/null
+[[ ! -e $root/etc/fastfetch/config.jsonc && ! -e $root/etc/fastfetch/config.json ]]
+rpm --root "$root" -V fastfetch > /job/audit/fastfetch-original-verify.log
+[[ ! -s /job/audit/fastfetch-original-verify.log ]]
 grep -Fxq CONFIG_NF_TABLES=m "$root/usr/lib/modules/$release/config"
 grep -Fxq CONFIG_NF_NAT=m "$root/usr/lib/modules/$release/config"
 for service in debug-shell.service uke-cdc-shell.service uke-esp32-cdc-log.service uke-boot-guard.service; do
@@ -55,12 +60,25 @@ grep -Fxq 'SELINUX=enforcing' "$root/etc/selinux/config"
 chroot "$root" /usr/bin/semodule -l > /job/audit/selinux-modules.txt
 grep -Fxq uke-ssc /job/audit/selinux-modules.txt
 grep -Fxq uke-power-profile /job/audit/selinux-modules.txt
-grep -Fxq 'PARTLABEL=userdata / f2fs defaults,noatime 0 0' "$root/etc/fstab"
+grep -Fxq "PARTLABEL=userdata / $filesystem defaults,noatime 0 0" "$root/etc/fstab"
+grep -Fxq installonly_limit=0 "$root/etc/dnf/dnf.conf"
 require_no_match -Fq 'senemos-uke-linux-kernel-mainline*' "$root/etc/dnf/dnf.conf"
 if [[ -e $root/etc/senemos/kernel-update.conf ]] && grep -Fxq automatic=1 "$root/etc/senemos/kernel-update.conf"; then exit 1; fi
+jq -e '.retained_kernel_releases | type=="array" and length==(unique|length) and all(.[]; type=="string" and test("^[0-9]+\\.[0-9]+\\.[0-9]+-[0-9]+$"))' \
+    /builder/configs/images/userdata-rawhide.json >/dev/null
 for directory in "$root/usr/lib/modules/"*; do
-    [[ ${directory##*/} == "$release" || ${directory##*/} == 7.2.11-14 || ${directory##*/} == 7.2.11-17 ]]
+    jq -e --arg current "$release" --arg release "${directory##*/}" \
+        '([$current]+.retained_kernel_releases) | index($release)!=null' \
+        /builder/configs/images/userdata-rawhide.json >/dev/null
 done
+while IFS= read -r baseline; do
+    [[ -d $root/usr/lib/modules/$baseline ]]
+    for component in boot core dtbs modules; do
+        [[ $(rpm --root "$root" -q "senemos-uke-linux-kernel-mainline-$component-$baseline.fc46" \
+            --qf '%{VERSION}-%{RELEASE}') == "$baseline.fc46" ]]
+    done
+done < <(jq -r --arg current "$release" '[$current]+.retained_kernel_releases | .[]' \
+    /builder/configs/images/userdata-rawhide.json)
 grep -Fxq automatic=1 "$root/etc/senemos/userdata-update.conf"
 [[ -z $(find "$root/dev" "$root/proc" "$root/sys" "$root/run" -mindepth 1 -print -quit) ]]
 cmp /job/audit/private-rpm-payloads.tsv /job/audit/device-private-rpm-payloads.tsv

@@ -3,6 +3,9 @@
 set -Eeuo pipefail
 [[ $# == 2 && $2 =~ ^localhost/[a-zA-Z0-9._:/-]+$ ]]
 job=$(realpath "$1") vm_image=$2
+# shellcheck source=src/image/filesystem-policy.sh
+source "$(dirname "$0")/filesystem-policy.sh"
+[[ $(userdata_profile_filesystem "$(dirname "$0")/../../configs/images/userdata-rawhide.json") == f2fs ]]
 [[ -f $job/device-packages.complete && -f $job/root-audit.complete && ! -e $job/rootfs-frozen ]]
 [[ -f $job/vm/vmlinuz && -f $job/vm/initramfs.cpio.gz && -d $job/root ]]
 baseline=$job/baseline/userdata.f2fs.img

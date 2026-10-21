@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Offline host composer. Original Fedora desktop files are not rewritten.
 set -Eeuo pipefail
+source /builder/src/image/filesystem-policy.sh
+filesystem=$(userdata_profile_filesystem /builder/configs/images/userdata-rawhide.json)
 root=/job/root
 [[ $# == 0 && -f /job/packages.complete && ! -L $root && ! -e /job/rootfs-frozen ]]
 [[ $(stat -c %u "$root/etc/passwd") == 0 ]]
@@ -33,9 +35,7 @@ systemctl --root="$root" set-default graphical.target
 systemctl --root="$root" mask debug-shell.service NetworkManager-wait-online.service \
     uke-cdc-shell.service uke-esp32-cdc-log.service uke-boot-guard.service
 [[ $(readlink "$root/etc/systemd/system/display-manager.service") == /usr/lib/systemd/system/plasmalogin.service ]]
-cat > "$root/etc/fstab" <<'FSTAB'
-PARTLABEL=userdata / f2fs defaults,noatime 0 0
-FSTAB
+printf 'PARTLABEL=userdata / %s defaults,noatime 0 0\n' "$filesystem" > "$root/etc/fstab"
 cat /builder/configs/images/uke-persist.fstab >> "$root/etc/fstab"
 install -d -m700 "$root/mnt/vendor/persist"
 cat > "$root/etc/selinux/config" <<'SELINUX'
@@ -72,7 +72,7 @@ cat > "$root/etc/dnf/dnf.conf" <<'DNF'
 [main]
 install_weak_deps=False
 allow_vendor_change=False
-installonly_limit=3
+installonly_limit=0
 excludepkgs=kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource
 DNF
 printf 'LANG=en_US.UTF-8\n' > "$root/etc/locale.conf"
@@ -90,7 +90,9 @@ done
 mkdir -p "$root/var/lib/dbus" "$root/usr/share/uke"
 ln -s /etc/machine-id "$root/var/lib/dbus/machine-id"
 install -m644 /builder/configs/images/userdata-rawhide.json "$root/usr/share/uke/image-profile.json"
-printf 'userdata-f2fs-%s-device-test\n' "$(jq -er .kernel_release /builder/configs/images/userdata-rawhide.json)" > "$root/usr/share/uke/image-finalized"
+printf 'userdata-%s-%s-device-test\n' "$filesystem" "$(jq -er .kernel_release /builder/configs/images/userdata-rawhide.json)" > "$root/usr/share/uke/image-finalized"
+# A newly composed installation must run its own completion-gated growth phase.
+rm -f -- "$root/var/lib/senemos/installation/online-grow-complete" "$root/var/lib/senemos/installation/online-grow-complete.tmp"
 for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then
         echo 'Mounted runtime tree refused during offline finalization' >&2; exit 1

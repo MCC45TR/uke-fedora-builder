@@ -4,19 +4,21 @@ set -Eeuo pipefail
 [[ $# == 1 ]]
 job=$(realpath "$1")
 repo=$(cd "$(dirname "$0")/../.." && pwd)
+source "$repo/src/image/filesystem-policy.sh"
+filesystem=$(userdata_profile_filesystem "$repo/configs/images/userdata-rawhide.json")
 destination=$job/fastboot
 manifest=$job/delivery/payload.json
-raw=$job/image/userdata.f2fs.img
+raw=$job/image/userdata.$filesystem.img
 boot=$job/delivery/boot-userdata.img
-for flag in root-audit.complete f2fs-image.complete f2fs-xattr-audit.complete; do
+for flag in root-audit.complete "$filesystem-image.complete" "$filesystem-xattr-audit.complete"; do
     [[ -f $job/$flag ]]
 done
 [[ ! -e $destination && ! -L $destination ]]
 for input in "$manifest" "$raw" "$boot"; do
     [[ -f $input && ! -L $input ]]
 done
-jq -e '.artifact_kind == "prepared-data-payload" and .device == "uke" and
-    .root_partition == "userdata" and .root_filesystem == "f2fs" and
+jq -e --arg filesystem "$filesystem" '.artifact_kind == "prepared-data-payload" and .device == "uke" and
+    .root_partition == "userdata" and .root_filesystem == $filesystem and
     .boot.selector == "senemos.root=userdata"' "$manifest" >/dev/null
 raw_bytes=$(jq -er '.root.raw_bytes' "$manifest")
 raw_sha=$(jq -er '.root.raw_sha256' "$manifest")
@@ -39,7 +41,7 @@ simg2img "$destination/userdata.img" "$work/userdata.raw"
     $(sha256sum "$work/userdata.raw" | cut -d ' ' -f1) == "$raw_sha" ]]
 blkid -p -o export "$work/userdata.raw" | sed -n '/^\(TYPE\|LABEL\|BLOCK_SIZE\)=/p' |
     LC_ALL=C sort > "$destination/checks/filesystem.txt"
-grep -qx TYPE=f2fs "$destination/checks/filesystem.txt"
+grep -qx "TYPE=$filesystem" "$destination/checks/filesystem.txt"
 grep -qx LABEL=UKE_LINUX "$destination/checks/filesystem.txt"
 cp --reflink=auto "$boot" "$destination/boot.img"
 ln "$destination/userdata.img" "$destination/system.img"
@@ -60,10 +62,11 @@ jq -n --slurpfile prepared "$manifest" \
       prepared_payload:$prepared[0],exporter_commit:$exporter,
       userdata:{file:"system.img",alias:"userdata.img",target_partition:"userdata",format:"android-sparse-v1",block_bytes:4096,
         bytes:$sparse_bytes,sha256:$sparse_sha,raw_bytes:$prepared[0].root.raw_bytes,
-        raw_sha256:$prepared[0].root.raw_sha256,dont_care_chunks:0,automatic_filesystem_growth:false},
+        raw_sha256:$prepared[0].root.raw_sha256,dont_care_chunks:0,
+        automatic_filesystem_growth:($prepared[0].root_growth.enabled==true),root_growth:$prepared[0].root_growth},
       boot:($prepared[0].boot + {file:"boot.img"}),
       validation:{independent_decoder:"AOSP simg2img",decoder_binary_sha256:$decoder,
-        codec_source_sha256:$codec,expanded_size_and_sha256_match:true,f2fs_identity_readback:true,
+        codec_source_sha256:$codec,expanded_size_and_sha256_match:true,filesystem_identity_readback:true,
         boot_identical_to_prepared_payload:true,device_flash_tested:false,physical_boot_tested:false},
       operation_scope:"Manual userdata and boot_b flashing only; preserve boot_a; no device operation performed by export."}' \
     > "$destination/manifest.json"
