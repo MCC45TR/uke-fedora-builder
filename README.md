@@ -115,3 +115,12 @@ does not establish tablet UFS, screen, USB or sleep behavior.
 Firmware redistribution and licenses are reviewed separately from kernel source
 packages. Public releases include checksums and installation limits; physical
 results are reported separately for each tested build and device variant.
+
+### Root mount policy — 19 October 2026
+
+New Core and boot-pair roots use noatime and errors=remount-ro on ext4. This
+matches the boot integration template while preserving the existing filesystem
+identity, normal ordered journaling, write barriers and commit interval. The
+first option avoids access-time writes; the second protects an errored root
+from further writes. Periodic trimming remains separate from continuous
+mount-time discard. Source checks do not qualify a newly exported image.
