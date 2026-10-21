@@ -20,9 +20,10 @@ Native audio remains disabled in this candidate.
 | `manifest.json` | Exact artifacts, source and validation limits |
 | `rollback/boot_b-before-refresh.img` | Read-only 21 October checkpoint of the running release-17 Linux boot B |
 
-Flashing userdata destroys the existing Android userdata filesystem and user
-data. Back up needed files first. The root filesystem is 14 GiB; this test image
-does not automatically grow it to the full partition. Fastfetch reports physical
+Flashing userdata replaces the entire existing filesystem and erases all Fedora
+or Android data stored in that partition. Back up needed files first. The root
+filesystem is 14 GiB; this test image does not automatically grow it to the full
+partition. Fastfetch reports physical
 storage separately from the mounted filesystem capacity. Userdata must be at least
 15,032,385,536 bytes and boot B at least 100,663,296 bytes. GPT is not changed.
 The existing separate `linux` partition is not an installation target.
@@ -50,8 +51,8 @@ fastboot reboot
 ```
 
 Do not run `fastboot -w` or format userdata after flashing: it would erase Fedora.
-Boot A is not written, but replacing userdata also removes Android's existing
-user data. This is a manual test image, not a recovery-flashable installer.
+Boot A is not written. All existing Fedora or Android data in userdata is still
+erased. This is a manual test image, not a recovery-flashable installer.
 
 First boot starts original Plasma Setup. Create the account and connect Wi-Fi.
 Root password login is locked and no human account is preset. Plasma Setup
