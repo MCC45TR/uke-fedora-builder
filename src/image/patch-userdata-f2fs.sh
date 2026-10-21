@@ -21,7 +21,7 @@ podman unshare tar --create --numeric-owner --one-file-system --sort=name \
     --acls --xattrs --xattrs-include=security.capability \
     -f - -C "$job/root" . | zstd -T2 -3 -o "$job/image/rootfs.tar.zst"
 (cd "$job/image"; sha256sum rootfs.tar.zst > rootfs.tar.zst.sha256)
-cp --reflink=always -- "$baseline" "$job/image/userdata.f2fs.img"
+cp --reflink=auto --sparse=always -- "$baseline" "$job/image/userdata.f2fs.img"
 touch "$job/rootfs-frozen"
 podman run --rm --pull=never --network=none --security-opt label=disable --cpus=2 --memory=3g --device /dev/kvm \
     -v "$job/vm:/vm:ro" -v "$job/image:/job" "$vm_image" \

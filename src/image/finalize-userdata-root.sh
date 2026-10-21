@@ -90,7 +90,7 @@ done
 mkdir -p "$root/var/lib/dbus" "$root/usr/share/uke"
 ln -s /etc/machine-id "$root/var/lib/dbus/machine-id"
 install -m644 /builder/configs/images/userdata-rawhide.json "$root/usr/share/uke/image-profile.json"
-printf 'userdata-f2fs-20261020-device-test\n' > "$root/usr/share/uke/image-finalized"
+printf 'userdata-f2fs-%s-device-test\n' "$(jq -er .kernel_release /builder/configs/images/userdata-rawhide.json)" > "$root/usr/share/uke/image-finalized"
 for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then
         echo 'Mounted runtime tree refused during offline finalization' >&2; exit 1

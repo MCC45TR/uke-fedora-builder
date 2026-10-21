@@ -6,7 +6,7 @@ current tablet. Do not upload or redistribute the system image. No existing
 account, password, SSH key or Wi-Fi connection is copied into the fresh root.
 
 The installed kernel profile is `senemos-uke-linux-kernel-mainline-singleboot`
-7.2.11-16. Its exact signed core, modules, DTBs and boot bundle are shared with
+7.2.12-1. Its exact signed core, modules, DTBs and boot bundle are shared with
 the ordinary mainline profile; the singleboot selection targets `userdata`,
 while the ordinary profile targets `linux`. The only configured COPR is
 `mcc45tr/uke-linux-test`; original Fedora repositories remain available.
@@ -15,10 +15,10 @@ Native audio remains disabled in this candidate.
 | File | Target and contents |
 |---|---|
 | `system.img` / `userdata.img` | Identical Android sparse F2FS root image; flash to **userdata** |
-| `boot.img` | Android boot v4, kernel 7.2.11-16, explicit userdata root selector |
+| `boot.img` | Android boot v4, kernel 7.2.12-1, explicit userdata root selector |
 | `SHA256SUMS` | Image and record checksums |
 | `manifest.json` | Exact artifacts, source and validation limits |
-| `rollback/boot_b-before-refresh.img` | Read-back backup of the current Linux boot B |
+| `rollback/boot_b-before-refresh.img` | Read-only 21 October checkpoint of the running release-17 Linux boot B |
 
 Flashing userdata destroys the existing Android userdata filesystem and user
 data. Back up needed files first. The root filesystem is 14 GiB; this test image
@@ -26,6 +26,9 @@ does not automatically grow it to the full partition. Fastfetch reports physical
 storage separately from the mounted filesystem capacity. Userdata must be at least
 15,032,385,536 bytes and boot B at least 100,663,296 bytes. GPT is not changed.
 The existing separate `linux` partition is not an installation target.
+Release-14 and release-17 matched module sets are retained alongside the selected
+7.2.12-1 kernel. The rollback checkpoint is a boot image, not a backup of userdata
+or proof of automatic failed-boot recovery.
 
 Use current Android platform-tools and verify the files before manual writes:
 
@@ -63,7 +66,7 @@ sudo systemctl enable --now sshd.service
 
 SELinux is enforcing, original firewalld is enabled and nftables tools are
 installed. Standalone nftables startup is disabled because firewalld manages the
-rules. Signed COPR packages provide sensor startup, Automatic VRR/brightness
+rules. Signed COPR packages provide sensor startup, packaged VRR/brightness
 defaults, original Fastfetch configuration and F2FS-compatible half-RAM swap
 initialization. Actual sensor response, VRR continuity and tablet swap activation
 still need physical acceptance of this image.
@@ -77,7 +80,8 @@ CDC remains manual through `sudo uke-control set cdc on`. The packaged userdata
 updater validates, stages and acknowledges boot trials, but refuses an unqualified
 alternate early-firmware cohort. Physical A/B recovery remains unaccepted, and
 boot A/B does not roll back the shared root filesystem.
-To return to the retained Linux root, restore the saved boot B manually:
+To test the retained release-17 kernel against this root, restore its saved boot B
+manually. This does not restore the userdata that flashing replaced:
 
 ```sh
 fastboot flash boot_b rollback/boot_b-before-refresh.img

@@ -1,5 +1,14 @@
 # Fedora userdata F2FS preparation
 
+21 October 2026 refresh: the retained private image selects the completed signed
+`7.2.12-1` ordinary/singleboot cohort, COPR 11183190/11183373. Both Fedora Rawhide
+and test COPR metadata are refreshed before synchronization. Kernel provenance
+comes from the image profile rather than stale payload literals. The standard
+three-kernel retention includes release 14 and the measured release-17 boot-B
+cohort; release 16 is retired through DNF.
+The current input/output images are regular files; no tablet operation is part
+of composition. Earlier composition details below retain their dated scope.
+
 The current correction retains the previously delivered filesystem. Use
 `install-userdata-device-packages.sh` to update the existing root through the
 normal signed test COPR, then `patch-userdata-f2fs.sh` to update its verified
@@ -66,8 +75,9 @@ the SDK through the explicitly selected `qemu-aarch64-static` interpreter.
    in one dependency-checked transaction; no dummy provider or dependency bypass
    is permitted. This device-matched image is private and must not be redistributed.
 3. Run `finalize-userdata-root.sh`. Regenerate hwdb with a recorded native host
-   `systemd-hwdb --root=/job/root update`; the emulated tool must not leave an
-   empty database. Run `audit-userdata-policy-sources.sh` to prove that generated
+   `systemd-hwdb --root=/job/root --strict update`; verify the same database query
+   with the target tool. The emulated RPM trigger can fail with `ENOSYS` while
+   leaving a stale nonempty database. Run `audit-userdata-policy-sources.sh` to prove that generated
    contexts contain only the original Fedora text plus the signed Uke power
    backend's exact file context. Rebuild caches from that proven text with the
    target `sefcontext_compile`. Remove unmounted bootstrap runtime-tree contents;

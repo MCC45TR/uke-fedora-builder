@@ -4,7 +4,7 @@ set -Eeuo pipefail
 [[ $# == 0 && -f /job/packages.complete && ! -e /job/rootfs-frozen ]]
 root=/job/root
 release=$(jq -er .kernel_release /builder/configs/images/userdata-rawhide.json)
-[[ $release == 7.2.11-16 && -d $root && ! -L $root ]]
+[[ $release =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+$ && -d $root && ! -L $root ]]
 install -m644 /job/inputs/compose.repo /etc/yum.repos.d/uke-compose.repo
 install -m644 /job/inputs/fedora-46.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora46
 install -m644 /job/inputs/uke-copr-test.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test
@@ -17,27 +17,53 @@ command=(dnf5 --use-host-config --installroot="$root" --releasever=rawhide
     --disable-repo='*' --enable-repo=rawhide --enable-repo=uke-linux-test
     --setopt=cachedir=/job/cache --setopt=keepcache=True --setopt=gpgcheck=True
     --setopt=uke-linux-test.metadata_expire=0
+    --setopt=rawhide.metadata_expire=0
     --setopt=localpkg_gpgcheck=True --setopt=install_weak_deps=False
     --setopt=allow_vendor_change=True
     --setopt=tsflags=nodocs --setopt=excludepkgs='*-debuginfo,*-debugsource,kernel,kernel-core,kernel-modules*,sddm*')
 packages=("senemos-uke-linux-kernel-mainline-singleboot-$release.fc46"
-    uke-core-meta uke-kde-plasma-meta uke-core-1.0.21-1.fc46 uke-hw-1.1.1-3.fc46
-    uke-power-1.1.0-1.fc46 uke-sensors-1.0.1-1.fc46 uke-additional uke-extras
-    uke-control-1.0.21-1.fc46 uke-control-tests-1.0.21-1.fc46 uke-firmware uke-fastfetch-config-1.0.1-1.fc46
-    uke-front-color-1.0.2-1.fc46 uke-adaptive-display-1.0.15-2.fc46
-    uke-power-profile-backend-1.0.4-2.fc46 uke-touchscreen-1.0.13-2.fc46
-    uke-bluetooth-1.0.6-2.fc46 uke-wifi-factory-1.1.1-1.fc46
-    uke-charge-control-1.1.0-1.fc46 uke-offline-charge-1.1.0-1.fc46 uke-battery-observer-1.1.0-1.fc46
-    uke-mesa-dri-drivers uke-mesa-vulkan-drivers uke-ssc-fileservice-2026.09.21-9.fc46
+    uke-core-meta uke-kde-plasma-meta uke-core uke-hw
+    uke-power uke-sensors uke-additional uke-extras
+    uke-control uke-control-tests uke-firmware uke-fastfetch-config
+    uke-front-color uke-adaptive-display
+    uke-power-profile-backend uke-touchscreen
+    uke-bluetooth uke-wifi-factory
+    uke-charge-control uke-offline-charge uke-battery-observer
+    uke-mesa-dri-drivers uke-mesa-vulkan-drivers uke-ssc-fileservice
     uke-libaccounts-glib uke-libwacom uke-libwacom-data
     ddcutil openssh-server nftables firewalld selinux-policy-targeted policycoreutils)
+rollback=()
+retired=()
+for component in boot core dtbs modules; do
+    archive=/job/inputs/kernel17-copr/senemos-uke-linux-kernel-mainline-$component-7.2.11-17.fc46.aarch64.rpm
+    [[ -f $archive && ! -L $archive ]]
+    rollback+=("$archive")
+    retired+=("senemos-uke-linux-kernel-mainline-$component-7.2.11-16.fc46.aarch64")
+done
+solve() {
+    local output=$1 rc=0
+    shift
+    "${command[@]}" "$@" --assumeno > "$output" 2>&1 || rc=$?
+    if [[ $rc == 0 ]]; then
+        grep -Fq 'Nothing to do' "$output"
+    else
+        [[ $rc == 1 ]] && grep -Fq 'Operation aborted by the user' "$output"
+    fi
+}
 if [[ ${UKE_COMPOSE_SOLVE_ONLY:-0} == 1 ]]; then
-    rc=0
-    "${command[@]}" install --allowerasing "${packages[@]}" --assumeno > /job/logs/device-solve.log 2>&1 || rc=$?
-    [[ $rc == 1 ]] && grep -Fq 'Operation aborted by the user' /job/logs/device-solve.log
+    solve /job/logs/device-solve.log install --allowerasing "${packages[@]}"
+    solve /job/logs/rawhide-sync-solve.log distro-sync --allowerasing --exclude='senemos-uke-linux-kernel-mainline*'
+    solve /job/logs/rollback-solve.log install --setopt=installonly_limit=4 "${rollback[@]}"
+    solve /job/logs/retire-solve.log remove --setopt=clean_requirements_on_remove=False "${retired[@]}"
     exit
 fi
 "${command[@]}" -y install --allowerasing "${packages[@]}" > /job/logs/device-install.log 2>&1
+# Synchronize the retained Fedora root while preserving the selected kernel tuple.
+"${command[@]}" -y distro-sync --allowerasing \
+    --exclude='senemos-uke-linux-kernel-mainline*' > /job/logs/rawhide-sync.log 2>&1
+# Retain the measured boot-B cohort and the earlier baseline with matching modules.
+"${command[@]}" -y install --setopt=installonly_limit=4 "${rollback[@]}" > /job/logs/rollback-install.log 2>&1
+"${command[@]}" -y remove --setopt=clean_requirements_on_remove=False "${retired[@]}" > /job/logs/retire-install.log 2>&1
 "${command[@]}" check > /job/logs/device-dependency-check.log 2>&1
 [[ $(sha256sum "$reference" | cut -d ' ' -f1) == "$reference_sha" ]]
 rpm --root "$root" -q uke-local-touch-data >/dev/null

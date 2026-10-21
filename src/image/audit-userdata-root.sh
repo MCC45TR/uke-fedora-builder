@@ -2,6 +2,11 @@
 # Offline host container stage. No service or desktop session is started.
 set -Eeuo pipefail
 trap 'printf "Offline root audit failed at line %s\n" "$LINENO" >&2' ERR
+require_no_match() {
+    local rc=0
+    grep "$@" || rc=$?
+    [[ $rc == 1 ]]
+}
 [[ $# == 0 && -f /job/device-packages.complete && ! -e /job/rootfs-frozen ]]
 root=/job/root
 rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin \
@@ -40,7 +45,7 @@ done
 jq -e '[.[] | select(.name=="outputs") | .data[]] |
     length==1 and .[0].connectorName=="DSI-1" and
     .[0].automaticBrightness==true and .[0].autoRotation=="InTabletMode" and
-    .[0].vrrPolicy=="Automatic" and (.[0].autoBrightnessCurve|length)>1' \
+    .[0].vrrPolicy=="Always" and (.[0].autoBrightnessCurve|length)>1' \
     "$root/etc/xdg/kwinoutputconfig.json" >/dev/null
 [[ -f $root/usr/lib/systemd/system/packagekit-offline-update.service ]]
 [[ -x $root/usr/libexec/pk-offline-update && -x $root/usr/bin/clear ]]
@@ -51,10 +56,10 @@ chroot "$root" /usr/bin/semodule -l > /job/audit/selinux-modules.txt
 grep -Fxq uke-ssc /job/audit/selinux-modules.txt
 grep -Fxq uke-power-profile /job/audit/selinux-modules.txt
 grep -Fxq 'PARTLABEL=userdata / f2fs defaults,noatime 0 0' "$root/etc/fstab"
-! grep -Fq 'senemos-uke-linux-kernel-mainline*' "$root/etc/dnf/dnf.conf"
+require_no_match -Fq 'senemos-uke-linux-kernel-mainline*' "$root/etc/dnf/dnf.conf"
 if [[ -e $root/etc/senemos/kernel-update.conf ]] && grep -Fxq automatic=1 "$root/etc/senemos/kernel-update.conf"; then exit 1; fi
 for directory in "$root/usr/lib/modules/"*; do
-    [[ ${directory##*/} == "$release" || ${directory##*/} == 7.2.11-14 ]]
+    [[ ${directory##*/} == "$release" || ${directory##*/} == 7.2.11-14 || ${directory##*/} == 7.2.11-17 ]]
 done
 grep -Fxq automatic=1 "$root/etc/senemos/userdata-update.conf"
 [[ -z $(find "$root/dev" "$root/proc" "$root/sys" "$root/run" -mindepth 1 -print -quit) ]]
@@ -70,7 +75,7 @@ grep -Fq 'name=Uke Linux Test' "$root/etc/yum.repos.d/_copr:copr.fedorainfraclou
 grep -Fq 'gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-copr-test' "$root/etc/yum.repos.d/_copr:copr.fedorainfracloud.org:mcc45tr:uke-linux-test.repo"
 [[ $(find "$root/etc/yum.repos.d" -name '*copr*' -type f | wc -l) == 1 ]]
 grep -Fxq test "$root/etc/uke-control/channel"
-! grep -rE 'uke-linux-test:custom:|results/mcc45tr/uke-linux/' "$root/etc/yum.repos.d"
+require_no_match -rE 'uke-linux-test:custom:|results/mcc45tr/uke-linux/' "$root/etc/yum.repos.d"
 chroot "$root" /usr/sbin/visudo -cf /etc/sudoers
 chroot "$root" /usr/sbin/ldconfig -N -X
 rpm --root "$root" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\n]' > /job/rpm-owned-files.tsv
