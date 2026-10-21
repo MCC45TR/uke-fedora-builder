@@ -3,6 +3,7 @@
 set -Eeuo pipefail
 [[ $# == 0 && -f /job/packages.complete && ! -e /job/rootfs-frozen ]]
 root=/job/root
+# shellcheck source=src/image/filesystem-policy.sh
 source /builder/src/image/filesystem-policy.sh
 filesystem=$(userdata_profile_filesystem /builder/configs/images/userdata-rawhide.json)
 release=$(jq -er .kernel_release /builder/configs/images/userdata-rawhide.json)

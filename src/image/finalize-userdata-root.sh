@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Offline host composer. Original Fedora desktop files are not rewritten.
 set -Eeuo pipefail
+# shellcheck source=src/image/filesystem-policy.sh
 source /builder/src/image/filesystem-policy.sh
 filesystem=$(userdata_profile_filesystem /builder/configs/images/userdata-rawhide.json)
 root=/job/root

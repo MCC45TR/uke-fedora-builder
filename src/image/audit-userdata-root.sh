@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Offline host container stage. No service or desktop session is started.
 set -Eeuo pipefail
+# shellcheck source=src/image/filesystem-policy.sh
 source /builder/src/image/filesystem-policy.sh
 filesystem=$(userdata_profile_filesystem /builder/configs/images/userdata-rawhide.json)
 trap 'printf "Offline root audit failed at line %s\n" "$LINENO" >&2' ERR
