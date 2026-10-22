@@ -29,7 +29,7 @@ packages=("senemos-uke-linux-kernel-mainline-singleboot-$release.fc46"
     uke-power uke-sensors uke-additional uke-extras
     uke-control uke-control-tests uke-firmware fastfetch
     uke-front-color uke-adaptive-display
-    uke-power-profile-backend uke-touchscreen
+    power-profiles-daemon uke-touchscreen
     uke-bluetooth uke-wifi-factory
     uke-charge-control uke-offline-charge uke-battery-observer
     uke-mesa-dri-drivers uke-mesa-vulkan-drivers uke-ssc-fileservice
@@ -52,6 +52,7 @@ done < <(jq -r '.[]' <<< "$retained")
 rpm --root "$root" -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\t%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}\n' > /job/audit/image-kernel-inventory.tsv
 while IFS=$'\t' read -r name version nevra; do
     case $name in
+        uke-power-profile-backend) retired+=("$nevra");;
         senemos-uke-linux-kernel-mainline-boot|senemos-uke-linux-kernel-mainline-core|\
         senemos-uke-linux-kernel-mainline-dtbs|senemos-uke-linux-kernel-mainline-modules)
             baseline=${version%.fc46}
@@ -95,6 +96,12 @@ if ((${#retired[@]})); then
     "${command[@]}" -y remove --setopt=clean_requirements_on_remove=False "${retired[@]}" > /job/logs/retire-install.log 2>&1
 fi
 "${command[@]}" check > /job/logs/device-dependency-check.log 2>&1
+rpm --root "$root" -q --provides "senemos-uke-linux-kernel-mainline-core-$release.fc46.aarch64" |
+    grep -Fx 'uke-kernel(platform-profile-qos-v1) = 1' > /job/audit/native-profile-capability.txt
+rpm --root "$root" -q uke-core-meta power-profiles-daemon >/dev/null
+if rpm --root "$root" -q uke-power-profile-backend >/dev/null 2>&1; then
+    echo 'The retired power-profile overlay remains installed' >&2; exit 1
+fi
 [[ $(sha256sum "$reference" | cut -d ' ' -f1) == "$reference_sha" ]]
 rpm --root "$root" -q uke-local-touch-data >/dev/null
 rpm --root "$root" --restore -a

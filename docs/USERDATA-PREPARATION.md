@@ -155,12 +155,20 @@ the audited first-boot growth mechanism independently of kernel activation.
 ## Filesystem selection and growth
 
 22 October 2026. The default source profile selects F2FS and signed kernel
-`7.2.12-6`. EXT4, XFS and Btrfs use the same explicit `root_filesystem` field.
+`7.2.12-9`. EXT4, XFS and Btrfs use the same explicit `root_filesystem` field.
 Changing that field prepares a new filesystem; it never converts an installed
 root. Non-F2FS profiles require the new `uke-kernel-update(root-filesystem-v2)`
 capability, an embedded v2 root-selector note and built-in support in every
 selected or retained kernel. Existing v1 kernels are refused for those profiles.
-That future kernel/hardware package set is not yet published.
+Signed kernel and hardware candidates provide those interfaces. Physical
+EXT4, XFS and Btrfs image boots remain unqualified.
+
+The selected kernel must also provide native platform profiles. Composition
+uses the original Fedora Power Profiles daemon, removes the retired Uke overlay
+from a retained build root and requires the selected core RPM's capability.
+Another installed kernel's capability is insufficient. The policy audit checks
+the original daemon, absence of overlay artifacts and exact original Fedora
+SELinux context text. These host checks do not establish a new image boot.
 
 | Filesystem | Growth in the prepared installation | Completion |
 |---|---|---|

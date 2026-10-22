@@ -73,12 +73,12 @@
   "automatic_kernel_activation": false,
   "installation_tested": false,
   "hardware_tested": false,
-  "kernel_release": "7.2.12-6",
+  "kernel_release": "7.2.12-9",
   "kernel_sources": {
-    "kernel_commit": "635c27013783bd1fed61e03962decb19a3e1cd8d",
-    "kernel_copr_build": 11184750,
-    "singleboot_commit": "635c27013783bd1fed61e03962decb19a3e1cd8d",
-    "singleboot_copr_build": 11184750
+    "kernel_commit": "6847ccabffdb9de3815e4754a9075eb61659f1fd",
+    "kernel_copr_build": 11185587,
+    "singleboot_commit": "6847ccabffdb9de3815e4754a9075eb61659f1fd",
+    "singleboot_copr_build": 11185587
   },
   "kernel_package": "senemos-uke-linux-kernel-mainline-singleboot",
   "retained_kernel_releases": [
