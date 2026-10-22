@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# shellcheck disable=SC2034
 # Sourced by the public ukelinux.sh host entry. No live block devices are used.
 set -Eeuo pipefail
 BUILDER=$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)
@@ -109,7 +110,7 @@ image_main() {
     while (($#)); do
         case $1 in
             --help|-h) help; return 0;;
-            --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;; --self-test) self=1;; --test) :;;
+            --yes) UKE_ASSUME_YES=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;; --self-test) self=1;; --test) :;;
             --build=*|--distro=*|--release=*|--jobs=*|--esp-size=*|--linux-size=*|--fat-sector=*) key=${1%%=*}; value=${1#*=};;
             --build|--distro|--release|--jobs|--esp-size|--linux-size|--fat-sector) key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
             *) die "Unknown option: $1";;
@@ -132,6 +133,10 @@ image_main() {
     if ((self)); then
         bash "$BUILDER/tests/image-contract.sh"
         return 0
+    fi
+    if ! command -v jq >/dev/null 2>&1; then
+        ((DRY_RUN == 0)) || die 'jq is required for the legacy Core plan; dry-run will not install it'
+        bootstrap 0
     fi
     effective_profile=$(jq -S --argjson esp "$esp_mib" --argjson linux "$root_mib" --argjson sector "$sector" '. + {esp_size_mib:$esp,root_size_mib:$linux,fat_sector_bytes:$sector}' "$profile")
     say "Core Rawhide AArch64 candidate; Linux 7.2.9, EXT4 $root_mib MiB, FAT32 ESP $esp_mib MiB ($sector-byte sectors); at most $JOBS CPUs"

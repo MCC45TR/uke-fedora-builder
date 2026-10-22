@@ -1,5 +1,7 @@
 # Fedora Rawhide Core filesystem candidates
 
+Historical Core recipe. The current source/image entry and its validation limits are in [PUBLIC-BUILD.md](PUBLIC-BUILD.md). The frozen package/cache contract below is retained for its dated results.
+
 The Uke workspace entry is `ukelinux.sh`. Its implementation belongs to this
 repository; it has no dependency on private documentation or a local root export.
 

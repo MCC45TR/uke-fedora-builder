@@ -112,7 +112,7 @@ pair_main() {
     while (($#)); do
         case $1 in
             --help|-h) pair_help; return;;
-            --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;; --test) :;;
+            --yes) UKE_ASSUME_YES=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;; --test) :;;
             --build=*|--distro=*|--release=*|--jobs=*|--device-dt=*|--kernel-cache=*|--core-candidate=*|--stock-boot=*) key=${1%%=*}; value=${1#*=};;
             --build|--distro|--release|--jobs|--device-dt|--kernel-cache|--core-candidate|--stock-boot) key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
             *) die "Unknown pair option: $1";;
@@ -150,7 +150,7 @@ pair_main() {
     hash=$(sha256sum "$stock" | cut -d ' ' -f1)
     jq -e --arg hash "$hash" 'any(.boot_templates[];.sha256==$hash)' "$profile" >/dev/null || die 'Unreviewed boot template'
     for tool in host_tool_image kernel_tool_image root_tool_image qemu_tool_image; do
-        "$ENGINE" image exists "$(jq -r ".$tool" "$profile")" || die "Missing pinned $tool"
+        "$ENGINE" image inspect "$(jq -r ".$tool" "$profile")" >/dev/null 2>&1 || die "Missing pinned $tool"
     done
     mkdir -p "$BUILDER/build/boot-pair"
     exec 9> "$BUILDER/build/ukelinux-build.lock"

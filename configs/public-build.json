@@ -1,0 +1,44 @@
+{
+  "schema_version": 1,
+  "date": "2026-10-23",
+  "distribution": "fedora",
+  "release": "rawhide",
+  "architecture": "aarch64",
+  "kernel": {
+    "url": "https://github.com/MCC45TR/senemos-uke-kernel-mainline.git",
+    "commit": "dbfbc03f295662434aef3011ad2c692c2356c87e",
+    "release": "7.2.12-17",
+    "policy": "All channels compile this explicit native source; channel names select RPM repositories, not a kernel.org latest alias."
+  },
+  "channels": {
+    "stable": {
+      "project": "uke-linux",
+      "fingerprint": "30DFB81A724CE0762F9DF77F844A293E5068FAFE"
+    },
+    "testing": {
+      "project": "uke-linux-test",
+      "fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E"
+    },
+    "unstable": {
+      "project": "uke-linux-test",
+      "fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E"
+    }
+  },
+  "boot": {
+    "slot": "b",
+    "multiboot_root": "linux",
+    "singleboot_root": "userdata",
+    "automatic_activation": false
+  },
+  "validation": {
+    "source_contract_only": true,
+    "native_build_tested": false,
+    "image_build_tested": false,
+    "hardware_tested": false
+  },
+  "hardware": {
+    "url": "https://github.com/MCC45TR/uke-linux-hardware-support.git",
+    "commit": "7ab4ca40aea4da56d2424e96a935d50226568958",
+    "policy": "Stable image builds compile the six required public platform families locally; testing and unstable use signed test-repository packages."
+  }
+}

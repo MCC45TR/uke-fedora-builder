@@ -1,0 +1,41 @@
+name: Public image build (manual)
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        type: choice
+        options: [multiboot, singleboot]
+        default: multiboot
+      filesystem:
+        type: choice
+        options: [ext4, f2fs, btrfs, xfs]
+        default: ext4
+      desktop:
+        type: choice
+        options: [kde, gnome]
+        default: kde
+      channel:
+        type: choice
+        options: [stable, testing, unstable]
+        default: testing
+permissions:
+  contents: read
+jobs:
+  compose:
+    runs-on: [self-hosted, Linux, ARM64]
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Build from the public workspace without device inputs
+        env:
+          MODE: ${{ inputs.mode }}
+          FILESYSTEM: ${{ inputs.filesystem }}
+          DESKTOP: ${{ inputs.desktop }}
+          CHANNEL: ${{ inputs.channel }}
+        run: |
+          set -Eeuo pipefail
+          job=$(mktemp -d)
+          git clone --recurse-submodules https://github.com/MCC45TR/uke-linux.git "$job/source"
+          "$job/source/ukelinux.sh" --build image --mode "$MODE" --filesystem "$FILESYSTEM" \
+            --desktop "$DESKTOP" --channel "$CHANNEL" --out "$job/out" --yes
+          # Results remain local; this job does not publish firmware or device data.
+          find "$job/out" -path '*/artifacts/manifest.json' -exec cat {} \;

@@ -20,6 +20,7 @@ privileged() {
 install_packages() {
     local manager=$1; shift
     say "Installing missing host prerequisites with $manager"
+    confirm_host_change "Install these system packages: $*"
     case $manager in
         dnf) privileged dnf -y --setopt=install_weak_deps=False install "$@";;
         apt) privileged apt-get update; privileged env DEBIAN_FRONTEND=noninteractive apt-get -y install --no-install-recommends "$@";;
@@ -27,6 +28,13 @@ install_packages() {
         pacman) privileged pacman -Syu --needed --noconfirm "$@";;
         apk) privileged apk add --no-cache "$@";;
     esac
+}
+confirm_host_change() {
+    [[ ${UKE_ASSUME_YES:-0} == 1 ]] && return 0
+    local answer
+    [[ -t 0 ]] || die 'Host changes require confirmation; rerun interactively or pass --yes'
+    read -r -p "$1 [y/N] " answer
+    [[ $answer == y || $answer == Y || $answer == yes ]] || die 'Host preparation declined'
 }
 bootstrap() {
     local ID='' ID_LIKE='' VERSION='' manager missing=0 cmd require_engine=${1:-1}
@@ -67,6 +75,7 @@ bootstrap() {
                 range_end=$((range_start + 65535))
                 ((range_end < 4294967295)) || die 'No available rootless UID/GID mapping range'
                 say 'Preparing missing rootless UID/GID allocations'
+                confirm_host_change 'Allocate a subordinate UID/GID range for rootless Podman?'
                 privileged usermod --add-subuids "$range_start-$range_end" --add-subgids "$range_start-$range_end" "$account"
             fi
         fi
@@ -83,6 +92,7 @@ prepare_aarch64() {
     # shellcheck disable=SC1091
     source /etc/os-release
     manager=$(package_manager "$ID" "${ID_LIKE:-}")
+    if [[ -z ${UKE_AARCH64_INTERPRETER:-} ]]; then
     case $manager in
         dnf) install_packages dnf qemu-user-static-aarch64;;
         apt) install_packages apt qemu-user-static binfmt-support;;
@@ -91,7 +101,13 @@ prepare_aarch64() {
         apk) install_packages apk qemu-aarch64;;
     esac
     binary=$(command -v qemu-aarch64-static || command -v qemu-aarch64) || die 'Official AArch64 emulator binary is unavailable'
-    [[ -e /proc/sys/fs/binfmt_misc/register ]] || privileged mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
+    else binary=$UKE_AARCH64_INTERPRETER; fi
+    [[ -x $binary ]] || die 'AArch64 interpreter is not executable'
+    confirm_host_change 'Enable AArch64 binfmt emulation for container builds?'
+    if [[ ! -e /proc/sys/fs/binfmt_misc/register ]]; then
+        privileged mkdir -p /proc/sys/fs/binfmt_misc
+        privileged mount -t binfmt_misc binfmt_misc /proc/sys/fs/binfmt_misc
+    fi
     # Register only our handler; existing host handlers are preserved. F keeps
     # the official static interpreter open across a container's mount namespace.
     registration=':senemos-aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:'"$binary"':F'

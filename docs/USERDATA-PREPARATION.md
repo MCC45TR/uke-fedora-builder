@@ -1,5 +1,7 @@
 # Fedora userdata F2FS preparation
 
+Retained private-root maintenance recipe. New public composition from an empty root is documented in [PUBLIC-BUILD.md](PUBLIC-BUILD.md); it does not require this recipe or any retained device image.
+
 21 October 2026 refresh: the retained private image selects the completed signed
 `7.2.12-1` ordinary/singleboot cohort, COPR 11183190/11183373. Both Fedora Rawhide
 and test COPR metadata are refreshed before synchronization. Kernel provenance

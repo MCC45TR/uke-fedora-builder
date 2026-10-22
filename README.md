@@ -10,6 +10,15 @@ Fedora desktop selection, user-created accounts and the enabled development
 COPR. Offline checks are separate from first-run GUI and tablet acceptance;
 the currently published Alpha image is not replaced by this source change.
 
+## Public build entry — 23 October 2026
+
+Run `./ukelinux.sh` from the [workspace](https://github.com/MCC45TR/uke-linux)
+for image or kernel builds. The [public build guide](docs/PUBLIC-BUILD.md) covers
+Ubuntu/Fedora/openSUSE/Arch/Alpine hosts, both boot layouts, four filesystems,
+KDE/GNOME, three package channels, prerequisite consent and output selection.
+The new workflow has shell/source checks only; full builds and physical image
+acceptance remain untested. Historical recipes below keep their dated scope.
+
 ## Status — 14 October 2026
 
 Matched RAM boots reach the tablet console, the existing 64 GiB Fedora root,

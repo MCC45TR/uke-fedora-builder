@@ -65,7 +65,7 @@ boot_main() {
     while (($#)); do
         case $1 in
             --help|-h) boot_help; return 0;;
-            --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;; --test) :;; --self-test) self=1;;
+            --yes) UKE_ASSUME_YES=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;; --test) :;; --self-test) self=1;;
             --build=*|--distro=*|--release=*|--jobs=*|--stock-boot=*|--kernel-component=*|--core-candidate=*|--reuse-boot-cache=*|--boot-template=*) key=${1%%=*}; value=${1#*=};;
             --build|--distro|--release|--jobs|--stock-boot|--kernel-component|--core-candidate|--reuse-boot-cache|--boot-template) key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
             *) die "Unknown boot option: $1";;
@@ -128,7 +128,7 @@ boot_main() {
     module_rpm=$(jq -er '.packages[]|select(.file|contains("-modules-"))|.file' "$artifact/build-manifest.json")
     verify_cache "$artifact/$module_rpm" "$(jq -r --arg file "$module_rpm" '.packages[]|select(.file==$file)|.sha256' "$artifact/build-manifest.json")"
     host_image=$(jq -r .host_tool_image "$profile"); kernel_image=$(jq -r .kernel_tool_image "$profile")
-    for input in "$host_image" "$kernel_image"; do "$ENGINE" image exists "$input" || die 'Pinned build image missing; prepare the qualified Core/kernel environment first'; done
+    for input in "$host_image" "$kernel_image"; do "$ENGINE" image inspect "$input" >/dev/null 2>&1 || die 'Pinned build image missing; prepare the qualified Core/kernel environment first'; done
     mkdir -p "$BUILDER/build/boot" "$BUILDER/referances/firmware/global-os3.0.303.0"
     exec 9> "$BUILDER/build/ukelinux-build.lock"
     if ! flock -n 9; then say 'Queued behind another image invocation'; flock 9; fi
