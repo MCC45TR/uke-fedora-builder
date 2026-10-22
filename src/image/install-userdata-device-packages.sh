@@ -30,7 +30,7 @@ packages=("senemos-uke-linux-kernel-mainline-singleboot-$release.fc46"
     uke-control uke-control-tests uke-firmware fastfetch
     uke-front-color uke-adaptive-display
     power-profiles-daemon uke-touchscreen
-    uke-bluetooth uke-wifi-factory
+    'uke-boot-integration(factory-wlan-v1)' 'uke-boot-integration(factory-bluetooth-v1)'
     uke-charge-control uke-offline-charge uke-battery-observer
     uke-mesa-dri-drivers uke-mesa-vulkan-drivers uke-ssc-fileservice
     uke-libaccounts-glib uke-libwacom uke-libwacom-data
@@ -99,9 +99,11 @@ fi
 rpm --root "$root" -q --provides "senemos-uke-linux-kernel-mainline-core-$release.fc46.aarch64" |
     grep -Fx 'uke-kernel(platform-profile-qos-v1) = 1' > /job/audit/native-profile-capability.txt
 rpm --root "$root" -q uke-core-meta power-profiles-daemon >/dev/null
-if rpm --root "$root" -q uke-power-profile-backend >/dev/null 2>&1; then
-    echo 'The retired power-profile overlay remains installed' >&2; exit 1
-fi
+for package in uke-power-profile-backend uke-bluetooth uke-wifi-factory; do
+    if rpm --root "$root" -q "$package" >/dev/null 2>&1; then
+        printf 'Retired standalone package remains installed: %s\n' "$package" >&2; exit 1
+    fi
+done
 [[ $(sha256sum "$reference" | cut -d ' ' -f1) == "$reference_sha" ]]
 rpm --root "$root" -q uke-local-touch-data >/dev/null
 rpm --root "$root" --restore -a

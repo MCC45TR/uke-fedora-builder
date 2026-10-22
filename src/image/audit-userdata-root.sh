@@ -15,7 +15,7 @@ root=/job/root
 rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin \
     plasma-discover-offline-updates plasma-discover-packagekit PackageKit glibc-all-langpacks \
     ncurses ibus ibus-libpinyin ibus-hangul ibus-anthy ibus-chewing ibus-m17n \
-    uke-installation-profile uke-kernel-update uke-touchscreen uke-bluetooth \
+    uke-installation-profile uke-kernel-update uke-touchscreen uke-boot-integration \
     uke-kde-plasma-meta openssh-server nftables firewalld selinux-policy-targeted \
     uke-core-meta uke-control uke-firmware uke-front-color uke-charge-control uke-offline-charge \
     uke-battery-observer fastfetch > /job/audit/required-packages.txt
@@ -60,7 +60,7 @@ jq -e '[.[] | select(.name=="outputs") | .data[]] |
 grep -Fxq 'SELINUX=enforcing' "$root/etc/selinux/config"
 chroot "$root" /usr/bin/semodule -l > /job/audit/selinux-modules.txt
 grep -Fxq uke-ssc /job/audit/selinux-modules.txt
-grep -Fxq uke-power-profile /job/audit/selinux-modules.txt
+require_no_match -Eq '^uke-power-profile([[:space:]]|$)' /job/audit/selinux-modules.txt
 grep -Fxq "PARTLABEL=userdata / $filesystem defaults,noatime 0 0" "$root/etc/fstab"
 grep -Fxq installonly_limit=0 "$root/etc/dnf/dnf.conf"
 require_no_match -Fq 'senemos-uke-linux-kernel-mainline*' "$root/etc/dnf/dnf.conf"

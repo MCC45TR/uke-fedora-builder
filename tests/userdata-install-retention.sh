@@ -55,6 +55,8 @@ retire=$(grep ' remove ' "$work/job/commands")
 [[ $retire == *uke-power-profile-backend-1.1.1-8.fc46.aarch64* ]]
 install_selection=$(grep ' install --allowerasing ' "$work/job/commands")
 [[ $install_selection == *power-profiles-daemon* && $install_selection != *uke-power-profile-backend* ]]
+[[ $install_selection == *factory-wlan-v1* && $install_selection == *factory-bluetooth-v1* ]]
+[[ $install_selection != *uke-bluetooth* && $install_selection != *uke-wifi-factory* ]]
 for version in 7.2.12-1 7.2.12-3 7.2.12-5; do
     for component in boot core dtbs modules; do
         [[ $retire == *"senemos-uke-linux-kernel-mainline-$component-$version.fc46.aarch64"* ]]

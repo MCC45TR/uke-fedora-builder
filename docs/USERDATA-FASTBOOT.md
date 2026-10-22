@@ -12,6 +12,12 @@ while the ordinary profile targets `linux`. The only configured COPR is
 `mcc45tr/uke-linux-test`; original Fedora repositories remain available.
 Native audio remains disabled in this candidate.
 
+The 22 October source recipe requires the factory WLAN and Bluetooth
+capabilities from boot integration `1.5.0` or later. Offline checks reject the
+retired standalone bridge packages and power-profile overlay, including its
+SELinux module. These source checks do not establish a newly delivered image
+or physical first boot of an alternative filesystem.
+
 | File | Target and contents |
 |---|---|
 | `system.img` / `userdata.img` | Identical Android sparse root image; filesystem from the manifest; target **userdata** |
