@@ -6,7 +6,7 @@ current tablet. Do not upload or redistribute the system image. No existing
 account, password, SSH key or Wi-Fi connection is copied into the fresh root.
 
 The source profile selects `senemos-uke-linux-kernel-mainline-singleboot`
-7.2.12-6. Read the delivered manifest for the actual artifacts. Its exact signed core, modules, DTBs and boot bundle are shared with
+7.2.12-9. Read the delivered manifest for the actual artifacts. Its exact signed core, modules, DTBs and boot bundle are shared with
 the ordinary mainline profile; the singleboot selection targets `userdata`,
 while the ordinary profile targets `linux`. The only configured COPR is
 `mcc45tr/uke-linux-test`; original Fedora repositories remain available.

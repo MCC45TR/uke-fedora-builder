@@ -9,6 +9,6 @@ dnf5 --use-host-config --installroot=/job/root --releasever=rawhide \
     --disable-repo='*' --enable-repo=uke-linux --setopt=cachedir=/job/cache \
     --setopt=keepcache=True --setopt=excludepkgs='*-debuginfo,*-debugsource' \
     download --destdir=/job/inputs/device-rpms \
-    uke-touchscreen uke-bluetooth uke-adaptive-display uke-power-profile-backend \
+    uke-touchscreen uke-bluetooth uke-adaptive-display \
     libssc iio-sensor-proxy uke-ssc-fileservice \
     mesa-dri-drivers mesa-vulkan-drivers mesa-filesystem mesa-libEGL mesa-libGL mesa-libgbm

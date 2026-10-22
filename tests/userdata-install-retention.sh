@@ -38,6 +38,7 @@ for version in 7.2.11-14 7.2.11-17 7.2.12-1 7.2.12-3 7.2.12-5 "$release"; do
     done
 done
 printf 'senemos-uke-linux-kernel-unstable-core\t7.3.0-2.fc46\tunrelated\n' >> "$work/job/inventory.tsv"
+printf 'uke-power-profile-backend\t1.1.1-8.fc46\tuke-power-profile-backend-1.1.1-8.fc46.aarch64\n' >> "$work/job/inventory.tsv"
 run() {
     bwrap --tmpfs / --ro-bind /usr /usr --symlink usr/bin /bin --symlink usr/lib /lib \
         --symlink usr/lib64 /lib64 --dev /dev --proc /proc --unshare-net --ro-bind "$work/bin" /fixture/bin \
@@ -51,6 +52,9 @@ run
 [[ $(grep -c -- '--setopt=installonly_limit=0' "$work/job/commands") == 4 ]]
 retire=$(grep ' remove ' "$work/job/commands")
 [[ $retire != *7.2.11-14* && $retire != *7.2.11-17* && $retire != *"$release"* && $retire != *unrelated* ]]
+[[ $retire == *uke-power-profile-backend-1.1.1-8.fc46.aarch64* ]]
+install_selection=$(grep ' install --allowerasing ' "$work/job/commands")
+[[ $install_selection == *power-profiles-daemon* && $install_selection != *uke-power-profile-backend* ]]
 for version in 7.2.12-1 7.2.12-3 7.2.12-5; do
     for component in boot core dtbs modules; do
         [[ $retire == *"senemos-uke-linux-kernel-mainline-$component-$version.fc46.aarch64"* ]]
