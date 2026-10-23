@@ -87,6 +87,10 @@ if [[ $stage == hardware ]]; then
     fi
     git -C "$hardware" checkout --detach "$hardware_commit"
     [[ -z $(git -C "$hardware" status --porcelain --untracked-files=no) ]]
+    # shellcheck source=source-inputs.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/source-inputs.sh
+    public_source_inputs "$hardware" /builder/configs/public-source-mirrors.json
     mkdir -p /job/artifacts/runtime
     local_repository
     for family in uke-additional uke-sensors uke-hw uke-power uke-core uke-metas; do

@@ -72,6 +72,11 @@ source-build repository has package signing disabled; remote repositories keep
 signature verification. No testing repository is enabled for a stable image.
 This full source route takes substantially longer than the testing image path.
 The source pin is independent of later RPM channel transitions on the tablet.
+The pinned source producer's four historical SRPM inputs are cached from the
+checksum-locked GitHub archive before composition. This preserves the selected
+commit and input bytes after the retired COPR archive projects are removed.
+Online builds verify each download; offline builds require the exact cached
+bytes. Only `uke-linux` and `uke-linux-test` remain active Uke COPR projects.
 
 ## Host preparation and input verification
 
