@@ -38,7 +38,7 @@ for archive in "${archives[@]}"; do
     rpmkeys --dbpath /job/kernel-keydb --checksig "$archive" | grep -F 'signatures OK'
     [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}.%{ARCH}' "$archive") == "$release.aarch64" ]]
     rpm2cpio "$archive" > /job/payload.cpio
-    (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
+    (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /job/payload.cpio)
 done
 release=${release%.fc46}
 bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release

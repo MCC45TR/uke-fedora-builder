@@ -75,7 +75,7 @@ if [[ $stage == kernel ]]; then
     mkdir /job/kernel-payload
     for package in /job/artifacts/kernel/*.aarch64.rpm; do
         rpm2cpio "$package" > /job/payload.cpio
-        (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
+        (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /job/payload.cpio)
     done
     release=$(jq -er .kernel.release "$policy")
     bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release
@@ -164,9 +164,12 @@ reference=/job/inputs/reference.bin
 [[ -f $reference && ! -L $reference && $(stat -c %s "$reference") == 5432 && $(stat -c %a "$reference") == 600 ]] || {
     echo 'Image account setup requires a private device-local touch reference' >&2; exit 1;
 }
-root=/job/root
+root=/var/tmp/uke-target-root
+original=/var/tmp/uke-original-fedora
 [[ ! -e $root ]]
-mkdir -p "$root" /job/original-fedora /job/keydb
+mkdir -p "$root" "$original" /job/keydb
+printf '%%_install_langs all\n' > /etc/rpm/macros.zz-uke-languages
+[[ $(rpm --eval '%{_install_langs}') == all ]]
 project=$(jq -er --arg channel "$channel" '.channels[$channel].project' "$policy")
 fingerprint=$(jq -er --arg channel "$channel" '.channels[$channel].fingerprint' "$policy")
 key=/cache/$project.asc
@@ -247,11 +250,11 @@ while IFS= read -r -d '' archive; do
     [[ $(rpm --root "$root" -q "$name" --qf '%{NEVRA}' 2>/dev/null) == "$(rpm -qp --qf '%{NEVRA}' "$archive")" ]] || continue
     rpmkeys --dbpath /job/keydb --checksig "$archive" | grep -F 'signatures OK'
     printf '%s\t%s\n' "$(rpm -qp --qf '%{NEVRA}' "$archive")" "$(sha256sum "$archive" | cut -d ' ' -f1)" >> /job/artifacts/fedora-inputs.tsv
-    rpm2cpio "$archive" > /job/payload.cpio
-    (cd /job/original-fedora; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
+    rpm2cpio "$archive" > /var/tmp/uke-payload.cpio
+    (cd "$original"; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /var/tmp/uke-payload.cpio)
 done < <(find /job/artifacts/transactions/root -type f -name '*.rpm' -print0)
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
-bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
+bash /builder/src/audit/check-target-payload.sh --original-kde-payload "$original" "$root"
 chroot "$root" /usr/sbin/usermod -L root
 systemctl --root="$root" enable NetworkManager.service firewalld.service bluetooth.service chronyd.service
 systemctl --root="$root" disable sshd.service sshd.socket
@@ -261,10 +264,14 @@ if [[ $desktop == kde ]]; then
     chroot "$root" /usr/bin/kwriteconfig6 --file /etc/xdg/plasmasetuprc --group Accounts --key UserGroups wheel
     chroot "$root" /usr/bin/systemd-sysusers /usr/lib/sysusers.d/plasma-setup-sysuser.conf
     systemctl --root="$root" enable plasma-setup.service plasmalogin.service
+    rpm --root "$root" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\n]' > /job/artifacts/rpm-files.tsv
+    c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/audit-languages.cpp -o /job/audit-languages
+    /job/audit-languages "$root" /job/artifacts/rpm-files.tsv > /job/artifacts/language-audit.json
 else
     systemctl --root="$root" enable gdm.service
 fi
 mkdir -p "$root/etc/senemos" "$root/etc/uke-control" "$root/etc/dnf" "$root/var/lib/uke-touch"
+printf '%%_install_langs all\n' > "$root/etc/rpm/macros.uke-languages"
 printf 'automatic=0\n' > "$root/etc/senemos/kernel-update.conf"
 printf 'automatic=0\n' > "$root/etc/senemos/userdata-update.conf"
 internal_channel=$channel
@@ -296,10 +303,18 @@ for file in etc/machine-id var/lib/dbus/machine-id var/lib/systemd/random-seed; 
     rm -f "$root/$file"
 done
 : > "$root/etc/machine-id"
+for tree in dev proc sys run; do
+    if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then
+        echo 'Mounted runtime tree refused during offline finalization' >&2; exit 1
+    fi
+    find "$root/$tree" -xdev -mindepth 1 -depth -delete
+done
 jq '. + {device_private_data_included:true,setup_input:"device-local-touch-reference",setup_input_physical_tested:false,
     oem_firmware_included:true,redistribution_review_required:true,
     touch_reference_validation:"shape and permissions only; physical acceptance is separate",
     python_policy:"only byte-identical signature-verified original Fedora packages",
     credentials_included:false,ssh_enabled:false}' /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
-tar --create --numeric-owner --one-file-system --sort=name --acls --xattrs --xattrs-include=security.capability -f /job/rootfs.tar -C "$root" .
+# Keep standard tar end padding for libguestfs; buffer only the host file writes.
+tar --create --numeric-owner --one-file-system --sort=name --acls --xattrs --xattrs-include=security.capability -f - -C "$root" . |
+    dd of=/job/rootfs.tar bs=1M iflag=fullblock status=none

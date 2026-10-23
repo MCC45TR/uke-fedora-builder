@@ -64,7 +64,8 @@ TEXT
         '     Complete the original desktop account setup using the touchscreen.' \
         '     REQUIRED: run sudo dnf update --refresh in Fedora after the first boot.' \
         '     Automatic kernel activation stays disabled. Updates do not authorize a slot write.' \
-        '     F2FS userdata grows offline during first boot; other formats retain the image size.'
+        '     The initial raw filesystem size is recorded in manifest.json.' \
+        '     Growth follows the installed Uke filesystem policy; physical growth was not tested by this build.'
 }
 public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing
@@ -154,7 +155,7 @@ public_main() {
     jq -n --arg target "$target" --arg mode "$mode" --arg fs "$filesystem" --arg desktop "$desktop" \
         --arg channel "$channel" --arg partition "$partition" --argjson size "$root_mib" \
         --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" \
-        '{target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder}' > "$WORK/request.json"
+        '{device:"uke",architecture:"aarch64",distribution:"fedora",release:"rawhide",target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder}' > "$WORK/request.json"
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha
     native_base=$(jq -er --arg arch "$architecture" '.fedora_rawhide_images[$arch]' "$WORK/recipe/configs/build-rules.json")

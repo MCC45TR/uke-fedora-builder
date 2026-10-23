@@ -7,6 +7,11 @@ size=$(jq -er .size_mib /job/request.json)
 case $filesystem in ext4|f2fs|xfs|btrfs) :;; *) exit 2;; esac
 case $partition in linux|userdata) :;; *) exit 2;; esac
 [[ $size =~ ^[1-9][0-9]{3,6}$ && ! -e /job/root.raw && -f /job/rootfs.tar ]]
+expected=/var/tmp/uke-expected-root
+readback=/var/tmp/uke-readback-root
+[[ ! -e $expected && ! -e $readback ]]
+mkdir "$expected" "$readback"
+tar --extract --numeric-owner --same-owner --same-permissions --acls --xattrs --xattrs-include=security.capability -f /job/rootfs.tar -C "$expected"
 truncate -s "${size}M" /job/root.raw
 [[ -f /job/root.raw && ! -L /job/root.raw ]]
 case $filesystem in
@@ -37,7 +42,12 @@ grep -Fx "$filesystem" /job/filesystem-readback.txt
 grep -Fx UKE_LINUX /job/filesystem-readback.txt
 grep -aF passwd_file_t /job/filesystem-readback.txt
 # Ignore generated SELinux labels here; contents, owners, ACLs and capabilities must match.
-tar --compare --numeric-owner --acls --xattrs --xattrs-include=security.capability -f /job/root-readback.tar -C /job/root
+tar --compare --numeric-owner --acls --xattrs --xattrs-include=security.capability -f /job/root-readback.tar -C "$expected"
+tar --extract --numeric-owner --same-owner --same-permissions --acls --xattrs --xattrs-include=security.capability -f /job/root-readback.tar -C "$readback"
+for name in expected readback; do
+    bash /builder/src/image/metadata-manifest.sh "${!name}" "/job/artifacts/xattrs-$name.tsv"
+done
+cmp /job/artifacts/xattrs-expected.tsv /job/artifacts/xattrs-readback.tsv
 for name in rootfs root-readback; do
     tar -tf "/job/$name.tar" | sed -e 's|^\./||' -e 's|/$||' | LC_ALL=C sort > "/job/$name.files"
 done

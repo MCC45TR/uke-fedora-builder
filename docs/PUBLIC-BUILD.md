@@ -29,7 +29,9 @@ including when the entry is invoked by an absolute path from elsewhere.
 Each invocation creates a new private run directory and preserves older output.
 The output filesystem must enforce a user-owned mode-0700 directory; otherwise
 the build refuses before copying any private input. A filesystem that ignores
-Unix permissions is unsuitable even if it has enough free space.
+Unix permissions is unsuitable even if it has enough free space. Temporary
+package roots and reference extraction use the container's Linux storage;
+large archives, images and receipts remain below the selected output parent.
 
 For actual image builds, replace `./reference.bin` with that device's already
 qualified private touch reference. Its required size is 5432 bytes and its mode
@@ -126,6 +128,10 @@ Source-built local kernel RPMs are unsigned and identified as such. Remote RPM
 signatures are verified, and the selected COPR key fingerprint is
 checked before import. Original Fedora desktop Python dependencies are admitted
 only when their payload bytes match separately signature-verified Fedora RPMs.
+
+Target installation uses all RPM languages; the worker's container language
+filter is not inherited. KDE roots must pass the existing native locale-file
+audit against every installed RPM's file inventory.
 
 Root installation and every static/dynamic platform BuildRequires pass first
 store the resolved DNF5 transaction and its RPM bytes under
@@ -232,9 +238,10 @@ The kernel-only output is insufficient for a new installation: install its exact
 matched RPM/module set into an existing compatible root before using its boot
 images. Never flash a kernel against a different module set.
 
-F2FS userdata is expanded offline by the source initramfs on first boot. Other
-formats retain the image size; automatic online growth is not enabled by this
-recipe. Complete original desktop account setup, then **run
+The delivered root starts at the selected raw size. F2FS has an early offline
+growth path; current Uke packages also enable the completion-gated
+`uke-root-grow.service` for admitted non-F2FS userdata. Physical growth is not
+qualified by host image checks. Complete original desktop account setup, then **run
 `sudo dnf update --refresh` after the first Fedora boot**. This is required.
 A package update does not authorize a kernel slot write; activation remains a
 separately guarded operation.
