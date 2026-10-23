@@ -33,6 +33,7 @@ source_commit=$(jq -er .kernel_commit "$request")
 kernel_version=$(jq -er .kernel_version "$request")
 KERNEL_PROFILE=$(jq -r '.kernel_profile // "normal"' "$request")
 KERNEL_CONFIG_SHA=$(jq -r '.kernel_native_config_sha256 // empty' "$request")
+export KERNEL_CONFIG_SHA
 RUN_TESTS=$(jq -r 'if .run_kernel_tests == false then 0 else 1 end' "$request")
 case $KERNEL_PROFILE in normal|el2-require) ;; *) die 'Unadmitted kernel profile';; esac
 kernel_family=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].family' "$policy")
