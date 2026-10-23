@@ -64,10 +64,14 @@ done
 cmp /job/rootfs.files /job/root-readback.files
 c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse
 /job/android-sparse encode /job/root.raw "/job/artifacts/$partition.img"
-/job/android-sparse decode "/job/artifacts/$partition.img" /job/expanded.raw
-cmp /job/root.raw /job/expanded.raw
-simg2img "/job/artifacts/$partition.img" /job/aosp-expanded.raw
-cmp /job/root.raw /job/aosp-expanded.raw
+expanded=/var/tmp/uke-expanded.raw
+[[ ! -e $expanded ]]
+/job/android-sparse decode "/job/artifacts/$partition.img" "$expanded"
+cmp /job/root.raw "$expanded"
+rm "$expanded"
+simg2img "/job/artifacts/$partition.img" "$expanded"
+cmp /job/root.raw "$expanded"
+rm "$expanded"
 jq --arg fs "$filesystem" --arg raw "$(sha256sum /job/root.raw | cut -d ' ' -f1)" --argjson bytes "$(stat -c %s /job/root.raw)" \
     --arg sparse "$(sha256sum "/job/artifacts/$partition.img" | cut -d ' ' -f1)" \
     --arg boot "$(sha256sum /job/artifacts/boot.img | cut -d ' ' -f1)" \
