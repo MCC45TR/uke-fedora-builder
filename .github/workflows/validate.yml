@@ -6,6 +6,15 @@ on:
 permissions:
   contents: read
 jobs:
+  package-transactions:
+    runs-on: ubuntu-24.04
+    container: registry.fedoraproject.org/fedora@sha256:f7d3478d02965da40131211c19fb827b4d6e3de0904e9d582a9354af47949c14
+    steps:
+      - name: Install disposable RPM fixture tools
+        run: dnf5 -y --setopt=install_weak_deps=False install git-core rpm-build rpm-sign dnf5-plugins gnupg2 createrepo_c jq diffutils findutils
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Verify stored package transactions
+        run: bash tests/public-package-replay.sh
   host-contracts:
     runs-on: ubuntu-24.04
     steps:
@@ -21,6 +30,7 @@ jobs:
           # The pinned host validation also checks all default diagnostics.
           shellcheck --exclude=SC2015 src/public/*.sh src/image/*.sh src/boot/*.sh src/boot-pair/*.sh src/boot-pair/dracut/*.sh src/audit/*.sh tests/*.sh
           bash tests/public-build-contract.sh
+          bash tests/public-worker-snapshot.sh docker
           bash tests/image-contract.sh
           bash tests/boot-contract.sh
           bash tests/boot-pair-contract.sh

@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # Runs only inside disposable host workers, never on the tablet.
+# shellcheck disable=SC2034
 set -Eeuo pipefail
 [[ $# == 1 && -f /job/request.json && -d /cache ]]
 request=/job/request.json
 policy=/builder/configs/public-build.json
 stage=$1
+# shellcheck source=packages.sh
+# shellcheck disable=SC1091
+source /builder/src/public/packages.sh
 if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then
     [[ $UKE_OUTPUT_OWNER =~ ^[0-9]+:[0-9]+$ ]]
     # Preserve the numeric owners in the staging root used for filesystem readback.
@@ -20,7 +24,9 @@ cache_flags=()
 [[ ${UKE_OFFLINE:-0} != 1 ]] || cache_flags+=(--cacheonly)
 rpm -qa --qf '%{NEVRA}\n' | LC_ALL=C sort > "/job/artifacts/worker-$stage-rpms.txt"
 local_repository() {
-    createrepo_c --update --excludes='*.src.rpm' /job/artifacts
+    find /job/artifacts -type f -name '*.rpm' ! -name '*.src.rpm' \
+        ! -path '/job/artifacts/transactions/*' -printf '%P\n' > /job/local-packages.txt
+    createrepo_c --update --pkglist /job/local-packages.txt /job/artifacts
     cat > /etc/yum.repos.d/uke-source-build.repo <<'REPO'
 [uke-source-build]
 name=Locally compiled pinned Uke sources
@@ -89,12 +95,15 @@ if [[ $stage == hardware ]]; then
     [[ -z $(git -C "$hardware" status --porcelain --untracked-files=no) ]]
     mkdir -p /job/artifacts/runtime
     local_repository
+    dnf=(dnf5 "${cache_flags[@]}")
+    rpm_root=/
+    repositories=()
     for family in uke-additional uke-sensors uke-hw uke-power uke-core uke-metas; do
         top=/job/hardware-$family
         make -C "$hardware/packaging/families" srpm FAMILY="$family" outdir="$top/source"
         srpms=("$top/source/SRPMS/"*.src.rpm)
         [[ ${#srpms[@]} == 1 && -f ${srpms[0]} ]]
-        dnf5 "${cache_flags[@]}" -y builddep "${srpms[0]}"
+        public_packages "/job/artifacts/transactions/$family-static" builddep "${srpms[0]}"
         for attempt in 1 2 3 4; do
             printf 'Building %s, dependency pass %s\n' "$family" "$attempt"
             result=0
@@ -104,7 +113,7 @@ if [[ $stage == hardware ]]; then
             [[ $result == 11 ]] || exit "$result"
             requirements=("$top/SRPMS/"*.buildreqs.nosrc.rpm)
             [[ -f ${requirements[0]} ]]
-            dnf5 "${cache_flags[@]}" -y builddep "${requirements[@]}"
+            public_packages "/job/artifacts/transactions/$family-dynamic-$attempt" builddep "${requirements[@]}"
             rm -- "${requirements[@]}"
         done
         [[ $result == 0 ]]
@@ -141,6 +150,8 @@ fi
 [[ $(gpg --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == "$fingerprint" ]]
 install -m644 "$key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
 install -m644 /builder/configs/keys/fedora-46.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora46
+rpmkeys --root "$root" --import /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected \
+    /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora46
 cat > /etc/yum.repos.d/uke-selected.repo <<REPO
 [uke-selected]
 name=Uke $channel
@@ -179,17 +190,19 @@ done
 if [[ $partition == userdata ]]; then
     local_rpms+=("/job/artifacts/kernel/$base-singleboot-$release.fc46.aarch64.rpm")
 fi
-# Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
+# Source-built local RPMs are unsigned. Remote RPM signatures remain mandatory.
+rpm_root=$root
 dnf=(dnf5 "${cache_flags[@]}" --use-host-config --installroot="$root" --releasever=rawhide
-    --disable-repo='*' --enable-repo=rawhide --enable-repo=uke-selected
+    --disable-repo='*'
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
     --setopt=install_weak_deps=False --setopt=gpgcheck=True --setopt=installonly_limit=0
     --setopt=tsflags=nodocs --setopt=excludepkgs='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-kvm*,senemos-uke-linux-kernel-mainline-unstable*')
+repositories=(--enable-repo=rawhide --enable-repo=uke-selected)
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
-    dnf+=(--enable-repo=uke-source-build)
+    repositories+=(--enable-repo=uke-source-build)
 fi
-"${dnf[@]}" -y install "${local_rpms[@]}" "${packages[@]}"
+public_packages /job/artifacts/transactions/root install "${local_rpms[@]}" "${packages[@]}"
 "${dnf[@]}" check
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
 [[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$release.fc46" ]]
@@ -208,7 +221,7 @@ while IFS= read -r -d '' archive; do
     printf '%s\t%s\n' "$(rpm -qp --qf '%{NEVRA}' "$archive")" "$(sha256sum "$archive" | cut -d ' ' -f1)" >> /job/artifacts/fedora-inputs.tsv
     rpm2cpio "$archive" > /job/payload.cpio
     (cd /job/original-fedora; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
-done < <(find "/cache/dnf-$channel" -type f -name '*.rpm' -print0)
+done < <(find /job/artifacts/transactions/root -type f -name '*.rpm' -print0)
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
 bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
 chroot "$root" /usr/sbin/usermod -L root

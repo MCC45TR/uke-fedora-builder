@@ -146,6 +146,7 @@ public_main() {
     mkdir -p "$WORK/artifacts" "$WORK/recipe" "$WORK/inputs" "$output/cache"
     # Freeze the source recipe before any container operation.
     cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/tests" "$WORK/recipe/"
+    (cd "$WORK" && find recipe -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$WORK/recipe.SHA256SUMS"
     jq -n --arg target "$target" --arg mode "$mode" --arg fs "$filesystem" --arg desktop "$desktop" \
         --arg channel "$channel" --arg partition "$partition" --argjson size "$root_mib" \
         --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" \
@@ -167,6 +168,9 @@ public_main() {
         prepare_aarch64
     fi
     public_worker "$arm_image" linux/arm64 "$arm_base" Containerfile.public
+    native_image=$(public_snapshot_worker "$native_image")
+    arm_image=$(public_snapshot_worker "$arm_image")
+    (cd "$WORK" && sha256sum inputs/worker-*.tar) > "$WORK/inputs/worker-archives.sha256"
     say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
     public_stage "$arm_image" linux/arm64 kernel
     if [[ $target == image ]]; then
@@ -177,9 +181,12 @@ public_main() {
         public_stage "$arm_image" linux/arm64 root
         public_stage "$native_image" "$host_platform" filesystem
     fi
-    jq --arg native "$("$ENGINE" image inspect --format '{{.Id}}' "$native_image")" \
-        --arg arm "$("$ENGINE" image inspect --format '{{.Id}}' "$arm_image")" \
-        '. + {native_worker:$native,aarch64_worker:$arm}' "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
+    jq --arg native "$native_image" --arg arm "$arm_image" \
+        --arg recipe "$(sha256sum "$WORK/recipe.SHA256SUMS" | cut -d ' ' -f1)" \
+        '. + {native_worker:$native,aarch64_worker:$arm,recipe_checksums_sha256:$recipe,
+          worker_archives:{native:("inputs/worker-"+($native|ltrimstr("sha256:"))+".tar"),
+                           aarch64:("inputs/worker-"+($arm|ltrimstr("sha256:"))+".tar")},
+          release_reproducibility_tested:false}' "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
     mv "$WORK/manifest.tmp" "$WORK/artifacts/manifest.json"
     if [[ $target == image ]]; then public_flash_help "$partition" > "$WORK/artifacts/FLASHING.txt";
     else
@@ -217,6 +224,18 @@ public_worker() {
     ((OFFLINE == 0)) || die "Offline worker missing: $image; prepare it online first"
     "$ENGINE" build --platform "$platform" --build-arg "BASE_IMAGE=$base" \
         -t "$image" -f "$WORK/recipe/configs/$file" "$WORK/recipe/configs"
+}
+public_snapshot_worker() {
+    local image archive
+    image=$("$ENGINE" image inspect --format '{{.Id}}' "$1") || return
+    image=sha256:${image#sha256:}
+    [[ $image =~ ^sha256:[0-9a-f]{64}$ ]] || return 1
+    archive=$WORK/inputs/worker-${image#sha256:}.tar
+    if [[ ! -f $archive ]]; then
+        "$ENGINE" save --output "$archive.part" "$image" >&2 || return
+        mv -- "$archive.part" "$archive" || return
+    fi
+    printf '%s\n' "$image"
 }
 public_stage() {
     local image=$1 platform=$2 stage=$3 result owner=none

@@ -68,8 +68,8 @@ The stable repository predates the current source families. Stable image builds
 therefore also compile `uke-additional`, `uke-sensors`, `uke-hw`, `uke-power`,
 `uke-core` and `uke-metas` from the exact public hardware commit in that policy.
 Their source RPMs and unsigned local binary RPMs are retained. Only that local
-source-build repository has package signing disabled; remote repositories keep
-signature verification. No testing repository is enabled for a stable image.
+source-build repository accepts unsigned RPMs; remote RPM signatures remain
+mandatory. No testing repository is enabled for a stable image.
 This full source route takes substantially longer than the testing image path.
 The source pin is independent of later RPM channel transitions on the tablet.
 
@@ -87,17 +87,51 @@ Containers install the compiler, RPM BuildRequires, DNF, filesystem tools and
 libguestfs. Native build and filesystem workers are built from public Fedora
 base digests in `configs/build-rules.json`, rather than assumed local image IDs.
 The generated container IDs and exact package inventories are recorded with the
-output. The base digest is pinned; packages installed from live repositories
-are not a frozen toolchain snapshot.
+output. The base digest is pinned; resolving live packages when creating a new
+worker can still change its contents. Before any build stage, the builder saves
+each actual worker under `inputs/worker-<image-ID>.tar`, records archive checksums
+and uses that immutable image ID for execution. Identical workers share one
+archive. `recipe.SHA256SUMS` binds the copied recipe bytes independently of the
+Git commit. Retain these host inputs with the private run directory; they are
+not tablet payloads. Worker archives require additional disk space.
 
 The native kernel producer verifies the upstream archive hash, detached
 OpenPGP signature, adaptation manifests and boot-source hashes. Its original
 Fedora `python3` BuildRequires supports upstream Kbuild on the host only; it is
 not copied into the initramfs or installed as a project tablet service.
 Source-built local kernel RPMs are unsigned and identified as such. Remote RPM
-signature verification stays enabled, and the selected COPR key fingerprint is
+signatures are verified, and the selected COPR key fingerprint is
 checked before import. Original Fedora desktop Python dependencies are admitted
 only when their payload bytes match separately signature-verified Fedora RPMs.
+
+Root installation and every static/dynamic platform BuildRequires pass first
+store the resolved DNF5 transaction and its RPM bytes under
+`artifacts/transactions/`, then replay that captured transaction with external
+repositories disabled. Command-line kernel RPMs are copied into the store as
+well. A successful dependency pass with no changes has a `NO_CHANGES` marker.
+Each nonempty store has checksums for its transaction and package bytes.
+The source-build repository excludes captured dependency packages, so they do
+not gain the unsigned local-source exception on later passes.
+
+Stored DNF5 transactions omit the original per-repository key settings. Before
+replay, the host helper checks stored bytes and verifies every remote RPM
+against the target RPM key database. Only the original local command-line and
+`uke-source-build` inputs retain the existing unsigned exception. DNF's later
+replay signature pass is disabled after these explicit checks. A missing key,
+unsigned remote RPM, changed store or incompatible installed version fails;
+no permissive replay option is used. The [DNF5 replay contract](https://dnf5.readthedocs.io/en/latest/commands/replay.8.html)
+requires matching package operations and versions.
+
+On 23 October 2026, an isolated Fedora x86_64 SDK test installed a signed remote
+fixture and an unsigned local fixture into two empty roots. After removing the
+source repository, replay produced matching RPM inventories and payload bytes.
+The test also exercises the actual BuildRequires plugin, package replacement
+and signature, version, missing-input and duplicate-store refusals. A separate
+Podman scratch-image round trip removes the original image, restores its archive
+and verifies its exact image ID and payload. These are host fixtures; Docker CI
+execution, complete AArch64 worker/root reconstruction and an independent kernel
+or release comparison remain open. The manifest keeps
+`release_reproducibility_tested: false` until that comparison has a receipt.
 
 `--dry-run` validates choices and prints the plan without installing anything,
 creating output or running containers; it does not require `jq`. `--offline`
