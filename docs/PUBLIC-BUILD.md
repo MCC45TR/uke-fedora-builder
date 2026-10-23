@@ -4,10 +4,12 @@
 Rawhide AArch64 root. It does not consume a prepared private root, historical
 Core cache, a stock boot dump or a pre-existing local container ID.
 
-The implementation has shell syntax, CLI and source-integrity checks. Kernel,
-container and image builds were not run for this change. None of the 48 image
-selections has new physical acceptance from this work. Mutable Rawhide/COPR
-repositories also prevent a promise of identical bytes on future builds.
+The native x86_64 worker and a resumed testing/singleboot/EXT4/KDE composition
+passed host checks on 23 October 2026. The image uses the signed testing
+`7.2.12-22` kernel family. Host-tooling corrections required stage resumption;
+an independent clean execution of the final recipe remains untested. No image
+selection has new physical acceptance. Mutable Rawhide/COPR repositories also
+prevent a promise of identical bytes on future builds.
 
 ## Start
 
@@ -251,8 +253,14 @@ separately guarded operation.
 The public shell fixtures cover all 48 selections, three kernel channels,
 invalid input, package-consent refusal, missing-`jq` planning and output paths.
 The source change also extends parser fixtures for the explicit Linux profile.
-No new container, kernel, filesystem image, VM boot or tablet run was executed
-for the 22 October implementation. First full builds, package resolution on each
-channel, desktop setup and recoverable tablet boot remain necessary acceptance
-checks. Historical `core`, `boot` and `boot-pair` commands remain available for
-their dated frozen contracts; their old caches are not prerequisites here.
+On 23 October, the testing/singleboot/EXT4/KDE image passed original-Fedora helper
+and locale audits, full filesystem content and capability/ACL readback, offline
+SELinux policy-label verification, and byte comparisons after decoding with
+both the project codec and AOSP `simg2img`. A native x86_64 worker executed the
+AArch64 package transaction through QEMU. The signed kernel RPMs were retrieved,
+not compiled locally. The run used 16 workers and resumed standard stages after
+host-tooling corrections. Other image combinations, a clean repeat build, source
+kernel compilation, desktop setup, filesystem growth and recoverable tablet
+boot remain untested by this run. Historical `core`, `boot` and `boot-pair`
+commands remain available for their dated frozen contracts; their old caches
+are not prerequisites here.
