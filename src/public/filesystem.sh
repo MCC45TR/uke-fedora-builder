@@ -64,9 +64,9 @@ c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.c
 # Both decoders and the raw-image hash read the same files; run them together.
 sha256sum /job/root.raw > /job/root.raw.sha256 &
 hash_pid=$!
-(/job/android-sparse decode "/job/artifacts/$partition.img" /job/expanded.raw && cmp /job/root.raw /job/expanded.raw) &
+(/job/android-sparse decode "/job/artifacts/$partition.img" /job/expanded.raw && dd if=/job/root.raw bs=4M status=none | cmp - /job/expanded.raw) &
 ours_pid=$!
-(simg2img "/job/artifacts/$partition.img" /job/aosp-expanded.raw && cmp /job/root.raw /job/aosp-expanded.raw) &
+(simg2img "/job/artifacts/$partition.img" /job/aosp-expanded.raw && dd if=/job/root.raw bs=4M status=none | cmp - /job/aosp-expanded.raw) &
 aosp_pid=$!
 wait "$hash_pid"
 wait "$ours_pid"
