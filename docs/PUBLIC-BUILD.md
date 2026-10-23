@@ -19,7 +19,7 @@ install Bash before opening the menu.
 ```sh
 git clone --recurse-submodules https://github.com/MCC45TR/uke-linux.git
 cd uke-linux
-./ukelinux.sh
+./ukelinux.sh --build image --touch-reference ./reference.bin
 ```
 
 The menu asks for image or kernel, boot mode, filesystem, desktop, package
@@ -31,12 +31,16 @@ The output filesystem must enforce a user-owned mode-0700 directory; otherwise
 the build refuses before copying any private input. A filesystem that ignores
 Unix permissions is unsuitable even if it has enough free space.
 
+For actual image builds, replace `./reference.bin` with that device's already
+qualified private touch reference. Its required size is 5432 bytes and its mode
+must be 0600. Kernel builds and dry-run planning need no reference.
+
 ```sh
 ./ukelinux.sh --build image --mode multiboot --filesystem ext4 \
-  --desktop kde --channel testing --out ./out
+  --desktop kde --channel testing --touch-reference ./reference.bin --out ./out
 
 ./ukelinux.sh --build image --mode singleboot --filesystem f2fs \
-  --desktop gnome --channel stable --out ./out
+  --desktop gnome --channel stable --touch-reference ./reference.bin --out ./out
 
 ./ukelinux.sh --build kernel --channel testing --out ./out
 

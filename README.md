@@ -16,9 +16,10 @@ Run `./ukelinux.sh` from the [workspace](https://github.com/MCC45TR/uke-linux)
 for image or kernel builds. The [public build guide](docs/PUBLIC-BUILD.md) covers
 Ubuntu/Fedora/openSUSE/Arch/Alpine hosts, both boot layouts, four filesystems,
 KDE/GNOME, three package channels, prerequisite consent and output selection.
-The new workflow has shell/source checks only; full builds and physical image
-acceptance remain untested. Historical recipes below keep their dated scope.
-Image builds require a device-local touch reference for touchscreen account
+CLI fixtures, stored-RPM tests and a Podman archive round trip pass on the host;
+complete AArch64 image builds and physical acceptance remain untested.
+Historical recipes below keep their dated scope.
+Image builds require `--touch-reference FILE` for touchscreen account
 setup and produce private, device-specific output. Generic USB input setup is
 not yet supported. Dry-run planning and kernel-only builds need no reference.
 
