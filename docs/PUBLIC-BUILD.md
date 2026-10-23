@@ -27,6 +27,9 @@ channel and output directory. Explicit CLI selections are retained. The default
 output parent is `out` below the directory from which the command was invoked,
 including when the entry is invoked by an absolute path from elsewhere.
 Each invocation creates a new private run directory and preserves older output.
+The output filesystem must enforce a user-owned mode-0700 directory; otherwise
+the build refuses before copying any private input. A filesystem that ignores
+Unix permissions is unsuitable even if it has enough free space.
 
 ```sh
 ./ukelinux.sh --build image --mode multiboot --filesystem ext4 \

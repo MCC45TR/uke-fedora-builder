@@ -142,6 +142,7 @@ public_main() {
     ((available >= required * 1024)) || die "At least $required MiB of free space is required"
     WORK=$(mktemp -d "$output/$target-$channel-XXXXXXXX")
     chmod 700 "$WORK"
+    [[ $(stat -c %a "$WORK") == 700 && $(stat -c %u "$WORK") == "$(id -u)" ]] || die 'Output filesystem must enforce a private, user-owned mode-0700 run directory'
     trap cleanup EXIT
     mkdir -p "$WORK/artifacts" "$WORK/recipe" "$WORK/inputs" "$output/cache"
     # Freeze the source recipe before any container operation.

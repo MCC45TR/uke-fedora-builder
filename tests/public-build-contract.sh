@@ -59,6 +59,19 @@ ln -s reference.bin "$fixture/link.bin"
 reject --touch-reference "$fixture/link.bin" --dry-run
 truncate -s 5431 "$fixture/reference.bin"
 reject --touch-reference "$fixture/reference.bin" --dry-run
+truncate -s 5432 "$fixture/reference.bin"
+# A filesystem that ignores chmod must refuse before copying private input.
+# shellcheck disable=SC2329
+(
+    bootstrap() { :; }
+    df() { printf 'Filesystem 1024-blocks Used Available Capacity Mounted\nfixture 999999999 0 999999999 0%% /\n'; }
+    stat() {
+        if [[ $1 == -c && $2 == %a && $3 == "$fixture/refused-output/"* ]]; then printf '775\n'
+        else command stat "$@"; fi
+    }
+    install() { echo 'Private input copy reached an inadmissible filesystem' >&2; exit 94; }
+    reject --build image --yes --out "$fixture/refused-output" --touch-reference "$fixture/reference.bin"
+)
 for partition in linux userdata; do
     public_flash_help "$partition" > "$fixture/flash"
     grep -Fx "       fastboot flash $partition $partition.img" "$fixture/flash" >/dev/null
