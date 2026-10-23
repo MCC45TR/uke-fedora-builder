@@ -37,12 +37,21 @@ for channel in stable testing unstable; do
     public_main --build kernel --channel "$channel" --dry-run > "$fixture/plan"
     grep -F 'kernel: Fedora Rawhide AArch64' "$fixture/plan" >/dev/null
 done
-for pair in '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 9' '--linux-size 65537'; do
+for pair in '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs -1' '--j0' '--j4bad' '--jobs 01' '--linux-size 65537'; do
     # Intentional fixture word splitting of fixed literal option/value pairs.
     # shellcheck disable=SC2086
     reject $pair --dry-run
 done
 reject --out '' --dry-run
+for choice in '--j4' '--j16' '--jobs 16' '--jobs=32'; do
+    # Intentional splitting of fixed CLI fixture strings.
+    # shellcheck disable=SC2086
+    public_main --dry-run $choice > "$fixture/jobs-plan"
+    case $choice in --j4) expected_jobs=4;; --jobs=32) expected_jobs=32;; *) expected_jobs=16;; esac
+    grep -F "$expected_jobs workers" "$fixture/jobs-plan" >/dev/null
+done
+public_main --dry-run > "$fixture/jobs-plan"
+grep -F "$(nproc) workers" "$fixture/jobs-plan" >/dev/null
 reject --out '/tmp/unsafe:volume' --dry-run
 reject --out '/tmp/unsafe,volume' --dry-run
 reject --out --dry-run

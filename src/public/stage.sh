@@ -37,6 +37,10 @@ priority=1
 REPO
 }
 if [[ $stage == kernel ]]; then
+    if [[ $(jq -er .target "$request") == image && $channel == testing ]]; then
+        bash /builder/src/public/repository-kernel.sh
+        exit
+    fi
     [[ $(uname -m) == aarch64 ]]
     source=/cache/kernel-$source_commit
     if [[ ! -d $source/.git ]]; then
@@ -46,7 +50,18 @@ if [[ $stage == kernel ]]; then
     git -C "$source" checkout --detach "$source_commit"
     [[ $(git -C "$source" rev-parse HEAD) == "$source_commit" && -z $(git -C "$source" status --porcelain --untracked-files=no) ]]
     # The signed upstream source and every adaptation hash are checked by make srpm.
-    make -C "$source" srpm outdir=/job/srpm
+    mkdir -p /job/artifacts/kernel
+    # Historical source pins cap jobs at eight; retain only this host build-policy correction.
+    spec=packaging/senemos-uke-linux-kernel-mainline.spec
+    cp "$source/$spec" /job/kernel-spec.original
+    sed '/^test "\$jobs" -le 8 || jobs=8$/d' /job/kernel-spec.original > /job/kernel-spec.parallel
+    diff -u --label "a/$spec" --label "b/$spec" /job/kernel-spec.original /job/kernel-spec.parallel \
+        > /job/artifacts/kernel/parallel-jobs.patch || [[ $? == 1 ]]
+    (
+        trap 'cp /job/kernel-spec.original "$source/$spec"' EXIT
+        cp /job/kernel-spec.parallel "$source/$spec"
+        make -C "$source" srpm outdir=/job/srpm
+    )
     mkdir -p /job/rpmbuild
     srpms=(/job/srpm/*.src.rpm)
     [[ ${#srpms[@]} == 1 && -f ${srpms[0]} ]]
@@ -77,6 +92,7 @@ if [[ $stage == kernel ]]; then
     # The native RPM producer audits its linked initramfs with no Python exception.
     jq --arg source "$source_commit" --arg release "$release" \
         '. + {kernel_source_commit:$source,kernel_release:$release,kernel_rpms_locally_built:true,
+          kernel_parallelism_policy:"requested jobs retained; historical eight-worker cap removed in retained SRPM spec",
           local_kernel_rpm_signature:"unsigned local build; signed upstream source verified by producer",
           physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' \
         "$request" > /job/artifacts/manifest.json
@@ -136,7 +152,14 @@ if [[ $stage == filesystem ]]; then
     bash /builder/src/public/filesystem.sh
     exit
 fi
-[[ $(uname -m) == aarch64 ]]
+if [[ $(uname -m) == x86_64 ]]; then
+    mkdir -p /run/uke-binfmt
+    mount -t binfmt_misc binfmt_misc /run/uke-binfmt
+    registration=':uke-image-aarch64:M::\x7fELF\x02\x01\x01\x00\x00\x00\x00\x00\x00\x00\x00\x00\x02\x00\xb7\x00:\xff\xff\xff\xff\xff\xff\xff\x00\xff\xff\xff\xff\xff\xff\xff\xff\xfe\xff\xff\xff:/usr/bin/qemu-aarch64-static:F'
+    printf '%s\n' "$registration" > /run/uke-binfmt/register
+else
+    [[ $(uname -m) == aarch64 ]]
+fi
 reference=/job/inputs/reference.bin
 [[ -f $reference && ! -L $reference && $(stat -c %s "$reference") == 5432 && $(stat -c %a "$reference") == 600 ]] || {
     echo 'Image account setup requires a private device-local touch reference' >&2; exit 1;
@@ -183,7 +206,7 @@ else
     packages+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
         gnome-control-center gnome-software gnome-console nautilus)
 fi
-release=$(jq -er .kernel.release "$policy")
+release=$(jq -er .kernel_release /job/artifacts/manifest.json)
 base=senemos-uke-linux-kernel-mainline
 local_rpms=()
 for component in '' -core -modules -dtbs -boot; do
@@ -196,9 +219,10 @@ if [[ $partition == userdata ]]; then
 fi
 # Source-built local RPMs are unsigned. Remote RPM signatures remain mandatory.
 rpm_root=$root
-dnf=(dnf5 "${cache_flags[@]}" --use-host-config --installroot="$root" --releasever=rawhide
+dnf=(dnf5 "${cache_flags[@]}" --forcearch=aarch64 --use-host-config --installroot="$root" --releasever=rawhide
     --disable-repo='*'
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
+    --setopt=optional_metadata_types=filelists
     --setopt=install_weak_deps=False --setopt=gpgcheck=True --setopt=installonly_limit=0
     --setopt=tsflags=nodocs --setopt=excludepkgs='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-kvm*,senemos-uke-linux-kernel-mainline-unstable*')
 repositories=(--enable-repo=rawhide --enable-repo=uke-selected)

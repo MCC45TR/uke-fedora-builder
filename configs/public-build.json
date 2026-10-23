@@ -8,7 +8,7 @@
     "url": "https://github.com/MCC45TR/senemos-uke-kernel-mainline.git",
     "commit": "dbfbc03f295662434aef3011ad2c692c2356c87e",
     "release": "7.2.12-17",
-    "policy": "All channels compile this explicit native source; channel names select RPM repositories, not a kernel.org latest alias."
+    "policy": "Kernel-only builds and stable/unstable images compile this source. Testing images consume the latest signed mainline family from uke-linux-test."
   },
   "channels": {
     "stable": {

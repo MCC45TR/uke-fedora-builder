@@ -48,7 +48,8 @@ must be 0600. Kernel builds and dry-run planning need no reference.
   --desktop kde --channel unstable --dry-run
 ```
 
-`--jobs` accepts 1 through 8. `--linux-size` accepts 8192 through 65536 MiB and
+Parallelism defaults to the host's available CPU count. Use `--jobs 16` or
+`--j16` to override it; `--j4` selects four workers. `--linux-size` accepts 8192 through 65536 MiB and
 defaults to 16384. The sparse codec has a 64 GiB raw-image bound. Allow at least
 64 GiB for kernel/tool work plus three times the selected root size. x86_64
 hosts compile the native AArch64 kernel under QEMU user emulation, which can
@@ -67,10 +68,20 @@ be slow. No generic ARM64 kernel is substituted.
 | `testing` | Signed packages from `mcc45tr/uke-linux-test`; the installed control channel is named `test`. |
 | `unstable` | The test repository with the installed control channel named `unstable`. |
 
-All three channels build the same explicit native kernel source selected in
+Testing image builds retrieve the latest signed mainline kernel family from
+`mcc45tr/uke-linux-test`, verify its signing key, every RPM signature, matching
+versions, module hashes and both boot payloads. The exact RPMs and checksums are
+retained. These builds use native host package tools and an AArch64 installroot;
+on x86_64, scriptlets use an isolated container-local binfmt table and the original
+Fedora QEMU interpreter. No host binfmt registration is changed.
+
+Kernel-only builds and the other image channels build the explicit source selected in
 [`configs/public-build.json`](../configs/public-build.json). An unstable selection
 does not silently replace it with an unported kernel.org release candidate.
 Kernel-only output uses that same source/spec and produces both root profiles.
+For historical source pins, the builder removes the spec's eight-worker limit
+before SRPM generation and retains that exact build-policy diff beside the RPMs.
+The cached checkout is restored after source generation; kernel/DT inputs are unchanged.
 The stable repository predates the current source families. Stable image builds
 therefore also compile `uke-additional`, `uke-sensors`, `uke-hw`, `uke-power`,
 `uke-core` and `uke-metas` from the exact public hardware commit in that policy.

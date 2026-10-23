@@ -11,7 +11,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --channel stable|testing|unstable Uke RPM channel (Fedora remains Rawhide)
   --out DIRECTORY                   Default: ./out in the invoking directory
   --linux-size MIB                  Root image size; default 16384, minimum 8192
-  --jobs N                          Compiler workers; default 2, maximum 8
+  --jobs N, --jN                    Parallel workers; default: available CPUs
   --touch-reference FILE            Device-local 5432-byte reference; required for images
   --yes                             Consent to listed host preparation operations
   --offline                         Reuse prepared worker images and kernel inputs
@@ -21,7 +21,8 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
 
 Supported Linux hosts: Ubuntu, Fedora, openSUSE, Arch Linux and Alpine;
 x86_64 and AArch64. Bash bootstraps after confirmation on minimal hosts.
-Image builds compile the pinned native kernel spec, then compose an empty root.
+Testing images use the latest signed COPR mainline kernel and an empty root.
+Other image channels compile the pinned native kernel spec before composition.
 Kernel-only builds produce its source RPM, binary RPMs and both boot profiles.
 Existing core, boot, boot-pair and --check-device commands remain available.
 Run sudo dnf update --refresh after the first Fedora boot. This is required.
@@ -69,7 +70,8 @@ public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing
     local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior=''
     local -A selected=()
-    JOBS=2 OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 ENGINE='' CID='' PAUSED=0
+    JOBS=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1\n')
+    OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 ENGINE='' CID='' PAUSED=0
     # Preserve explicit historical commands without making them the default path.
     for argument in "$@"; do
         if [[ $argument == --check-device || $argument == --build=core || $argument == --build=boot || $argument == --build=boot-pair ||
@@ -84,6 +86,7 @@ public_main() {
             --help|-h) public_help; return;;
             --self-test) bash "$BUILDER/tests/public-build-contract.sh"; return;;
             --yes) UKE_ASSUME_YES=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;;
+            --j[0-9]*) key=--jobs; value=${1#--j};;
             --build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
             --build|--mode|--filesystem|--desktop|--channel|--out|--jobs|--linux-size|--touch-reference)
                 key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
@@ -111,7 +114,7 @@ public_main() {
     case $filesystem in ext4|f2fs|btrfs|xfs) :;; *) die 'Unsupported root filesystem';; esac
     case $desktop in kde|gnome) :;; *) die 'Desktop must be kde or gnome';; esac
     case $channel in stable|testing|unstable) :;; *) die 'Unknown package channel';; esac
-    [[ $JOBS =~ ^[1-8]$ ]] || die 'Jobs must be between 1 and 8'
+    [[ $JOBS =~ ^[1-9][0-9]*$ ]] || die 'Jobs must be a positive integer'
     [[ $root_mib =~ ^[1-9][0-9]{3,4}$ ]] || die 'Root size must be 8192..65536 MiB'
     ((root_mib >= 8192 && root_mib <= 65536)) || die 'Root size must be 8192..65536 MiB'
     [[ -n $output && $output != *:* && $output != *,* && $output != *$'\n'* ]] || die 'Output path must be nonempty and contain no colon, comma or newline'
@@ -123,7 +126,7 @@ public_main() {
     [[ $mode != singleboot ]] || partition=userdata
     say "$target: Fedora Rawhide AArch64; $mode; $filesystem; $desktop; $channel; $JOBS workers"
     say "Output parent: $output (a new run directory is created; existing output is preserved)"
-    say 'The pinned source kernel is common to all channels; channel names select the Uke RPM repository.'
+    say 'Testing images use the latest signed mainline kernel from uke-linux-test; source builds retain the explicit kernel pin.'
     say 'REQUIRED after first Fedora boot: sudo dnf update --refresh'
     ((DRY_RUN == 0)) || return 0
     [[ $target != image || -n $reference ]] || die 'Image account setup requires --touch-reference from this device; USB input is not yet supported'
@@ -160,6 +163,11 @@ public_main() {
     native_image=localhost/uke-public-native:${recipe_sha:0:16}-$architecture
     arm_image=localhost/uke-public-arm64:${recipe_sha:0:16}
     public_worker "$native_image" "$host_platform" "$native_base" Containerfile.public-native
+    local repository_kernel=0
+    [[ $target != image || $channel != testing ]] || repository_kernel=1
+    if ((repository_kernel)); then
+        arm_image=$native_image
+    else
     TEST_IMAGE=$arm_base
     "$ENGINE" image inspect "$arm_base" >/dev/null 2>&1 || { ((OFFLINE == 0)) && "$ENGINE" pull --platform linux/arm64 "$arm_base"; }
     if [[ $architecture == x86_64 ]]; then
@@ -169,17 +177,25 @@ public_main() {
         prepare_aarch64
     fi
     public_worker "$arm_image" linux/arm64 "$arm_base" Containerfile.public
+    fi
     native_image=$(public_snapshot_worker "$native_image")
     arm_image=$(public_snapshot_worker "$arm_image")
     (cd "$WORK" && sha256sum inputs/worker-*.tar) > "$WORK/inputs/worker-archives.sha256"
-    say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
-    public_stage "$arm_image" linux/arm64 kernel
+    if ((repository_kernel)); then
+        say 'Retrieving the latest signed AArch64 mainline kernel from uke-linux-test'
+        public_stage "$arm_image" "$host_platform" kernel
+    else
+        say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
+        public_stage "$arm_image" linux/arm64 kernel
+    fi
     if [[ $target == image ]]; then
         if [[ $channel == stable ]]; then
             say 'Building the pinned platform source families missing from the stable repository'
             public_stage "$arm_image" linux/arm64 hardware
         fi
-        public_stage "$arm_image" linux/arm64 root
+        local root_platform=linux/arm64
+        ((repository_kernel == 0)) || root_platform=$host_platform
+        public_stage "$arm_image" "$root_platform" root
         public_stage "$native_image" "$host_platform" filesystem
     fi
     jq --arg native "$native_image" --arg arm "$arm_image" \
@@ -246,7 +262,10 @@ public_stage() {
         owner=$(id -u):$(id -g)
     fi
     wait_idle
-    CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable \
+    local -a capabilities=()
+    # Rootless cross-install scriptlets need a binfmt table in this container's user namespace.
+    if [[ $stage == root && $platform == linux/amd64 ]]; then capabilities+=(--cap-add SYS_ADMIN); fi
+    CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable "${capabilities[@]}" \
         --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache:/cache" \
         -e "UKE_OFFLINE=$OFFLINE" -e "UKE_OUTPUT_OWNER=$owner" "$image" bash /builder/src/public/stage.sh "$stage")
     "$ENGINE" start -a "$CID" 2>&1 | tee "$WORK/$stage.log"
