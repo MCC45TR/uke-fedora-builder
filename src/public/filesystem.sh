@@ -67,10 +67,10 @@ c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.c
 expanded=/var/tmp/uke-expanded.raw
 [[ ! -e $expanded ]]
 /job/android-sparse decode "/job/artifacts/$partition.img" "$expanded"
-cmp /job/root.raw "$expanded"
+dd if=/job/root.raw bs=4M status=none | cmp - "$expanded"
 rm "$expanded"
 simg2img "/job/artifacts/$partition.img" "$expanded"
-cmp /job/root.raw "$expanded"
+dd if=/job/root.raw bs=4M status=none | cmp - "$expanded"
 rm "$expanded"
 jq --arg fs "$filesystem" --arg raw "$(sha256sum /job/root.raw | cut -d ' ' -f1)" --argjson bytes "$(stat -c %s /job/root.raw)" \
     --arg sparse "$(sha256sum "/job/artifacts/$partition.img" | cut -d ' ' -f1)" \
