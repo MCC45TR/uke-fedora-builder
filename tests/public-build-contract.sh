@@ -48,6 +48,8 @@ reject --out '/tmp/unsafe,volume' --dry-run
 reject --out --dry-run
 reject --jobs
 reject --unknown --dry-run
+# Missing setup input must stop before host preparation, even with --yes.
+reject --build image --yes
 truncate -s 5432 "$fixture/reference.bin"
 chmod 644 "$fixture/reference.bin"
 reject --touch-reference "$fixture/reference.bin" --dry-run

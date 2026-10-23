@@ -18,6 +18,9 @@ Ubuntu/Fedora/openSUSE/Arch/Alpine hosts, both boot layouts, four filesystems,
 KDE/GNOME, three package channels, prerequisite consent and output selection.
 The new workflow has shell/source checks only; full builds and physical image
 acceptance remain untested. Historical recipes below keep their dated scope.
+Image builds require a device-local touch reference for touchscreen account
+setup and produce private, device-specific output. Generic USB input setup is
+not yet supported. Dry-run planning and kernel-only builds need no reference.
 
 ## Status — 14 October 2026
 

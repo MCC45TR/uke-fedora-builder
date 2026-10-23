@@ -12,7 +12,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --out DIRECTORY                   Default: ./out in the invoking directory
   --linux-size MIB                  Root image size; default 16384, minimum 8192
   --jobs N                          Compiler workers; default 2, maximum 8
-  --touch-reference FILE            Optional device-local 5432-byte reference
+  --touch-reference FILE            Device-local 5432-byte reference; required for images
   --yes                             Consent to listed host preparation operations
   --offline                         Reuse prepared worker images and kernel inputs
   --dry-run                         Print selections; no installation or build
@@ -26,6 +26,8 @@ Kernel-only builds produce its source RPM, binary RPMs and both boot profiles.
 Existing core, boot, boot-pair and --check-device commands remain available.
 Run sudo dnf update --refresh after the first Fedora boot. This is required.
 Build output is unqualified until its separate physical installation test.
+Image builds need the device's accepted touch reference for account setup.
+USB keyboard/mouse setup is not supported by the current hardware profile.
 HELP
 }
 public_choice() {
@@ -57,7 +59,8 @@ TEXT
     fi
     printf '       fastboot flash %s %s.img\n' "$partition" "$partition"
     printf '%s\n' '       fastboot flash boot_b boot.img' '       fastboot set_active b' '       fastboot reboot' \
-        '  4. Complete the original desktop account setup.' \
+        '  4. Use this private image only on the device that supplied its touch reference.' \
+        '     Complete the original desktop account setup using the touchscreen.' \
         '     REQUIRED: run sudo dnf update --refresh in Fedora after the first boot.' \
         '     Automatic kernel activation stays disabled. Updates do not authorize a slot write.' \
         '     F2FS userdata grows offline during first boot; other formats retain the image size.'
@@ -123,6 +126,7 @@ public_main() {
     say 'The pinned source kernel is common to all channels; channel names select the Uke RPM repository.'
     say 'REQUIRED after first Fedora boot: sudo dnf update --refresh'
     ((DRY_RUN == 0)) || return 0
+    [[ $target != image || -n $reference ]] || die 'Image account setup requires --touch-reference from this device; USB input is not yet supported'
     bootstrap
     architecture=$(uname -m)
     case $architecture in x86_64) host_platform=linux/amd64;; aarch64) host_platform=linux/arm64;; *) die 'Supported architectures: x86_64 and AArch64';; esac

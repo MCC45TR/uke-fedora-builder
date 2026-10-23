@@ -124,6 +124,10 @@ if [[ $stage == filesystem ]]; then
     exit
 fi
 [[ $(uname -m) == aarch64 ]]
+reference=/job/inputs/reference.bin
+[[ -f $reference && ! -L $reference && $(stat -c %s "$reference") == 5432 && $(stat -c %a "$reference") == 600 ]] || {
+    echo 'Image account setup requires a private device-local touch reference' >&2; exit 1;
+}
 root=/job/root
 [[ ! -e $root ]]
 mkdir -p "$root" /job/original-fedora /job/keydb
@@ -238,13 +242,7 @@ install_weak_deps=False
 installonly_limit=0
 excludepkgs=kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource
 DNF
-private=false
-if [[ -f /job/inputs/reference.bin ]]; then
-    [[ ! -L /job/inputs/reference.bin && $(stat -c %s /job/inputs/reference.bin) == 5432 ]]
-    install -m600 /job/inputs/reference.bin "$root/var/lib/uke-touch/reference.bin"
-    private=true
-fi
-# Generic images can complete setup using USB input until their own touch data exist.
+install -m600 "$reference" "$root/var/lib/uke-touch/reference.bin"
 mkdir -p "$root/etc/systemd/system/uke-touchscreen.service.d"
 printf '[Unit]\nConditionPathExists=/var/lib/uke-touch/reference.bin\n' > "$root/etc/systemd/system/uke-touchscreen.service.d/local-data.conf"
 for unit in uke-touchscreen.service uke-wifi-factory.service uke-install-profile.service; do
@@ -257,8 +255,7 @@ for file in etc/machine-id var/lib/dbus/machine-id var/lib/systemd/random-seed; 
     rm -f "$root/$file"
 done
 : > "$root/etc/machine-id"
-[[ ! -e $root/var/lib/uke-touch/reference.bin || $private == true ]]
-jq --argjson private "$private" '. + {device_private_data_included:$private,
+jq '. + {device_private_data_included:true,setup_input:"device-local-touch-reference",setup_input_physical_tested:false,
     oem_firmware_included:true,redistribution_review_required:true,
     touch_reference_validation:"shape and permissions only; physical acceptance is separate",
     python_policy:"only byte-identical signature-verified original Fedora packages",

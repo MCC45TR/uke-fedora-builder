@@ -108,13 +108,13 @@ never substitutes an unsigned download for a missing signed package.
 
 ## Device-local inputs
 
-Generic composition requires no private touch reference, unit identifier,
-backup image or calibration archive. Generic OEM firmware is installed from
-the public signed firmware package. Its notices and redistribution review remain
-separate from source availability; an image containing it is not automatically
-a public release artifact.
+Image builds require the target device's accepted touch reference for first
+account setup. A missing reference stops before host preparation. Dry-run
+planning and kernel-only builds need no reference. Generic OEM firmware is
+installed from the public signed firmware package. Its notices and
+redistribution review remain separate from source availability.
 
-Touch startup is conditional on that device's own reference. An optional
+Touch startup is conditional on that device's own reference. The required
 `--touch-reference FILE` accepts a regular, non-symlink file of exactly 5432
 bytes and mode 0600. It is copied only into the local root, and the output
 manifest records that private data are included. These checks establish shape
@@ -124,8 +124,12 @@ The public probe source is in `uke-sensors/src/touch-normal-probe.cpp`; its
 panel/GPIO admission and physical capture acceptance remain prerequisites.
 This workflow does not assert that a new device has completed them.
 
-Without a qualified reference, touch remains unavailable; use USB input for
-first account setup. No password, human account, SSH host key or remote root
+The resulting image contains private data and is only for that device; do not
+publish it as a generic image. USB keyboard/mouse setup remains unavailable
+until the exact host/VBUS profile passes physical acceptance. A public image
+without private touch data still requires that separate input work and is not
+provided by this path. File shape/permission checks do not qualify actual
+touchscreen account setup. No password, human account, SSH host key or remote root
 login is shipped. SSH is installed but disabled. Stock persist is mounted
 read-only by the existing explicit fstab policy. Automatic kernel activation
 is disabled in both update policies.
