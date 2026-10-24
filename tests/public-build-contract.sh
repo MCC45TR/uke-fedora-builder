@@ -109,4 +109,5 @@ PATH=$fixture/bin public_main --build image --dry-run > "$fixture/minimal-plan"
 jq -e '.kernel.commit|test("^[a-f0-9]{40}$")' "$root/configs/public-build.json" >/dev/null
 bash -n "$root"/src/public/*.sh
 bash "$root/tests/public-source-inputs.sh"
+bash "$root/tests/public-stage-routing.sh"
 printf '%s\n' '48 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'

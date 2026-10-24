@@ -31,6 +31,7 @@ jobs:
           shellcheck --exclude=SC2015 src/public/*.sh src/image/*.sh src/boot/*.sh src/boot-pair/*.sh src/boot-pair/dracut/*.sh src/audit/*.sh tests/*.sh
           bash tests/public-build-contract.sh
           bash tests/public-worker-snapshot.sh docker
+          sudo bash tests/public-worker-namespace.sh
           bash tests/image-contract.sh
           bash tests/boot-contract.sh
           bash tests/boot-pair-contract.sh

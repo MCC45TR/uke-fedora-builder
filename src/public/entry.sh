@@ -263,12 +263,15 @@ public_stage() {
         owner=$(id -u):$(id -g)
     fi
     wait_idle
-    local -a capabilities=()
-    # Rootless cross-install scriptlets need a binfmt table in this container's user namespace.
-    if [[ $stage == root && $platform == linux/amd64 ]]; then capabilities+=(--cap-add SYS_ADMIN); fi
+    local -a capabilities=() stage_command=(bash /builder/src/public/stage.sh "$stage")
+    # A distinct user namespace keeps rootful and concurrent workers' binfmt separate.
+    if [[ $stage == root && $platform == linux/amd64 ]]; then
+        capabilities+=(--cap-add SYS_ADMIN)
+        stage_command=(bash /builder/src/public/worker-namespace.sh "${stage_command[@]}")
+    fi
     CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable "${capabilities[@]}" \
         --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache:/cache" \
-        -e "UKE_OFFLINE=$OFFLINE" -e "UKE_OUTPUT_OWNER=$owner" "$image" bash /builder/src/public/stage.sh "$stage")
+        -e "UKE_OFFLINE=$OFFLINE" -e "UKE_OUTPUT_OWNER=$owner" "$image" "${stage_command[@]}")
     "$ENGINE" start -a "$CID" 2>&1 | tee "$WORK/$stage.log"
     result=$("$ENGINE" inspect --format '{{.State.ExitCode}}' "$CID")
     "$ENGINE" rm "$CID" >/dev/null; CID=''

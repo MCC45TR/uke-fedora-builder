@@ -54,6 +54,8 @@ if [[ $stage == kernel ]]; then
     # Historical source pins cap jobs at eight; retain only this host build-policy correction.
     spec=packaging/senemos-uke-linux-kernel-mainline.spec
     cp "$source/$spec" /job/kernel-spec.original
+    # Match the literal RPM shell variable rather than expanding it here.
+    # shellcheck disable=SC2016
     sed '/^test "\$jobs" -le 8 || jobs=8$/d' /job/kernel-spec.original > /job/kernel-spec.parallel
     diff -u --label "a/$spec" --label "b/$spec" /job/kernel-spec.original /job/kernel-spec.parallel \
         > /job/artifacts/kernel/parallel-jobs.patch || [[ $? == 1 ]]

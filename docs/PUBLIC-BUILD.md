@@ -78,8 +78,18 @@ Testing image builds retrieve the latest signed mainline kernel family from
 `mcc45tr/uke-linux-test`, verify its signing key, every RPM signature, matching
 versions, module hashes and both boot payloads. The exact RPMs and checksums are
 retained. These builds use native host package tools and an AArch64 installroot;
-on x86_64, scriptlets use an isolated container-local binfmt table and the original
-Fedora QEMU interpreter. No host binfmt registration is changed.
+on x86_64, each root stage enters a new user and mount namespace before
+registering the original Fedora QEMU interpreter. All existing numeric UID/GID
+ranges are preserved. Concurrent workers therefore keep distinct binfmt tables
+and interpreter references, even when their container runtime shares a parent
+user namespace. No initial host binfmt registration is changed by this stage.
+The kernel and runtime must permit user-namespace binfmt mounts; a failure
+stops this stage rather than using the initial host registry.
+
+24 October 2026: two concurrent rootless Podman probes pass namespace separation,
+synthetic binfmt execution and full UID/GID-range preservation. This change has
+not completed a new full image build or Docker runtime test. The preceding clean
+image result belongs to recipe `7c772db`; its recorded identity is retained.
 
 24 October 2026: the testing-image manifest reads kernel_source_commit from the
 signed RPM payload's source identity and rejects a missing or malformed value.
@@ -111,7 +121,7 @@ bytes. Only `uke-linux` and `uke-linux-test` remain active Uke COPR projects.
 Missing host tools are offered through APT, DNF, Zypper, Pacman or APK. The
 package list is shown before confirmation. Podman is preferred; an operational
 Docker engine can also be used. Rootless Podman UID/GID preparation and
-AArch64 binfmt registration require their own confirmation when needed.
+AArch64 binfmt registration for source-build workers require their own confirmation when needed.
 `--yes` supplies consent for these preparation operations in unattended runs.
 No host distribution upgrade is performed except Pacman's required synchronized
 `-Syu` transaction when installing missing packages.
