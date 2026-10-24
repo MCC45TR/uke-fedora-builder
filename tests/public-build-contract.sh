@@ -37,7 +37,7 @@ for channel in stable testing unstable; do
     public_main --build kernel --channel "$channel" --dry-run > "$fixture/plan"
     grep -F 'kernel: Fedora Rawhide AArch64' "$fixture/plan" >/dev/null
 done
-for pair in '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 9' '--linux-size 65537'; do
+for pair in '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 99999' '--linux-size 65537'; do
     # Intentional fixture word splitting of fixed literal option/value pairs.
     # shellcheck disable=SC2086
     reject $pair --dry-run

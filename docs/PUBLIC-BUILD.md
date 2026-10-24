@@ -41,7 +41,7 @@ Each invocation creates a new private run directory and preserves older output.
   --desktop kde --channel unstable --dry-run
 ```
 
-`--jobs` accepts 1 through 8. `--linux-size` accepts 8192 through 65536 MiB and
+`--jobs` accepts 1 through the number of online CPUs and defaults to all of them. `--linux-size` accepts 8192 through 65536 MiB and
 defaults to 16384. The sparse codec has a 64 GiB raw-image bound. Allow at least
 64 GiB for kernel/tool work plus three times the selected root size. x86_64
 hosts compile the native AArch64 kernel under QEMU user emulation, which can

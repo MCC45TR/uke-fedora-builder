@@ -11,7 +11,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --channel stable|testing|unstable Uke RPM channel (Fedora remains Rawhide)
   --out DIRECTORY                   Default: ./out in the invoking directory
   --linux-size MIB                  Root image size; default 16384, minimum 8192
-  --jobs N                          Compiler workers; default 2, maximum 8
+  --jobs N                          Compiler workers; default all online CPUs
   --touch-reference FILE            Optional device-local 5432-byte reference
   --yes                             Consent to listed host preparation operations
   --offline                         Reuse prepared worker images and kernel inputs
@@ -66,7 +66,7 @@ public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing
     local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior=''
     local -A selected=()
-    JOBS=2 OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 ENGINE='' CID='' PAUSED=0
+    JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1) OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 ENGINE='' CID='' PAUSED=0
     # Preserve explicit historical commands without making them the default path.
     for argument in "$@"; do
         if [[ $argument == --check-device || $argument == --build=core || $argument == --build=boot || $argument == --build=boot-pair ||
@@ -108,7 +108,9 @@ public_main() {
     case $filesystem in ext4|f2fs|btrfs|xfs) :;; *) die 'Unsupported root filesystem';; esac
     case $desktop in kde|gnome) :;; *) die 'Desktop must be kde or gnome';; esac
     case $channel in stable|testing|unstable) :;; *) die 'Unknown package channel';; esac
-    [[ $JOBS =~ ^[1-8]$ ]] || die 'Jobs must be between 1 and 8'
+    [[ $JOBS =~ ^[1-9][0-9]{0,3}$ ]] || die 'Jobs must be a positive integer'
+    local processors; processors=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)
+    ((JOBS <= processors)) || die "Jobs must not exceed the $processors online CPUs"
     [[ $root_mib =~ ^[1-9][0-9]{3,4}$ ]] || die 'Root size must be 8192..65536 MiB'
     ((root_mib >= 8192 && root_mib <= 65536)) || die 'Root size must be 8192..65536 MiB'
     [[ -n $output && $output != *:* && $output != *,* && $output != *$'\n'* ]] || die 'Output path must be nonempty and contain no colon, comma or newline'
