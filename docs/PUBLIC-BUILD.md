@@ -43,9 +43,18 @@ Each invocation creates a new private run directory and preserves older output.
 
 `--jobs` accepts 1 through the number of online CPUs and defaults to all of them. `--linux-size` accepts 8192 through 65536 MiB and
 defaults to 16384. The sparse codec has a 64 GiB raw-image bound. Allow at least
-64 GiB for kernel/tool work plus three times the selected root size. x86_64
-hosts compile the native AArch64 kernel under QEMU user emulation, which can
-be slow. No generic ARM64 kernel is substituted.
+64 GiB for kernel/tool work plus three times the selected root size. No
+generic ARM64 kernel is substituted.
+
+x86_64 hosts run every step that executes no AArch64 code in a native worker:
+the kernel is cross-compiled with LLVM, and the root is installed with native
+`dnf5 --forcearch=aarch64`. QEMU user emulation, through the host binfmt handler,
+runs only the initramfs base, the stable-channel hardware packages, RPM
+scriptlets and three `chroot` commands. A root stage fails if any scriptlet
+failed under emulation. Set `UKE_CROSS=0` to emulate every AArch64 step instead.
+
+`UKE_KERNEL_REPO=PATH` replaces the pinned kernel source with that checkout at its committed `HEAD`;
+the checkout must have no uncommitted changes. Unset, the pinned source is used.
 
 ## Selections
 

@@ -124,6 +124,15 @@ public_main() {
     say "Output parent: $output (a new run directory is created; existing output is preserved)"
     say 'The pinned source kernel is common to all channels; channel names select the Uke RPM repository.'
     say 'REQUIRED after first Fedora boot: sudo dnf update --refresh'
+    KERNEL_COMMIT='' STAGE_MOUNTS=()
+    local kernel_repo=${UKE_KERNEL_REPO:-none}
+    if [[ $kernel_repo != none && -d $kernel_repo/.git ]] && command -v git >/dev/null 2>&1; then
+        kernel_repo=$(cd -- "$kernel_repo" && pwd)
+        [[ -z $(git -C "$kernel_repo" status --porcelain --untracked-files=no) ]] || die "Commit or discard changes in $kernel_repo first"
+        KERNEL_COMMIT=$(git -C "$kernel_repo" rev-parse HEAD)
+        STAGE_MOUNTS=(-v "$kernel_repo:/kernel-repo:ro")
+        say "Kernel source: local checkout $kernel_repo at ${KERNEL_COMMIT:0:12} (UKE_KERNEL_REPO overrides the pinned source)"
+    fi
     ((DRY_RUN == 0)) || return 0
     bootstrap
     architecture=$(uname -m)
@@ -146,8 +155,9 @@ public_main() {
     cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/tests" "$WORK/recipe/"
     jq -n --arg target "$target" --arg mode "$mode" --arg fs "$filesystem" --arg desktop "$desktop" \
         --arg channel "$channel" --arg partition "$partition" --argjson size "$root_mib" \
-        --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" \
-        '{target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder}' > "$WORK/request.json"
+        --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" --arg kernel "$KERNEL_COMMIT" \
+        '{target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder}
+         + (if $kernel == "" then {} else {kernel_commit_override:$kernel} end)' > "$WORK/request.json"
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha
     native_base=$(jq -er --arg arch "$architecture" '.fedora_rawhide_images[$arch]' "$WORK/recipe/configs/build-rules.json")
@@ -165,19 +175,36 @@ public_main() {
         prepare_aarch64
     fi
     public_worker "$arm_image" linux/arm64 "$arm_base" Containerfile.public
-    say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
-    public_stage "$arm_image" linux/arm64 kernel
+    # x86_64 hosts run every step that executes no AArch64 code in a native worker; the
+    # host's binfmt handler still runs RPM scriptlets and chroot commands. UKE_CROSS=0 emulates all steps.
+    local cross=0 cross_image=localhost/uke-public-cross:${recipe_sha:0:16} root_image=$arm_image root_platform=linux/arm64
+    if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 ]]; then
+        cross=1 root_image=$cross_image root_platform=$host_platform
+        public_worker "$cross_image" "$host_platform" "$native_base" Containerfile.public
+    fi
+    if ((cross)); then
+        say "Cross-compiling the AArch64 kernel natively on $JOBS CPUs; only AArch64 userspace steps are emulated"
+        public_stage "$cross_image" "$host_platform" kernel-source
+        public_stage "$arm_image" linux/arm64 kernel-base
+        public_stage "$cross_image" "$host_platform" kernel-build
+    else
+        say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
+        public_stage "$arm_image" linux/arm64 kernel
+    fi
     if [[ $target == image ]]; then
         if [[ $channel == stable ]]; then
             say 'Building the pinned platform source families missing from the stable repository'
             public_stage "$arm_image" linux/arm64 hardware
         fi
-        public_stage "$arm_image" linux/arm64 root
+        ((cross == 0)) || say 'Installing the AArch64 root with native dnf; only package scriptlets are emulated'
+        public_stage "$root_image" "$root_platform" root
         public_stage "$native_image" "$host_platform" filesystem
     fi
     jq --arg native "$("$ENGINE" image inspect --format '{{.Id}}' "$native_image")" \
         --arg arm "$("$ENGINE" image inspect --format '{{.Id}}' "$arm_image")" \
-        '. + {native_worker:$native,aarch64_worker:$arm}' "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
+        --arg cross "$( ((cross == 0)) || "$ENGINE" image inspect --format '{{.Id}}' "$cross_image")" \
+        '. + {native_worker:$native,aarch64_worker:$arm} + (if $cross == "" then {} else {cross_worker:$cross} end)' \
+        "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
     mv "$WORK/manifest.tmp" "$WORK/artifacts/manifest.json"
     if [[ $target == image ]]; then public_flash_help "$partition" > "$WORK/artifacts/FLASHING.txt";
     else
@@ -225,7 +252,7 @@ public_stage() {
     fi
     wait_idle
     CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable \
-        --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache:/cache" \
+        --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache:/cache" ${STAGE_MOUNTS[@]+"${STAGE_MOUNTS[@]}"} \
         -e "UKE_OFFLINE=$OFFLINE" -e "UKE_OUTPUT_OWNER=$owner" "$image" bash /builder/src/public/stage.sh "$stage")
     "$ENGINE" start -a "$CID" 2>&1 | tee "$WORK/$stage.log"
     result=$("$ENGINE" inspect --format '{{.State.ExitCode}}' "$CID")

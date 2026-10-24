@@ -5,7 +5,7 @@ RUN dnf -y update --refresh && dnf -y --setopt=install_weak_deps=False install \
     rpm-build dnf5-plugins make git-core curl jq gnupg2 tar xz cpio zstd \
     gcc-c++ binutils coreutils findutils util-linux attr acl policycoreutils ripgrep \
     bc bison flex clang llvm lld make gcc perl compiler-rt elfutils-libelf-devel \
-    openssl-devel ncurses-devel alsa-topology-utils rsync kmod dtc python3 \
+    openssl-devel systemd-devel libasan libubsan ncurses-devel alsa-topology-utils rsync kmod dtc python3 \
     dracut systemd systemd-udev grep sed gzip f2fs-tools createrepo_c \
     && dnf clean all
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC
