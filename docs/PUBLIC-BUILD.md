@@ -79,6 +79,10 @@ retained. These builds use native host package tools and an AArch64 installroot;
 on x86_64, scriptlets use an isolated container-local binfmt table and the original
 Fedora QEMU interpreter. No host binfmt registration is changed.
 
+24 October 2026: the testing-image manifest reads kernel_source_commit from the
+signed RPM payload's source identity and rejects a missing or malformed value.
+The explicit source-build pin is not substituted for that repository identity.
+
 Kernel-only builds and the other image channels build the explicit source selected in
 [`configs/public-build.json`](../configs/public-build.json). An unstable selection
 does not silently replace it with an unported kernel.org release candidate.

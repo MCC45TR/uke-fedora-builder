@@ -41,6 +41,8 @@ for archive in "${archives[@]}"; do
     (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /job/payload.cpio)
 done
 release=${release%.fc46}
+source_commit=$(cat "/job/kernel-payload/usr/share/senemos/uke/$release/source-commit")
+[[ $source_commit =~ ^[0-9a-f]{40}$ ]]
 bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release
 modules=/job/kernel-payload/usr/lib/modules/$release
 [[ -f $bundle/linux.img && -f $bundle/userdata.img && -f $modules/vmlinuz ]]
@@ -54,8 +56,8 @@ for profile in linux userdata; do
 done
 rpm -qp --qf '%{NEVRA}\t%{SOURCERPM}\n' "${archives[@]}" | LC_ALL=C sort > /job/artifacts/kernel/packages.tsv
 (cd /job/artifacts/kernel; sha256sum -- *.rpm) > /job/artifacts/kernel/RPM-SHA256SUMS
-jq --arg release "$release" --arg fingerprint "$expected" \
-    '. + {kernel_release:$release,kernel_rpms_locally_built:false,kernel_repository:"mcc45tr/uke-linux-test",
+jq --arg release "$release" --arg source "$source_commit" --arg fingerprint "$expected" \
+    '. + {kernel_source_commit:$source,kernel_release:$release,kernel_rpms_locally_built:false,kernel_repository:"mcc45tr/uke-linux-test",
       kernel_rpm_signature:"verified COPR signature",kernel_key_fingerprint:$fingerprint,
       physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' \
     /job/request.json > /job/artifacts/manifest.json
