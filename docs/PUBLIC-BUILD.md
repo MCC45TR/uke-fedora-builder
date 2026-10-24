@@ -1,15 +1,17 @@
 # Public source and image builds
 
-23 October 2026. This host workflow starts from public source and an empty Fedora
+24 October 2026. This host workflow starts from public source and an empty Fedora
 Rawhide AArch64 root. It does not consume a prepared private root, historical
 Core cache, a stock boot dump or a pre-existing local container ID.
 
-The native x86_64 worker and a resumed testing/singleboot/EXT4/KDE composition
-passed host checks on 23 October 2026. The image uses the signed testing
-`7.2.12-22` kernel family. Host-tooling corrections required stage resumption;
-an independent clean execution of the final recipe remains untested. No image
-selection has new physical acceptance. Mutable Rawhide/COPR repositories also
-prevent a promise of identical bytes on future builds.
+A clean testing/singleboot/EXT4/KDE execution of recipe `7c772db` completed on
+24 October 2026 with the signed testing `7.2.12-25` kernel family. A native
+x86_64 worker passed root, SELinux, independent readback and both sparse-decoder
+checks. All final artifact, worker-archive and recipe checksums were independently
+verified. The policy records the tested recipe commit and checksum separately
+from later validation-metadata edits. No image selection has new physical
+acceptance. Mutable Rawhide/COPR repositories still prevent a promise of
+identical bytes on future builds.
 
 ## Start
 
@@ -268,3 +270,12 @@ kernel compilation, desktop setup, filesystem growth and recoverable tablet
 boot remain untested by this run. Historical `core`, `boot` and `boot-pair`
 commands remain available for their dated frozen contracts; their old caches
 are not prerequisites here.
+
+On 24 October, an uninterrupted clean execution from an initially empty private
+output passed for the same testing/singleboot/EXT4/KDE selection, using two
+workers and signed kernel 7.2.12-25. It completed without manual stage resumption.
+The final 16 GiB raw image matched both decoders byte for byte, and all 994
+artifact checksums plus the retained worker and recipe checksums passed a
+separate read-only verification. Other profiles, local source-kernel compilation,
+physical desktop setup, filesystem growth and recoverable tablet boot remain
+separate acceptance gates. This does not establish identical release reproduction.

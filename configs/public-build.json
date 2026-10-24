@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "date": "2026-10-23",
+  "date": "2026-10-24",
   "distribution": "fedora",
   "release": "rawhide",
   "architecture": "aarch64",
@@ -36,8 +36,11 @@
     "image_build_tested": true,
     "hardware_tested": false,
     "tested_image_profile": "testing/singleboot/ext4/kde",
-    "stages_resumed": true,
-    "independent_clean_rebuild_tested": false,
+    "stages_resumed": false,
+    "independent_clean_rebuild_tested": true,
+    "tested_recipe_commit": "7c772dbb9ea36ac509d0dd1ce29ea484240fe9b7",
+    "tested_recipe_checksums_sha256": "34888d19f61886891b840c5de142623f50067f5643ec39aa2de9b12846b0f425",
+    "tested_kernel_release": "7.2.12-25",
     "kernel_source_build_tested": false
   },
   "hardware": {

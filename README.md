@@ -10,16 +10,17 @@ Fedora desktop selection, user-created accounts and the enabled development
 COPR. Offline checks are separate from first-run GUI and tablet acceptance;
 the currently published Alpha image is not replaced by this source change.
 
-## Public build entry — 23 October 2026
+## Public build entry — 24 October 2026
 
 Run `./ukelinux.sh` from the [workspace](https://github.com/MCC45TR/uke-linux)
 for image or kernel builds. The [public build guide](docs/PUBLIC-BUILD.md) covers
 Ubuntu/Fedora/openSUSE/Arch/Alpine hosts, both boot layouts, four filesystems,
 KDE/GNOME, three package channels, prerequisite consent and output selection.
-CLI fixtures and a resumed testing/singleboot/EXT4/KDE composition passed host
-content, metadata, SELinux and two sparse-decoder comparisons on 23 October 2026.
-It used signed testing kernel RPMs; a clean repeat build and physical acceptance
-remain untested.
+On 24 October 2026, a clean testing/singleboot/EXT4/KDE execution passed host
+content, metadata, SELinux and both sparse-decoder comparisons with signed
+kernel 7.2.12-25. Every final artifact, retained worker and recipe checksum
+also passed independent verification. Physical first setup, tablet boot and
+the separate source-kernel build remain untested.
 Historical recipes below keep their dated scope.
 Image builds require `--touch-reference FILE` for touchscreen account
 setup and produce private, device-specific output. Generic USB input setup is
