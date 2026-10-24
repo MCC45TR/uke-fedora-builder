@@ -1,6 +1,9 @@
 #!/usr/bin/env bash
 # Public host orchestration; no connected device is opened.
 # shellcheck disable=SC2034,SC2154
+# shellcheck source=kernel-source.sh
+# shellcheck disable=SC1091
+source "$BUILDER/src/public/kernel-source.sh"
 public_help() {
     cat <<'HELP'
 Uke Fedora AArch64 source and image builder
@@ -9,6 +12,8 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --filesystem ext4|f2fs|btrfs|xfs   Single-device root filesystem
   --desktop kde|gnome               Original Fedora desktop
   --channel stable|testing|unstable Uke RPM channel (Fedora remains Rawhide)
+  --kernel VERSION|latest|lastest   Linux version to build; latest is kernel.org's newest stable
+                                    release and needs a reviewed Uke profile (default: policy version)
   --out DIRECTORY                   Default: ./out in the invoking directory
   --linux-size MIB                  Root image size; default 16384, minimum 8192
   --jobs N                          Compiler workers; default all online CPUs
@@ -63,33 +68,9 @@ TEXT
         '     Automatic kernel activation stays disabled. Updates do not authorize a slot write.' \
         '     F2FS userdata grows offline during first boot; other formats retain the image size.'
 }
-# A finished kernel is cached by source commit and release so later image builds can skip the compile.
-kernel_cache_dir() {
-    local commit=${KERNEL_COMMIT:-$(jq -er .kernel.commit "$WORK/recipe/configs/public-build.json")}
-    printf '%s/cache/kernel-builds/%s-%s\n' "$output" "$commit" "$(jq -er .kernel.release "$WORK/recipe/configs/public-build.json")"
-}
-kernel_cache_restore() {
-    local dir; dir=$(kernel_cache_dir)
-    [[ -f $dir/SHA256SUMS && -f $dir/kernel/kernel-info.json && -f $dir/boot-linux.img && -f $dir/boot-userdata.img ]] ||
-        die "No cached kernel for this source ($dir); build it first with --build kernel"
-    (cd "$dir" && sha256sum -c --quiet SHA256SUMS) || die "Cached kernel failed checksum verification: $dir"
-    cp -a "$dir/kernel" "$dir"/boot-*.img "$WORK/artifacts/"
-    jq --slurpfile info "$dir/kernel/kernel-info.json" '. + $info[0]' "$WORK/request.json" > "$WORK/artifacts/manifest.json"
-    say "Reused cached kernel: $dir"
-}
-kernel_cache_save() {
-    local dir tmp; dir=$(kernel_cache_dir)
-    [[ ! -e $dir ]] || return 0
-    mkdir -p "${dir%/*}"
-    tmp=$(mktemp -d "${dir%/*}/.tmp-XXXXXXXX")
-    cp -a "$WORK/artifacts/kernel" "$WORK"/artifacts/boot-*.img "$tmp/"
-    (cd "$tmp" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 -P "$JOBS" -n 4 sha256sum | LC_ALL=C sort -k2 > SHA256SUMS)
-    mv "$tmp" "$dir"
-    say "Cached kernel for later image builds: $dir"
-}
 public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing
-    local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior=''
+    local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior='' kernel_request=''
     local -A selected=()
     JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1) OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 REUSE_KERNEL=0 ENGINE='' CID='' PAUSED=0
     # Preserve explicit historical commands without making them the default path.
@@ -106,8 +87,8 @@ public_main() {
             --help|-h) public_help; return;;
             --self-test) bash "$BUILDER/tests/public-build-contract.sh"; return;;
             --yes) UKE_ASSUME_YES=1;; --reuse-kernel) REUSE_KERNEL=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;;
-            --build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
-            --build|--mode|--filesystem|--desktop|--channel|--out|--jobs|--linux-size|--touch-reference)
+            --build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--kernel=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
+            --build|--mode|--filesystem|--desktop|--channel|--kernel|--out|--jobs|--linux-size|--touch-reference)
                 key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
             *) die "Unknown option: $1";;
         esac
@@ -116,6 +97,7 @@ public_main() {
             --build) target=$value; selected[target]=1;; --mode) mode=$value; selected[mode]=1;;
             --filesystem) filesystem=$value; selected[filesystem]=1;;
             --desktop) desktop=$value; selected[desktop]=1;; --channel) channel=$value; selected[channel]=1;; --out) output=$value; out_given=1;;
+            --kernel) kernel_request=$value;;
             --jobs) JOBS=$value;; --linux-size) root_mib=$value;; --touch-reference) reference=$value;;
         esac
         shift
@@ -133,6 +115,8 @@ public_main() {
     case $filesystem in ext4|f2fs|btrfs|xfs) :;; *) die 'Unsupported root filesystem';; esac
     case $desktop in kde|gnome) :;; *) die 'Desktop must be kde or gnome';; esac
     case $channel in stable|testing|unstable) :;; *) die 'Unknown package channel';; esac
+    [[ -z $kernel_request || $kernel_request =~ ^(latest|lastest|[0-9]+\.[0-9]+(\.[0-9]+)?)$ ]] ||
+        die 'Kernel must be an explicit version such as 7.2.12, latest or lastest'
     [[ $REUSE_KERNEL == 0 || $target == image ]] || die '--reuse-kernel applies to image builds only'
     [[ $JOBS =~ ^[1-9][0-9]{0,3}$ ]] || die 'Jobs must be a positive integer'
     local processors; processors=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)
@@ -148,17 +132,13 @@ public_main() {
     [[ $mode != singleboot ]] || partition=userdata
     say "$target: Fedora Rawhide AArch64; $mode; $filesystem; $desktop; $channel; $JOBS workers"
     say "Output parent: $output (a new run directory is created; existing output is preserved)"
-    say 'The pinned source kernel is common to all channels; channel names select the Uke RPM repository.'
+    say 'One kernel source and version is common to all channels; channel names select the Uke RPM repository.'
     say 'REQUIRED after first Fedora boot: sudo dnf update --refresh'
-    KERNEL_COMMIT='' STAGE_MOUNTS=()
-    local kernel_repo=${UKE_KERNEL_REPO:-none}
-    if [[ $kernel_repo != none && -d $kernel_repo/.git ]] && command -v git >/dev/null 2>&1; then
-        kernel_repo=$(cd -- "$kernel_repo" && pwd)
-        [[ -z $(git -C "$kernel_repo" status --porcelain --untracked-files=no) ]] || die "Commit or discard changes in $kernel_repo first"
-        KERNEL_COMMIT=$(git -C "$kernel_repo" rev-parse HEAD)
-        STAGE_MOUNTS=(-v "$kernel_repo:/kernel-repo:ro")
-        say "Kernel source: local checkout $kernel_repo at ${KERNEL_COMMIT:0:12} (UKE_KERNEL_REPO overrides the pinned source)"
-    fi
+    # An explicit local checkout must be valid; it is never silently ignored.
+    local kernel_repo=''
+    if [[ -n ${UKE_KERNEL_REPO:-} && $UKE_KERNEL_REPO != none ]]; then kernel_repo=$(kernel_repo_validate "$UKE_KERNEL_REPO") || exit 1; fi
+    if [[ -n $kernel_repo ]]; then say "Kernel: ${kernel_request:-the policy default version}; source: local checkout $kernel_repo"
+    else say "Kernel: ${kernel_request:-the policy default version}; source: the policy repository, resolved once when the build starts"; fi
     ((REUSE_KERNEL == 0)) || say 'Kernel: reusing the cached build of this source; a missing cache stops the build'
     ((DRY_RUN == 0)) || return 0
     bootstrap
@@ -180,11 +160,26 @@ public_main() {
     mkdir -p "$WORK/artifacts" "$WORK/recipe" "$WORK/inputs" "$output/cache"
     # Freeze the source recipe before any container operation.
     cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/tests" "$WORK/recipe/"
+    # Resolve the kernel version and source revision once; every stage and the cache use these exact values.
+    local policy_file=$WORK/recipe/configs/public-build.json kernel_url bundle=''
+    [[ -n $kernel_request ]] || kernel_request=$(jq -er .kernel.default_version "$policy_file")
+    KERNEL_VERSION=$(kernel_version_resolve "$kernel_request" "$WORK/inputs/releases.json" "$output/cache/releases/releases.json" "$OFFLINE") || exit 1
+    kernel_url=$(jq -er .kernel.url "$policy_file")
+    if [[ -n $kernel_repo ]]; then
+        KERNEL_COMMIT=$(git -C "$kernel_repo" rev-parse HEAD)
+        kernel_repo_bundle "$kernel_repo" "$WORK/inputs/kernel.bundle"
+        bundle=inputs/kernel.bundle
+    else
+        KERNEL_COMMIT=$(kernel_commit_resolve "$kernel_url" "$(jq -er .kernel.ref "$policy_file")" "$OFFLINE" "$output/cache") || exit 1
+    fi
+    say "Kernel source ${KERNEL_COMMIT:0:12}, Linux $KERNEL_VERSION (requested: $kernel_request)"
     jq -n --arg target "$target" --arg mode "$mode" --arg fs "$filesystem" --arg desktop "$desktop" \
         --arg channel "$channel" --arg partition "$partition" --argjson size "$root_mib" \
-        --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" --arg kernel "$KERNEL_COMMIT" \
-        '{target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder}
-         + (if $kernel == "" then {} else {kernel_commit_override:$kernel} end)' > "$WORK/request.json"
+        --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" --arg commit "$KERNEL_COMMIT" \
+        --arg version "$KERNEL_VERSION" --arg requested "$kernel_request" --arg url "$kernel_url" --arg bundle "$bundle" \
+        '{target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder,
+          kernel_commit:$commit,kernel_version:$version,kernel_requested:$requested,kernel_url:$url}
+         + (if $bundle == "" then {} else {kernel_bundle:$bundle} end)' > "$WORK/request.json"
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha
     native_base=$(jq -er --arg arch "$architecture" '.fedora_rawhide_images[$arch]' "$WORK/recipe/configs/build-rules.json")
@@ -209,6 +204,17 @@ public_main() {
         cross=1 root_image=$cross_image root_platform=$host_platform
         public_worker "$cross_image" "$host_platform" "$native_base" Containerfile.public
     fi
+    # The cache identifies the producer: route, recipe and the worker images that compile the kernel and link its initramfs.
+    local producer_file=$WORK/producer.json arm_id
+    arm_id=$("$ENGINE" image inspect --format '{{.Id}}' "$arm_image")
+    if ((cross)); then
+        kernel_producer_json cross "$recipe_sha" "$("$ENGINE" image inspect --format '{{.Id}}' "$cross_image")" "$arm_id" > "$producer_file"
+    elif [[ $architecture == x86_64 ]]; then
+        kernel_producer_json emulated "$recipe_sha" "$arm_id" > "$producer_file"
+    else
+        kernel_producer_json native "$recipe_sha" "$arm_id" > "$producer_file"
+    fi
+    KERNEL_PRODUCER_SHA=$(kernel_producer_sha "$producer_file")
     if ((REUSE_KERNEL)); then
         kernel_cache_restore
     else
@@ -221,8 +227,13 @@ public_main() {
             say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
             public_stage "$arm_image" linux/arm64 kernel
         fi
+        install -m644 "$producer_file" "$WORK/artifacts/kernel/producer.json"
         kernel_cache_save
     fi
+    # A reused kernel keeps the producer that built it, not the workers of this run.
+    jq --slurpfile producer "$WORK/artifacts/kernel/producer.json" '. + {kernel_producer:$producer[0]}' \
+        "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
+    mv "$WORK/manifest.tmp" "$WORK/artifacts/manifest.json"
     if [[ $target == image ]]; then
         if [[ $channel == stable ]]; then
             say 'Building the pinned platform source families missing from the stable repository'
@@ -287,7 +298,7 @@ public_stage() {
     if [[ $stage == filesystem && $platform == "$host_platform" && -r /dev/kvm && -w /dev/kvm ]]; then devices=(--device /dev/kvm); fi
     wait_idle
     CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable ${devices[@]+"${devices[@]}"} \
-        --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache:/cache" ${STAGE_MOUNTS[@]+"${STAGE_MOUNTS[@]}"} \
+        --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache:/cache" \
         -e "UKE_OFFLINE=$OFFLINE" -e "UKE_OUTPUT_OWNER=$owner" "$image" bash /builder/src/public/stage.sh "$stage")
     "$ENGINE" start -a "$CID" 2>&1 | tee "$WORK/$stage.log"
     result=$("$ENGINE" inspect --format '{{.State.ExitCode}}' "$CID")

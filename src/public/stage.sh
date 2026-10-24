@@ -14,9 +14,15 @@ channel=$(jq -er .channel "$request")
 filesystem=$(jq -er .filesystem "$request")
 partition=$(jq -er .partition "$request")
 jobs=$(jq -er .jobs "$request")
-source_commit=$(jq -r '.kernel_commit_override // empty' "$request")
-source_commit=${source_commit:-$(jq -er .kernel.commit "$policy")}
-[[ $source_commit =~ ^[0-9a-f]{40}$ ]]
+die() { printf 'stage: ERROR: %s\n' "$*" >&2; exit 1; }
+say() { printf 'stage: %s\n' "$*"; }
+# shellcheck source=kernel-source.sh
+# shellcheck disable=SC1091
+source /builder/src/public/kernel-source.sh
+# The host resolved the exact source commit and Linux version once; the release is derived from the source below.
+source_commit=$(jq -er .kernel_commit "$request")
+kernel_version=$(jq -er .kernel_version "$request")
+[[ $source_commit =~ ^[0-9a-f]{40}$ && $kernel_version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
 cache_flags=()
 [[ ${UKE_OFFLINE:-0} != 1 ]] || cache_flags+=(--cacheonly)
 rpm -qa --qf '%{NEVRA}\n' | LC_ALL=C sort > "/job/artifacts/worker-$stage-rpms.txt"
@@ -32,20 +38,20 @@ priority=1
 REPO
 }
 kernel_checkout() {
-    local url
-    url=$(jq -er .kernel.url "$policy")
-    # A sibling checkout supplied by the host replaces the pinned remote; the commit stays explicit.
-    if [[ -n $(jq -r '.kernel_commit_override // empty' "$request") ]]; then
-        [[ -d /kernel-repo ]]
-        url=/kernel-repo
-    fi
+    local url snapshot
+    url=$(jq -er .kernel_url "$request")
+    # A local checkout reaches the worker as a snapshot bundle made by the host, never as a live mount.
+    snapshot=$(jq -r '.kernel_bundle // empty' "$request")
+    if [[ -n $snapshot ]]; then url=/job/$snapshot; fi
     source=/cache/kernel-$source_commit
     if [[ ! -d $source/.git ]]; then
-        [[ ${UKE_OFFLINE:-0} != 1 || $url == /kernel-repo ]]
+        [[ ${UKE_OFFLINE:-0} != 1 || -n $snapshot ]]
         git -c safe.directory='*' clone --no-checkout --no-hardlinks "$url" "$source"
     fi
     git -C "$source" checkout --detach "$source_commit"
     [[ $(git -C "$source" rev-parse HEAD) == "$source_commit" && -z $(git -C "$source" status --porcelain --untracked-files=no) ]]
+    # The source's own entry must have a reviewed Uke profile for this exact version, or the build stops here.
+    kernel_source_check "$source" "$kernel_version"
     # Downloaded source inputs are shared between source commits so a new commit never fetches them again.
     for shared in releases touch-runtime; do
         mkdir -p "/cache/$shared" "$source/referances"
@@ -55,18 +61,26 @@ kernel_checkout() {
         rm -rf "$source/referances/$shared"
         ln -sfn "/cache/$shared" "$source/referances/$shared"
     done
+    # Keep the kernel.org release list this build resolved from, for later offline runs.
+    if [[ -f /job/inputs/releases.json ]]; then cp -f /job/inputs/releases.json /cache/releases/releases.json; fi
 }
 kernel_srpm() {
     # The signed upstream source and every adaptation hash are checked by make srpm.
-    make -C "$source" srpm outdir=/job/srpm
+    make -C "$source" srpm outdir=/job/srpm version="$kernel_version"
     mkdir -p /job/rpmbuild
     srpms=(/job/srpm/*.src.rpm)
     [[ ${#srpms[@]} == 1 && -f ${srpms[0]} ]]
+    [[ $(rpm -qp --qf '%{VERSION}' "${srpms[0]}") == "$kernel_version" ]] || die "The source RPM is not Linux $kernel_version"
 }
 kernel_spec() {
     rpm --define '_topdir /job/rpmbuild' -i "${srpms[0]}"
     spec=(/job/rpmbuild/SPECS/*.spec)
     [[ ${#spec[@]} == 1 ]]
+    # The release comes from the selected source, so the initramfs, RPMs and module paths share one name.
+    release=$(rpmspec -q --srpm --qf '%{VERSION}-%{RELEASE}\n' --define '_topdir /job/rpmbuild' --define 'dist %{nil}' "${spec[0]}")
+    [[ $release =~ ^${kernel_version//./\\.}-[0-9A-Za-z._+]+$ ]] || die "Unexpected kernel release from the source spec: $release"
+    printf '%s\n' "$release" > /job/kernel-release
+    say "Kernel release $release (Linux $kernel_version from ${source_commit:0:12})"
     # Older pinned specs clamp compiler jobs to 8; lift only that clamp so every requested CPU is used.
     sed -i '/^test "\$jobs" -le 8 || jobs=8$/d' "${spec[0]}"
 }
@@ -84,7 +98,9 @@ kernel_collect() {
         rpm2cpio "$package" > /job/payload.cpio
         (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
     done
-    release=$(jq -er .kernel.release "$policy")
+    release=$(< /job/kernel-release)
+    [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}' /job/artifacts/kernel/senemos-uke-linux-kernel-mainline-core-*.aarch64.rpm) == "$release.fc46" ]] ||
+        die "Built kernel RPMs do not match release $release"
     bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release
     modules=/job/kernel-payload/usr/lib/modules/$release
     [[ -f $bundle/linux.img && -f $bundle/userdata.img && -f $modules/vmlinuz ]]
@@ -97,8 +113,9 @@ kernel_collect() {
         cp "$bundle/$profile.img" "/job/artifacts/boot-$profile.img"
     done
     # The native RPM producer audits its linked initramfs with no Python exception.
-    jq -n --arg source "$source_commit" --arg release "$release" \
-        '{kernel_source_commit:$source,kernel_release:$release,kernel_rpms_locally_built:true,
+    jq -n --arg source "$source_commit" --arg release "$release" --arg version "$kernel_version" \
+        --arg requested "$(jq -er .kernel_requested "$request")" \
+        '{kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,kernel_rpms_locally_built:true,
           local_kernel_rpm_signature:"unsigned local build; signed upstream source verified by producer",
           physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' \
         > /job/artifacts/kernel/kernel-info.json
@@ -123,7 +140,7 @@ if [[ $stage == kernel-source ]]; then
 fi
 if [[ $stage == kernel-base ]]; then
     [[ $(uname -m) == aarch64 ]]
-    release=$(jq -er .kernel.release "$policy")
+    release=$(< /job/kernel-release)
     # Same relative layout as the RPM build tree, so path prefixes are identical.
     work=$(mktemp -d) && cd "$work"
     tar -xJf /job/rpmbuild/SOURCES/senemos-uke-boot-recipe.tar.xz
@@ -263,7 +280,7 @@ else
     packages+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
         gnome-control-center gnome-software gnome-console nautilus)
 fi
-release=$(jq -er .kernel.release "$policy")
+release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
 base=senemos-uke-linux-kernel-mainline
 local_rpms=()
 for component in '' -core -modules -dtbs -boot; do
