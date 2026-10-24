@@ -41,6 +41,8 @@ Each invocation creates a new private run directory and preserves older output.
   --desktop kde --channel unstable --dry-run
 ```
 
+Every kernel build is cached under `out/cache/kernel-builds/` by source commit and release. After `--build kernel`, an image build with `--reuse-kernel` restores it, verifies its checksums and skips the compile; it stops if no matching cache exists.
+
 `--jobs` accepts 1 through the number of online CPUs and defaults to all of them. `--linux-size` accepts 8192 through 65536 MiB and
 defaults to 16384. The sparse codec has a 64 GiB raw-image bound. Allow at least
 64 GiB for kernel/tool work plus three times the selected root size. No

@@ -15,6 +15,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --touch-reference FILE            Optional device-local 5432-byte reference
   --yes                             Consent to listed host preparation operations
   --offline                         Reuse prepared worker images and kernel inputs
+  --reuse-kernel                    Image only: reuse the kernel from an earlier build of the same source
   --dry-run                         Print selections; no installation or build
   --self-test                       Run shell contract fixtures; no image build
   --help, -h                        Show this help
@@ -62,11 +63,35 @@ TEXT
         '     Automatic kernel activation stays disabled. Updates do not authorize a slot write.' \
         '     F2FS userdata grows offline during first boot; other formats retain the image size.'
 }
+# A finished kernel is cached by source commit and release so later image builds can skip the compile.
+kernel_cache_dir() {
+    local commit=${KERNEL_COMMIT:-$(jq -er .kernel.commit "$WORK/recipe/configs/public-build.json")}
+    printf '%s/cache/kernel-builds/%s-%s\n' "$output" "$commit" "$(jq -er .kernel.release "$WORK/recipe/configs/public-build.json")"
+}
+kernel_cache_restore() {
+    local dir; dir=$(kernel_cache_dir)
+    [[ -f $dir/SHA256SUMS && -f $dir/kernel/kernel-info.json && -f $dir/boot-linux.img && -f $dir/boot-userdata.img ]] ||
+        die "No cached kernel for this source ($dir); build it first with --build kernel"
+    (cd "$dir" && sha256sum -c --quiet SHA256SUMS) || die "Cached kernel failed checksum verification: $dir"
+    cp -a "$dir/kernel" "$dir"/boot-*.img "$WORK/artifacts/"
+    jq --slurpfile info "$dir/kernel/kernel-info.json" '. + $info[0]' "$WORK/request.json" > "$WORK/artifacts/manifest.json"
+    say "Reused cached kernel: $dir"
+}
+kernel_cache_save() {
+    local dir tmp; dir=$(kernel_cache_dir)
+    [[ ! -e $dir ]] || return 0
+    mkdir -p "${dir%/*}"
+    tmp=$(mktemp -d "${dir%/*}/.tmp-XXXXXXXX")
+    cp -a "$WORK/artifacts/kernel" "$WORK"/artifacts/boot-*.img "$tmp/"
+    (cd "$tmp" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS)
+    mv "$tmp" "$dir"
+    say "Cached kernel for later image builds: $dir"
+}
 public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing
     local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior=''
     local -A selected=()
-    JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1) OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 ENGINE='' CID='' PAUSED=0
+    JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1) OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 REUSE_KERNEL=0 ENGINE='' CID='' PAUSED=0
     # Preserve explicit historical commands without making them the default path.
     for argument in "$@"; do
         if [[ $argument == --check-device || $argument == --build=core || $argument == --build=boot || $argument == --build=boot-pair ||
@@ -80,7 +105,7 @@ public_main() {
         case $1 in
             --help|-h) public_help; return;;
             --self-test) bash "$BUILDER/tests/public-build-contract.sh"; return;;
-            --yes) UKE_ASSUME_YES=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;;
+            --yes) UKE_ASSUME_YES=1;; --reuse-kernel) REUSE_KERNEL=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;;
             --build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
             --build|--mode|--filesystem|--desktop|--channel|--out|--jobs|--linux-size|--touch-reference)
                 key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
@@ -108,6 +133,7 @@ public_main() {
     case $filesystem in ext4|f2fs|btrfs|xfs) :;; *) die 'Unsupported root filesystem';; esac
     case $desktop in kde|gnome) :;; *) die 'Desktop must be kde or gnome';; esac
     case $channel in stable|testing|unstable) :;; *) die 'Unknown package channel';; esac
+    [[ $REUSE_KERNEL == 0 || $target == image ]] || die '--reuse-kernel applies to image builds only'
     [[ $JOBS =~ ^[1-9][0-9]{0,3}$ ]] || die 'Jobs must be a positive integer'
     local processors; processors=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1)
     ((JOBS <= processors)) || die "Jobs must not exceed the $processors online CPUs"
@@ -133,6 +159,7 @@ public_main() {
         STAGE_MOUNTS=(-v "$kernel_repo:/kernel-repo:ro")
         say "Kernel source: local checkout $kernel_repo at ${KERNEL_COMMIT:0:12} (UKE_KERNEL_REPO overrides the pinned source)"
     fi
+    ((REUSE_KERNEL == 0)) || say 'Kernel: reusing the cached build of this source; a missing cache stops the build'
     ((DRY_RUN == 0)) || return 0
     bootstrap
     architecture=$(uname -m)
@@ -182,14 +209,19 @@ public_main() {
         cross=1 root_image=$cross_image root_platform=$host_platform
         public_worker "$cross_image" "$host_platform" "$native_base" Containerfile.public
     fi
-    if ((cross)); then
-        say "Cross-compiling the AArch64 kernel natively on $JOBS CPUs; only AArch64 userspace steps are emulated"
-        public_stage "$cross_image" "$host_platform" kernel-source
-        public_stage "$arm_image" linux/arm64 kernel-base
-        public_stage "$cross_image" "$host_platform" kernel-build
+    if ((REUSE_KERNEL)); then
+        kernel_cache_restore
     else
-        say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
-        public_stage "$arm_image" linux/arm64 kernel
+        if ((cross)); then
+            say "Cross-compiling the AArch64 kernel natively on $JOBS CPUs; only AArch64 userspace steps are emulated"
+            public_stage "$cross_image" "$host_platform" kernel-source
+            public_stage "$arm_image" linux/arm64 kernel-base
+            public_stage "$cross_image" "$host_platform" kernel-build
+        else
+            say 'Compiling the native AArch64 kernel; x86_64 workers use explicit emulation'
+            public_stage "$arm_image" linux/arm64 kernel
+        fi
+        kernel_cache_save
     fi
     if [[ $target == image ]]; then
         if [[ $channel == stable ]]; then

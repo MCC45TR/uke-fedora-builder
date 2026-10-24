@@ -86,3 +86,24 @@ jq -e '.kernel.commit|test("^[a-f0-9]{40}$")' "$root/configs/public-build.json" 
 bash -n "$root"/src/public/*.sh
 bash "$root/tests/public-source-inputs.sh"
 printf '%s\n' '48 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
+# Kernel cache: a saved kernel restores byte-for-byte, a missing one stops the build and the flag is image-only.
+cache_fixture=$(mktemp -d)
+(
+    WORK=$cache_fixture/work output=$cache_fixture/out KERNEL_COMMIT=$(printf 'a%.0s' {1..40})
+    mkdir -p "$WORK/recipe/configs" "$WORK/artifacts/kernel"
+    cp "$root/configs/public-build.json" "$WORK/recipe/configs/"
+    printf '{"channel":"testing"}\n' > "$WORK/request.json"
+    printf '{"kernel_release":"x"}\n' > "$WORK/artifacts/kernel/kernel-info.json"
+    : > "$WORK/artifacts/kernel/packages.tsv"; printf img > "$WORK/artifacts/boot-linux.img"; printf img > "$WORK/artifacts/boot-userdata.img"
+    say() { :; }
+    (kernel_cache_restore) > /dev/null 2>&1 && { echo 'Restore without a cache succeeded' >&2; exit 1; }
+    kernel_cache_save
+    rm -rf "$WORK/artifacts"; mkdir "$WORK/artifacts"
+    kernel_cache_restore
+    [[ -f $WORK/artifacts/boot-linux.img && $(jq -r '.kernel_release + .channel' "$WORK/artifacts/manifest.json") == xtesting ]]
+    printf bad > "$output/cache/kernel-builds"/*/boot-linux.img
+    (kernel_cache_restore) > /dev/null 2>&1 && { echo 'Corrupt cache accepted' >&2; exit 1; }
+    exit 0
+)
+rm -rf -- "$cache_fixture"
+reject --build kernel --reuse-kernel --dry-run
