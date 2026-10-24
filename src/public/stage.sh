@@ -280,7 +280,7 @@ dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-con
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
     --setopt=install_weak_deps=False --setopt=gpgcheck=True --setopt=installonly_limit=0
     # Uke packages require files such as /usr/lib/systemd/systemd-growfs, which only the filelists metadata resolves.
-    --setopt=optional_metadata_types=filelists
+    --setopt=optional_metadata_types=filelists --setopt=max_parallel_downloads=10
     --setopt=tsflags=nodocs --setopt=excludepkgs='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-kvm*,senemos-uke-linux-kernel-mainline-unstable*')
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository

@@ -83,7 +83,7 @@ kernel_cache_save() {
     mkdir -p "${dir%/*}"
     tmp=$(mktemp -d "${dir%/*}/.tmp-XXXXXXXX")
     cp -a "$WORK/artifacts/kernel" "$WORK"/artifacts/boot-*.img "$tmp/"
-    (cd "$tmp" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > SHA256SUMS)
+    (cd "$tmp" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 -P "$JOBS" -n 4 sha256sum | LC_ALL=C sort -k2 > SHA256SUMS)
     mv "$tmp" "$dir"
     say "Cached kernel for later image builds: $dir"
 }
@@ -263,7 +263,7 @@ Kernel-only manual installation (none of these commands was executed):
   REQUIRED in Fedora after boot: sudo dnf update --refresh
 TEXT
     fi
-    (cd "$WORK/artifacts" || exit; find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > ../SHA256SUMS)
+    (cd "$WORK/artifacts" || exit; find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 -P "$JOBS" -n 4 sha256sum | LC_ALL=C sort -k2 > ../SHA256SUMS)
     mv "$WORK/SHA256SUMS" "$WORK/artifacts/SHA256SUMS"
     say "Completed host output: $WORK/artifacts"
     cat "$WORK/artifacts/FLASHING.txt"
@@ -282,8 +282,11 @@ public_stage() {
     if [[ $ENGINE == docker ]] && ! "$ENGINE" info --format '{{json .SecurityOptions}}' | jq -e 'any(.[]; contains("rootless"))' >/dev/null; then
         owner=$(id -u):$(id -g)
     fi
+    local devices=()
+    # Only the filesystem appliance benefits from hardware virtualization; it falls back to TCG without it.
+    if [[ $stage == filesystem && $platform == "$host_platform" && -r /dev/kvm && -w /dev/kvm ]]; then devices=(--device /dev/kvm); fi
     wait_idle
-    CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable \
+    CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable ${devices[@]+"${devices[@]}"} \
         --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache:/cache" ${STAGE_MOUNTS[@]+"${STAGE_MOUNTS[@]}"} \
         -e "UKE_OFFLINE=$OFFLINE" -e "UKE_OUTPUT_OWNER=$owner" "$image" bash /builder/src/public/stage.sh "$stage")
     "$ENGINE" start -a "$CID" 2>&1 | tee "$WORK/$stage.log"

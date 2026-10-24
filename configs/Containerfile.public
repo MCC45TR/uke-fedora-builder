@@ -1,4 +1,4 @@
-ARG BASE_IMAGE
+ARG BASE_IMAGE=scratch
 FROM ${BASE_IMAGE}
 # Native AArch64 worker; Kbuild Python stays here and never enters the tablet root.
 RUN dnf -y update --refresh && dnf -y --setopt=install_weak_deps=False install \

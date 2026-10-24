@@ -1,4 +1,4 @@
-ARG BASE_IMAGE
+ARG BASE_IMAGE=scratch
 FROM ${BASE_IMAGE}
 RUN dnf -y update --refresh && dnf -y --setopt=install_weak_deps=False install \
     libguestfs-tools-c kernel-core kernel-modules qemu-kvm-core f2fs-tools e2fsprogs xfsprogs btrfs-progs \
