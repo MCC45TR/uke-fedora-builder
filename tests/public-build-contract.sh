@@ -93,6 +93,7 @@ for choice in 7.2.12 7.3 latest lastest; do public_main --kernel "$choice" --dry
 for choice in 7.x latest\;rm v7.2.12 7.2.12.1 newest; do reject --kernel "$choice" --dry-run; done
 reject --kernel
 # Version resolution fetches kernel.org's list once for latest, never for an explicit version, and rejects bad lists.
+# shellcheck disable=SC2317,SC2329
 (
     snapshot=$fixture/releases.json cached=$fixture/cached-releases.json
     curl() { printf '{"latest_stable":{"version":"7.9.1"}}\n'; }
@@ -110,15 +111,21 @@ reject --kernel
     curl() { return 22; }
     quiet_fail kernel_version_resolve latest "$snapshot" "$cached" 0
 )
-# The source's own entry decides whether a reviewed profile exists; a missing, failing or disagreeing entry stops the build.
+# Admission uses the actual SRPM Makefile, including when the standalone host entry accepts another version.
 (
     source=$fixture/kernel-source; mkdir -p "$source"
     quiet_fail kernel_source_check "$source" 7.2.12
-    printf '%s\n' 'echo "senemos: Target fedora/rawhide AArch64; Linux $2; 4 jobs"' > "$source/senemos.sh"
+    printf '%s\n' 'exit 0' > "$source/senemos.sh"
+    quiet_fail kernel_source_check "$source" 7.2.9
+    cat > "$source/Makefile" <<'MAKE'
+validate:
+	@test "$(version)" = 7.2.12
+MAKE
     kernel_source_check "$source" 7.2.12
-    printf '%s\n' 'echo "senemos: ERROR: No reviewed Uke adaptation profile for Linux $2" >&2; exit 1' > "$source/senemos.sh"
+    quiet_fail kernel_source_check "$source" 7.2.9
     quiet_fail kernel_source_check "$source" 7.3
-    printf '%s\n' 'echo "senemos: Target fedora/rawhide AArch64; Linux 7.0.1; 4 jobs"' > "$source/senemos.sh"
+    sed -i 's/7.2.12/7.2.10/' "$source/Makefile"
+    kernel_source_check "$source" 7.2.10
     quiet_fail kernel_source_check "$source" 7.2.12
 )
 # Local checkout: Git decides. Worktrees pass; plain, bare, nested, empty and dirty paths stop; the worker gets a snapshot.
@@ -150,17 +157,26 @@ reject --kernel
 )
 # Kernel cache: restores byte-for-byte with its producer, is keyed by source, version and producer, and repairs damage.
 cache_fixture=$(mktemp -d)
+# shellcheck disable=SC2317,SC2329
 (
     WORK=$cache_fixture/work output=$cache_fixture/out JOBS=2
     KERNEL_COMMIT=$(printf 'a%.0s' {1..40}) KERNEL_VERSION=7.2.12
     mkdir -p "$WORK/recipe/configs" "$WORK/artifacts/kernel"
-    printf '{"channel":"testing"}\n' > "$WORK/request.json"
+    printf '{"channel":"testing","kernel_requested":"latest"}\n' > "$WORK/request.json"
     say() { :; }
-    producer_a=$(kernel_producer_json cross r1 worker-1 worker-2) producer_b=$(kernel_producer_json cross r1 worker-1 worker-3)
+    mkdir "$cache_fixture/recipe"
+    cp -a "$root/src" "$root/configs" "$cache_fixture/recipe/"
+    recipe_a=$(kernel_recipe_hash "$cache_fixture/recipe")
+    [[ $recipe_a == "$(kernel_recipe_hash "$root")" ]]
+    sed -i 's/clang++ -std=c++17 -O2/clang++ -std=c++17 -O0/' "$cache_fixture/recipe/src/public/stage.sh"
+    recipe_b=$(kernel_recipe_hash "$cache_fixture/recipe")
+    [[ $recipe_a != "$recipe_b" ]]
+    producer_a=$(kernel_producer_json cross "$recipe_a" worker-1 worker-2) producer_b=$(kernel_producer_json cross "$recipe_a" worker-1 worker-3)
+    producer_c=$(kernel_producer_json cross "$recipe_b" worker-1 worker-2)
     use_producer() { printf '%s\n' "$1" > "$cache_fixture/producer.json"; KERNEL_PRODUCER_SHA=$(kernel_producer_sha "$cache_fixture/producer.json"); }
     stage_artifacts() {
         rm -rf "$WORK/artifacts"; mkdir -p "$WORK/artifacts/kernel"
-        printf '{"kernel_source_commit":"%s","kernel_version":"%s","kernel_release":"7.2.12-20"}\n' "$KERNEL_COMMIT" "$KERNEL_VERSION" > "$WORK/artifacts/kernel/kernel-info.json"
+        printf '{"kernel_source_commit":"%s","kernel_version":"%s","kernel_release":"7.2.12-20","kernel_requested":"7.2.12"}\n' "$KERNEL_COMMIT" "$KERNEL_VERSION" > "$WORK/artifacts/kernel/kernel-info.json"
         cp "$cache_fixture/producer.json" "$WORK/artifacts/kernel/producer.json"
         : > "$WORK/artifacts/kernel/packages.tsv"; printf img > "$WORK/artifacts/boot-linux.img"; printf img > "$WORK/artifacts/boot-userdata.img"
     }
@@ -171,12 +187,17 @@ cache_fixture=$(mktemp -d)
     rm -rf "$WORK/artifacts"; mkdir "$WORK/artifacts"
     kernel_cache_restore
     [[ -f $WORK/artifacts/boot-linux.img && $(jq -r '.kernel_release + .channel' "$WORK/artifacts/manifest.json") == 7.2.12-20testing ]]
+    [[ $(jq -r .kernel_requested "$WORK/artifacts/manifest.json") == latest ]]
     [[ $(kernel_producer_sha "$WORK/artifacts/kernel/producer.json") == "$KERNEL_PRODUCER_SHA" ]]
     # Another producer or version never sees this entry.
     use_producer "$producer_b"; quiet_fail kernel_cache_restore
+    use_producer "$producer_c"; quiet_fail kernel_cache_restore
     use_producer "$producer_a"; (KERNEL_VERSION=7.2.11; quiet_fail kernel_cache_restore)
     # Metadata that names another producer or version is not admitted even when its checksums are valid.
-    sealed() { (cd "$entry" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | LC_ALL=C sort -k2 > SHA256SUMS); }
+    sealed() {
+        (cd "$entry" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | LC_ALL=C sort -k2) > "$cache_fixture/SHA256SUMS"
+        mv "$cache_fixture/SHA256SUMS" "$entry/SHA256SUMS"
+    }
     printf '%s\n' "$producer_b" > "$entry/kernel/producer.json"; sealed; quiet_fail kernel_cache_restore
     stage_artifacts; kernel_cache_save; kernel_cache_restore
     jq '.kernel_version = "7.2.11"' "$entry/kernel/kernel-info.json" > "$cache_fixture/info" && cp "$cache_fixture/info" "$entry/kernel/kernel-info.json"; sealed

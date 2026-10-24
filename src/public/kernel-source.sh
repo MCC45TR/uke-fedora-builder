@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Kernel source selection and cache admission, shared by the host entry, the build stages and their fixtures.
-# The caller provides die and say.
+# The caller provides die, say, output and JOBS.
 
 # Print the top level of an explicit local kernel checkout, or stop. Git decides what a checkout is, so a
 # linked worktree (whose .git is a file) is accepted and a plain or bare directory is not.
@@ -57,14 +57,21 @@ kernel_commit_resolve() {
     printf '%s\n' "$commit"
 }
 
-# Ask the kernel source's own entry whether it has a reviewed Uke profile for this exact version; it fails
-# rather than substituting a generic or older kernel.
+# Use the same source checks as the SRPM producer; host-entry profiles can admit other build routes.
 kernel_source_check() {
     local source=$1 version=$2 plan
-    [[ -f $source/senemos.sh ]] || die "This kernel source has no senemos.sh to validate Linux $version"
-    plan=$(cd -- "$source" && bash ./senemos.sh --build "$version" --distro=fedora --dry-run 2>&1) ||
-        die "This kernel source cannot build Linux $version: ${plan##*$'\n'}"
-    grep -F "Linux $version;" <<< "$plan" > /dev/null || die "Kernel source resolved a different version than Linux $version"
+    [[ -f $source/Makefile ]] || die "This kernel source has no SRPM Makefile to validate Linux $version"
+    if ! plan=$(make -s -C "$source" validate version="$version" 2>&1); then
+        printf '%s\n' "$plan" >&2
+        die "The kernel SRPM producer does not admit Linux $version; select a version supported by this source"
+    fi
+}
+
+# Record executable producer inputs separately so script edits do not rebuild unchanged worker images.
+kernel_recipe_hash() {
+    (cd -- "$1" && sha256sum configs/Containerfile.public configs/Containerfile.public-native \
+        configs/public-build.json configs/build-rules.json \
+        src/public/entry.sh src/public/stage.sh src/public/kernel-source.sh) | sha256sum | cut -d ' ' -f1
 }
 
 # The producer is what compiles the kernel and links its initramfs: the route, the recipe and the worker images.
@@ -79,6 +86,7 @@ kernel_producer_sha() {
 
 # Cache key: source commit, exact version and producer. The release is derived from the source and recorded in it.
 kernel_cache_dir() {
+    # shellcheck disable=SC2154
     printf '%s/cache/kernel-builds/%s-%s-%s\n' "$output" "$KERNEL_COMMIT" "$KERNEL_VERSION" "${KERNEL_PRODUCER_SHA:0:16}"
 }
 # Succeeds only for an entry that is complete, checksummed and was produced for this source and producer.
@@ -99,7 +107,7 @@ kernel_cache_restore() {
     [[ -d $dir ]] || die "No cached kernel for Linux $KERNEL_VERSION from ${KERNEL_COMMIT:0:12} built by this producer ($dir); build it first with --build kernel"
     kernel_cache_check "$dir" || die "Cached kernel not admitted ($KERNEL_CACHE_WHY): $dir; rebuild it without --reuse-kernel"
     cp -a "$dir/kernel" "$dir"/boot-*.img "$WORK/artifacts/"
-    jq --slurpfile info "$dir/kernel/kernel-info.json" '. + $info[0]' "$WORK/request.json" > "$WORK/artifacts/manifest.json"
+    jq --slurpfile info "$dir/kernel/kernel-info.json" '. + ($info[0] | del(.kernel_requested))' "$WORK/request.json" > "$WORK/artifacts/manifest.json"
     say "Reused cached kernel: $dir"
 }
 kernel_cache_save() {
@@ -111,7 +119,8 @@ kernel_cache_save() {
     mkdir -p "${dir%/*}"
     tmp=$(mktemp -d "${dir%/*}/.tmp-XXXXXXXX")
     cp -a "$WORK/artifacts/kernel" "$WORK"/artifacts/boot-*.img "$tmp/"
-    (cd "$tmp" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 -P "$JOBS" -n 4 sha256sum | LC_ALL=C sort -k2 > SHA256SUMS)
+    (cd "$tmp" && find . -type f -print0 | LC_ALL=C sort -z | xargs -0 -P "$JOBS" -n 4 sha256sum | LC_ALL=C sort -k2) > "$tmp.sha256"
+    mv -- "$tmp.sha256" "$tmp/SHA256SUMS"
     if [[ -e $dir ]]; then mv -- "$dir" "$tmp.old"; fi
     mv -- "$tmp" "$dir"
     rm -rf -- "$tmp.old"

@@ -41,7 +41,7 @@ Each invocation creates a new private run directory and preserves older output.
   --desktop kde --channel unstable --dry-run
 ```
 
-Every kernel build is cached under `out/cache/kernel-builds/` by source commit, exact Linux version and producer. The producer is the build route, the recipe digest and the IDs of the worker images that compile the kernel and link its initramfs, so a rebuilt worker never reuses an older kernel. After `--build kernel`, an image build with `--reuse-kernel` restores the entry, checks its checksums, source and producer, keeps the producer's metadata in `manifest.json` and skips the compile; it stops if no admissible entry exists. A damaged entry is replaced by the next kernel build.
+Every kernel build is cached under `out/cache/kernel-builds/` by source commit, exact Linux version and producer. The producer includes the build route, worker configuration, executable kernel build scripts and exact worker image IDs. A changed helper compilation rule or worker therefore selects a different cache entry. After `--build kernel`, an image build with `--reuse-kernel` checks the entry's checksums, source and producer before restoring it. The manifest retains the original producer and the current requested kernel selection. A damaged entry is replaced by the next kernel build.
 
 `--jobs` accepts 1 through the number of online CPUs and defaults to all of them. `--linux-size` accepts 8192 through 65536 MiB and
 defaults to 16384. The sparse codec has a 64 GiB raw-image bound. Allow at least
@@ -55,7 +55,12 @@ runs only the initramfs base, the stable-channel hardware packages, RPM
 scriptlets and three `chroot` commands. A root stage fails if any scriptlet
 failed under emulation. Set `UKE_CROSS=0` to emulate every AArch64 step instead.
 
-`--kernel VERSION|latest|lastest` selects the Linux version. The default is `kernel.default_version` in the policy. `latest` is kernel.org's newest stable release; it is resolved once per build, before any worker starts, and `lastest` is accepted as an alias. The source's own `senemos.sh` must have a reviewed Uke adaptation profile for the exact version, or the build stops: it never builds a generic kernel or an older version in its place. The kernel release (for example `7.2.12-20`) is read from the selected source's spec, so the initramfs, RPMs and module paths match. `manifest.json` records the requested selection, the resolved version, the source commit and the release.
+`--kernel VERSION|latest|lastest` selects the Linux version. The default is `kernel.default_version` in the policy. `latest` is kernel.org's newest stable release; it is resolved once per build, before any worker starts, and `lastest` is accepted as an alias. The selected source must pass its actual SRPM producer's `make validate version=VERSION` checks before source downloads. A profile accepted by another host build route does not admit this native RPM route. Unsupported versions stop explicitly without substituting a generic or older kernel. The kernel release (for example `7.2.12-20`) is read from the selected source's spec, so the initramfs, RPMs and module paths match. `manifest.json` records the requested selection, the resolved version, the source commit and the release.
+
+24 October 2026: the current native SRPM producer admits Linux 7.2.12. Kernel.org
+`latest` resolves to 7.3, which needs a reviewed native Uke profile and producer
+update before this route can build it. Older profiles in the standalone kernel
+entry do not establish support in this producer.
 
 The kernel source is the head of `kernel.ref` in the policy repository, resolved once when the build starts. `UKE_KERNEL_REPO=PATH` uses a local checkout at its committed `HEAD` instead (`none` keeps the policy repository). Git validates the path, so a linked worktree is accepted; an invalid path or a checkout with uncommitted changes stops the build. Workers receive a snapshot of that commit. Offline builds use the newest cached source and kernel.org list unless a checkout is given.
 

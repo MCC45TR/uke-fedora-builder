@@ -50,7 +50,7 @@ kernel_checkout() {
     fi
     git -C "$source" checkout --detach "$source_commit"
     [[ $(git -C "$source" rev-parse HEAD) == "$source_commit" && -z $(git -C "$source" status --porcelain --untracked-files=no) ]]
-    # The source's own entry must have a reviewed Uke profile for this exact version, or the build stops here.
+    # Validate this exact SRPM producer before downloading its source archives.
     kernel_source_check "$source" "$kernel_version"
     # Downloaded source inputs are shared between source commits so a new commit never fetches them again.
     for shared in releases touch-runtime; do
@@ -82,6 +82,7 @@ kernel_spec() {
     printf '%s\n' "$release" > /job/kernel-release
     say "Kernel release $release (Linux $kernel_version from ${source_commit:0:12})"
     # Older pinned specs clamp compiler jobs to 8; lift only that clamp so every requested CPU is used.
+    # shellcheck disable=SC2016
     sed -i '/^test "\$jobs" -le 8 || jobs=8$/d' "${spec[0]}"
 }
 kernel_collect() {

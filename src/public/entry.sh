@@ -205,14 +205,15 @@ public_main() {
         public_worker "$cross_image" "$host_platform" "$native_base" Containerfile.public
     fi
     # The cache identifies the producer: route, recipe and the worker images that compile the kernel and link its initramfs.
-    local producer_file=$WORK/producer.json arm_id
+    local producer_file=$WORK/producer.json arm_id kernel_recipe
+    kernel_recipe=$(kernel_recipe_hash "$WORK/recipe")
     arm_id=$("$ENGINE" image inspect --format '{{.Id}}' "$arm_image")
     if ((cross)); then
-        kernel_producer_json cross "$recipe_sha" "$("$ENGINE" image inspect --format '{{.Id}}' "$cross_image")" "$arm_id" > "$producer_file"
+        kernel_producer_json cross "$kernel_recipe" "$("$ENGINE" image inspect --format '{{.Id}}' "$cross_image")" "$arm_id" > "$producer_file"
     elif [[ $architecture == x86_64 ]]; then
-        kernel_producer_json emulated "$recipe_sha" "$arm_id" > "$producer_file"
+        kernel_producer_json emulated "$kernel_recipe" "$arm_id" > "$producer_file"
     else
-        kernel_producer_json native "$recipe_sha" "$arm_id" > "$producer_file"
+        kernel_producer_json native "$kernel_recipe" "$arm_id" > "$producer_file"
     fi
     KERNEL_PRODUCER_SHA=$(kernel_producer_sha "$producer_file")
     if ((REUSE_KERNEL)); then
