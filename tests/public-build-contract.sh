@@ -37,7 +37,7 @@ for channel in stable testing unstable; do
     public_main --build kernel --channel "$channel" --dry-run > "$fixture/plan"
     grep -F 'kernel: Fedora Rawhide AArch64' "$fixture/plan" >/dev/null
 done
-for pair in '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 9' '--linux-size 65537'; do
+for pair in '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 99999' '--linux-size 65537'; do
     # Intentional fixture word splitting of fixed literal option/value pairs.
     # shellcheck disable=SC2086
     reject $pair --dry-run
@@ -82,7 +82,115 @@ mkdir "$fixture/bin"
 ln -s "$(command -v dirname)" "$fixture/bin/dirname"
 PATH=$fixture/bin public_main --build image --dry-run > "$fixture/minimal-plan"
 [[ ! -e $fixture/out ]]
-jq -e '.kernel.commit|test("^[a-f0-9]{40}$")' "$root/configs/public-build.json" >/dev/null
+jq -e '.kernel | (.ref|type=="string") and (.default_version|test("^[0-9]+\\.[0-9]+(\\.[0-9]+)?$")) and (has("commit")|not) and (has("release")|not)' \
+    "$root/configs/public-build.json" >/dev/null
 bash -n "$root"/src/public/*.sh
 bash "$root/tests/public-source-inputs.sh"
 printf '%s\n' '48 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
+quiet_fail() { if ("$@") > /dev/null 2>&1; then echo "Accepted: $*" >&2; exit 1; fi; }
+# Kernel selection: explicit versions, latest and its alias are accepted; anything else is refused before a build starts.
+for choice in 7.2.12 7.3 latest lastest; do public_main --kernel "$choice" --dry-run > /dev/null; done
+for choice in 7.x latest\;rm v7.2.12 7.2.12.1 newest; do reject --kernel "$choice" --dry-run; done
+reject --kernel
+# Version resolution fetches kernel.org's list once for latest, never for an explicit version, and rejects bad lists.
+(
+    snapshot=$fixture/releases.json cached=$fixture/cached-releases.json
+    curl() { printf '{"latest_stable":{"version":"7.9.1"}}\n'; }
+    [[ $(kernel_version_resolve 7.2.12 "$snapshot" "$cached" 0) == 7.2.12 && ! -e $snapshot ]]
+    [[ $(kernel_version_resolve latest "$snapshot" "$cached" 0) == 7.9.1 && $(jq -r .latest_stable.version "$snapshot") == 7.9.1 ]]
+    [[ $(kernel_version_resolve lastest "$snapshot" "$cached" 0) == 7.9.1 ]]
+    quiet_fail kernel_version_resolve latest "$snapshot" "$cached" 1
+    printf '{"latest_stable":{"version":"7.8.2"}}\n' > "$cached"
+    [[ $(kernel_version_resolve latest "$snapshot" "$cached" 1) == 7.8.2 ]]
+    quiet_fail kernel_version_resolve 7.x "$snapshot" "$cached" 0
+    curl() { printf '{"latest_stable":{"version":"next"}}\n'; }
+    quiet_fail kernel_version_resolve latest "$snapshot" "$cached" 0
+    curl() { printf 'not json\n'; }
+    quiet_fail kernel_version_resolve latest "$snapshot" "$cached" 0
+    curl() { return 22; }
+    quiet_fail kernel_version_resolve latest "$snapshot" "$cached" 0
+)
+# The source's own entry decides whether a reviewed profile exists; a missing, failing or disagreeing entry stops the build.
+(
+    source=$fixture/kernel-source; mkdir -p "$source"
+    quiet_fail kernel_source_check "$source" 7.2.12
+    printf '%s\n' 'echo "senemos: Target fedora/rawhide AArch64; Linux $2; 4 jobs"' > "$source/senemos.sh"
+    kernel_source_check "$source" 7.2.12
+    printf '%s\n' 'echo "senemos: ERROR: No reviewed Uke adaptation profile for Linux $2" >&2; exit 1' > "$source/senemos.sh"
+    quiet_fail kernel_source_check "$source" 7.3
+    printf '%s\n' 'echo "senemos: Target fedora/rawhide AArch64; Linux 7.0.1; 4 jobs"' > "$source/senemos.sh"
+    quiet_fail kernel_source_check "$source" 7.2.12
+)
+# Local checkout: Git decides. Worktrees pass; plain, bare, nested, empty and dirty paths stop; the worker gets a snapshot.
+(
+    git() { command git -c user.name=fixture -c user.email=fixture@example.invalid -c init.defaultBranch=main "$@"; }
+    repo=$fixture/kernel-repo; git init -q "$repo"; printf one > "$repo/file"
+    git -C "$repo" add file; git -C "$repo" commit -q -m one
+    git -C "$repo" worktree add -q --detach "$fixture/kernel-worktree"
+    [[ $(kernel_repo_validate "$repo") == "$(cd "$repo" && pwd -P)" && $(kernel_repo_validate "$fixture/kernel-worktree") == "$(cd "$fixture/kernel-worktree" && pwd -P)" ]]
+    [[ -f $fixture/kernel-worktree/.git ]]
+    mkdir "$fixture/plain" "$repo/nested"; git init -q --bare "$fixture/bare.git"; git init -q "$fixture/empty"
+    for bad in "$fixture/plain" "$fixture/missing" "$fixture/bare.git" "$repo/nested" "$fixture/empty" "$repo/file"; do quiet_fail kernel_repo_validate "$bad"; done
+    printf two > "$repo/file"; quiet_fail kernel_repo_validate "$repo"; git -C "$repo" checkout -q -- file
+    kernel_repo_bundle "$fixture/kernel-worktree" "$fixture/kernel.bundle"
+    git clone -q --no-checkout "$fixture/kernel.bundle" "$fixture/from-bundle"
+    [[ $(git -C "$fixture/from-bundle" rev-parse HEAD) == "$(git -C "$fixture/kernel-worktree" rev-parse HEAD)" ]]
+    # The entry honors a valid override, refuses an invalid one even for a plan, and keeps none as the policy source.
+    UKE_KERNEL_REPO=$fixture/kernel-worktree public_main --dry-run > /dev/null
+    UKE_KERNEL_REPO=none public_main --dry-run > /dev/null
+    status=0; (UKE_KERNEL_REPO=$fixture/plain public_main --dry-run) > /dev/null 2>&1 || status=$?
+    ((status > 0 && status < 90)) || { echo 'Invalid UKE_KERNEL_REPO was ignored' >&2; exit 1; }
+    # Source commit: the remote branch head online, the newest cached source offline.
+    [[ $(kernel_commit_resolve "$repo" main 0 "$fixture/none") == "$(git -C "$repo" rev-parse main)" ]]
+    quiet_fail kernel_commit_resolve "$repo" absent 0 "$fixture/none"
+    quiet_fail kernel_commit_resolve "$repo" main 1 "$fixture/none"
+    mkdir -p "$fixture/srcs/kernel-$(printf 'b%.0s' {1..40})" "$fixture/srcs/kernel-$(printf 'c%.0s' {1..40})"
+    touch -d '2 days ago' "$fixture/srcs/kernel-$(printf 'b%.0s' {1..40})"
+    [[ $(kernel_commit_resolve "$repo" main 1 "$fixture/srcs") == "$(printf 'c%.0s' {1..40})" ]]
+)
+# Kernel cache: restores byte-for-byte with its producer, is keyed by source, version and producer, and repairs damage.
+cache_fixture=$(mktemp -d)
+(
+    WORK=$cache_fixture/work output=$cache_fixture/out JOBS=2
+    KERNEL_COMMIT=$(printf 'a%.0s' {1..40}) KERNEL_VERSION=7.2.12
+    mkdir -p "$WORK/recipe/configs" "$WORK/artifacts/kernel"
+    printf '{"channel":"testing"}\n' > "$WORK/request.json"
+    say() { :; }
+    producer_a=$(kernel_producer_json cross r1 worker-1 worker-2) producer_b=$(kernel_producer_json cross r1 worker-1 worker-3)
+    use_producer() { printf '%s\n' "$1" > "$cache_fixture/producer.json"; KERNEL_PRODUCER_SHA=$(kernel_producer_sha "$cache_fixture/producer.json"); }
+    stage_artifacts() {
+        rm -rf "$WORK/artifacts"; mkdir -p "$WORK/artifacts/kernel"
+        printf '{"kernel_source_commit":"%s","kernel_version":"%s","kernel_release":"7.2.12-20"}\n' "$KERNEL_COMMIT" "$KERNEL_VERSION" > "$WORK/artifacts/kernel/kernel-info.json"
+        cp "$cache_fixture/producer.json" "$WORK/artifacts/kernel/producer.json"
+        : > "$WORK/artifacts/kernel/packages.tsv"; printf img > "$WORK/artifacts/boot-linux.img"; printf img > "$WORK/artifacts/boot-userdata.img"
+    }
+    use_producer "$producer_a"; stage_artifacts
+    quiet_fail kernel_cache_restore
+    kernel_cache_save
+    entry=$(kernel_cache_dir); [[ -d $entry && $entry == *"-7.2.12-${KERNEL_PRODUCER_SHA:0:16}" ]]
+    rm -rf "$WORK/artifacts"; mkdir "$WORK/artifacts"
+    kernel_cache_restore
+    [[ -f $WORK/artifacts/boot-linux.img && $(jq -r '.kernel_release + .channel' "$WORK/artifacts/manifest.json") == 7.2.12-20testing ]]
+    [[ $(kernel_producer_sha "$WORK/artifacts/kernel/producer.json") == "$KERNEL_PRODUCER_SHA" ]]
+    # Another producer or version never sees this entry.
+    use_producer "$producer_b"; quiet_fail kernel_cache_restore
+    use_producer "$producer_a"; (KERNEL_VERSION=7.2.11; quiet_fail kernel_cache_restore)
+    # Metadata that names another producer or version is not admitted even when its checksums are valid.
+    sealed() { (cd "$entry" && find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum | LC_ALL=C sort -k2 > SHA256SUMS); }
+    printf '%s\n' "$producer_b" > "$entry/kernel/producer.json"; sealed; quiet_fail kernel_cache_restore
+    stage_artifacts; kernel_cache_save; kernel_cache_restore
+    jq '.kernel_version = "7.2.11"' "$entry/kernel/kernel-info.json" > "$cache_fixture/info" && cp "$cache_fixture/info" "$entry/kernel/kernel-info.json"; sealed
+    quiet_fail kernel_cache_restore
+    stage_artifacts; kernel_cache_save; kernel_cache_restore
+    # A corrupt entry is not restored, and the next build replaces it instead of skipping the save.
+    printf bad > "$entry/boot-linux.img"; quiet_fail kernel_cache_restore
+    stage_artifacts; kernel_cache_save
+    kernel_cache_restore
+    [[ $(< "$WORK/artifacts/boot-linux.img") == img && -z $(compgen -G "$output/cache/kernel-builds/.tmp-*" || :) && -z $(compgen -G "$output/cache/kernel-builds/*.old" || :) ]]
+    # An incomplete entry is replaced too, and an intact one is left alone.
+    rm "$entry/kernel/producer.json"; quiet_fail kernel_cache_restore
+    stage_artifacts; kernel_cache_save; kernel_cache_restore
+    touch "$entry/kept"; stage_artifacts; kernel_cache_save; [[ -e $entry/kept ]]
+)
+rm -rf -- "$cache_fixture"
+reject --build kernel --reuse-kernel --dry-run

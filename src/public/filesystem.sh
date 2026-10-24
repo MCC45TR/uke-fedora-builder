@@ -14,7 +14,12 @@ case $filesystem in
     f2fs) format='mkfs f2fs /dev/sda label:UKE_LINUX features:extra_attr,inode_checksum,sb_checksum';;
     *) format="mkfs $filesystem /dev/sda label:UKE_LINUX blocksize:4096";;
 esac
+# The appliance uses KVM when the container was given /dev/kvm; the image forces TCG otherwise.
+if [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then unset LIBGUESTFS_BACKEND_SETTINGS; fi
+cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 guestfish --rw --format=raw -a /job/root.raw <<GUEST
+set-smp $cpus
+set-memsize 2048
 run
 $format
 mount /dev/sda /
@@ -24,7 +29,9 @@ sync
 umount-all
 GUEST
 # A separate read-only appliance verifies the populated image, not the staging tree.
-guestfish --ro --format=raw -a /job/root.raw <<'GUEST' > /job/filesystem-readback.txt
+guestfish --ro --format=raw -a /job/root.raw <<GUEST > /job/filesystem-readback.txt
+set-smp $cpus
+set-memsize 2048
 run
 vfs-type /dev/sda
 vfs-label /dev/sda
@@ -44,11 +51,17 @@ done
 cmp /job/rootfs.files /job/root-readback.files
 c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse
 /job/android-sparse encode /job/root.raw "/job/artifacts/$partition.img"
-/job/android-sparse decode "/job/artifacts/$partition.img" /job/expanded.raw
-cmp /job/root.raw /job/expanded.raw
-simg2img "/job/artifacts/$partition.img" /job/aosp-expanded.raw
-cmp /job/root.raw /job/aosp-expanded.raw
-jq --arg raw "$(sha256sum /job/root.raw | cut -d ' ' -f1)" --argjson bytes "$(stat -c %s /job/root.raw)" \
+# Both decoders and the raw-image hash read the same files; run them together.
+sha256sum /job/root.raw > /job/root.raw.sha256 &
+hash_pid=$!
+(/job/android-sparse decode "/job/artifacts/$partition.img" /job/expanded.raw && cmp /job/root.raw /job/expanded.raw) &
+ours_pid=$!
+(simg2img "/job/artifacts/$partition.img" /job/aosp-expanded.raw && cmp /job/root.raw /job/aosp-expanded.raw) &
+aosp_pid=$!
+wait "$hash_pid"
+wait "$ours_pid"
+wait "$aosp_pid"
+jq --arg raw "$(cut -d ' ' -f1 /job/root.raw.sha256)" --argjson bytes "$(stat -c %s /job/root.raw)" \
     --arg sparse "$(sha256sum "/job/artifacts/$partition.img" | cut -d ' ' -f1)" \
     --arg boot "$(sha256sum /job/artifacts/boot.img | cut -d ' ' -f1)" \
     --argjson boot_bytes "$(stat -c %s /job/artifacts/boot.img)" \

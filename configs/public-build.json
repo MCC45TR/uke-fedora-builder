@@ -6,9 +6,9 @@
   "architecture": "aarch64",
   "kernel": {
     "url": "https://github.com/MCC45TR/senemos-uke-kernel-mainline.git",
-    "commit": "dbfbc03f295662434aef3011ad2c692c2356c87e",
-    "release": "7.2.12-17",
-    "policy": "All channels compile this explicit native source; channel names select RPM repositories, not a kernel.org latest alias."
+    "ref": "main",
+    "default_version": "7.2.12",
+    "policy": "All channels build one kernel: the head of ref in url at build start, at default_version unless --kernel selects another. The Linux version needs a reviewed Uke profile in that source, the release is read from its spec, and latest means the newest kernel.org stable release; channel names select RPM repositories only."
   },
   "channels": {
     "stable": {

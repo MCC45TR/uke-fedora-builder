@@ -14,8 +14,15 @@ channel=$(jq -er .channel "$request")
 filesystem=$(jq -er .filesystem "$request")
 partition=$(jq -er .partition "$request")
 jobs=$(jq -er .jobs "$request")
-source_commit=$(jq -er .kernel.commit "$policy")
-[[ $source_commit =~ ^[0-9a-f]{40}$ ]]
+die() { printf 'stage: ERROR: %s\n' "$*" >&2; exit 1; }
+say() { printf 'stage: %s\n' "$*"; }
+# shellcheck source=kernel-source.sh
+# shellcheck disable=SC1091
+source /builder/src/public/kernel-source.sh
+# The host resolved the exact source commit and Linux version once; the release is derived from the source below.
+source_commit=$(jq -er .kernel_commit "$request")
+kernel_version=$(jq -er .kernel_version "$request")
+[[ $source_commit =~ ^[0-9a-f]{40}$ && $kernel_version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
 cache_flags=()
 [[ ${UKE_OFFLINE:-0} != 1 ]] || cache_flags+=(--cacheonly)
 rpm -qa --qf '%{NEVRA}\n' | LC_ALL=C sort > "/job/artifacts/worker-$stage-rpms.txt"
@@ -30,22 +37,57 @@ gpgcheck=0
 priority=1
 REPO
 }
-if [[ $stage == kernel ]]; then
-    [[ $(uname -m) == aarch64 ]]
+kernel_checkout() {
+    local url snapshot
+    url=$(jq -er .kernel_url "$request")
+    # A local checkout reaches the worker as a snapshot bundle made by the host, never as a live mount.
+    snapshot=$(jq -r '.kernel_bundle // empty' "$request")
+    if [[ -n $snapshot ]]; then url=/job/$snapshot; fi
     source=/cache/kernel-$source_commit
     if [[ ! -d $source/.git ]]; then
-        [[ ${UKE_OFFLINE:-0} != 1 ]]
-        git clone --no-checkout "$(jq -er .kernel.url "$policy")" "$source"
+        [[ ${UKE_OFFLINE:-0} != 1 || -n $snapshot ]]
+        git -c safe.directory='*' clone --no-checkout --no-hardlinks "$url" "$source"
     fi
     git -C "$source" checkout --detach "$source_commit"
     [[ $(git -C "$source" rev-parse HEAD) == "$source_commit" && -z $(git -C "$source" status --porcelain --untracked-files=no) ]]
+    # The source's own entry must have a reviewed Uke profile for this exact version, or the build stops here.
+    kernel_source_check "$source" "$kernel_version"
+    # Downloaded source inputs are shared between source commits so a new commit never fetches them again.
+    for shared in releases touch-runtime; do
+        mkdir -p "/cache/$shared" "$source/referances"
+        for input in "$source/referances/$shared"/*; do
+            [[ -L $input || ! -f $input ]] || cp -n "$input" "/cache/$shared/"
+        done
+        rm -rf "$source/referances/$shared"
+        ln -sfn "/cache/$shared" "$source/referances/$shared"
+    done
+    # Keep the kernel.org release list this build resolved from, for later offline runs.
+    if [[ -f /job/inputs/releases.json ]]; then cp -f /job/inputs/releases.json /cache/releases/releases.json; fi
+}
+kernel_srpm() {
     # The signed upstream source and every adaptation hash are checked by make srpm.
-    make -C "$source" srpm outdir=/job/srpm
+    make -C "$source" srpm outdir=/job/srpm version="$kernel_version"
     mkdir -p /job/rpmbuild
     srpms=(/job/srpm/*.src.rpm)
     [[ ${#srpms[@]} == 1 && -f ${srpms[0]} ]]
-    rpmbuild --rebuild --target aarch64 --define '_topdir /job/rpmbuild' \
-        --define "_smp_build_ncpus $jobs" --define 'dist .fc46' "${srpms[0]}"
+    [[ $(rpm -qp --qf '%{VERSION}' "${srpms[0]}") == "$kernel_version" ]] || die "The source RPM is not Linux $kernel_version"
+}
+kernel_spec() {
+    rpm --define '_topdir /job/rpmbuild' -i "${srpms[0]}"
+    spec=(/job/rpmbuild/SPECS/*.spec)
+    [[ ${#spec[@]} == 1 ]]
+    # The release comes from the selected source, so the initramfs, RPMs and module paths share one name.
+    release=$(rpmspec -q --srpm --qf '%{VERSION}-%{RELEASE}\n' --define '_topdir /job/rpmbuild' --define 'dist %{nil}' "${spec[0]}")
+    [[ $release =~ ^${kernel_version//./\\.}-[0-9A-Za-z._+]+$ ]] || die "Unexpected kernel release from the source spec: $release"
+    printf '%s\n' "$release" > /job/kernel-release
+    say "Kernel release $release (Linux $kernel_version from ${source_commit:0:12})"
+    # Older pinned specs clamp compiler jobs to 8; lift only that clamp so every requested CPU is used.
+    sed -i '/^test "\$jobs" -le 8 || jobs=8$/d' "${spec[0]}"
+}
+kernel_collect() {
+    # Stages run in separate containers, so find the source RPM again.
+    srpms=(/job/srpm/*.src.rpm)
+    [[ ${#srpms[@]} == 1 && -f ${srpms[0]} ]]
     mkdir -p /job/artifacts/kernel
     cp "${srpms[@]}" /job/artifacts/kernel/
     cp /job/rpmbuild/RPMS/aarch64/*.rpm /job/artifacts/kernel/
@@ -56,7 +98,9 @@ if [[ $stage == kernel ]]; then
         rpm2cpio "$package" > /job/payload.cpio
         (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
     done
-    release=$(jq -er .kernel.release "$policy")
+    release=$(< /job/kernel-release)
+    [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}' /job/artifacts/kernel/senemos-uke-linux-kernel-mainline-core-*.aarch64.rpm) == "$release.fc46" ]] ||
+        die "Built kernel RPMs do not match release $release"
     bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release
     modules=/job/kernel-payload/usr/lib/modules/$release
     [[ -f $bundle/linux.img && -f $bundle/userdata.img && -f $modules/vmlinuz ]]
@@ -69,11 +113,75 @@ if [[ $stage == kernel ]]; then
         cp "$bundle/$profile.img" "/job/artifacts/boot-$profile.img"
     done
     # The native RPM producer audits its linked initramfs with no Python exception.
-    jq --arg source "$source_commit" --arg release "$release" \
-        '. + {kernel_source_commit:$source,kernel_release:$release,kernel_rpms_locally_built:true,
+    jq -n --arg source "$source_commit" --arg release "$release" --arg version "$kernel_version" \
+        --arg requested "$(jq -er .kernel_requested "$request")" \
+        '{kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,kernel_rpms_locally_built:true,
           local_kernel_rpm_signature:"unsigned local build; signed upstream source verified by producer",
           physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' \
-        "$request" > /job/artifacts/manifest.json
+        > /job/artifacts/kernel/kernel-info.json
+    jq --slurpfile info /job/artifacts/kernel/kernel-info.json '. + $info[0]' "$request" > /job/artifacts/manifest.json
+}
+if [[ $stage == kernel ]]; then
+    [[ $(uname -m) == aarch64 ]]
+    kernel_checkout
+    kernel_srpm
+    kernel_spec
+    rpmbuild -bb --target aarch64 --define '_topdir /job/rpmbuild' \
+        --define "_smp_build_ncpus $jobs" --define 'dist .fc46' "${spec[0]}"
+    kernel_collect
+    exit
+fi
+# Cross hosts: sources and compilation run natively; only the AArch64 userspace pieces are emulated.
+if [[ $stage == kernel-source ]]; then
+    kernel_checkout
+    kernel_srpm
+    kernel_spec
+    exit
+fi
+if [[ $stage == kernel-base ]]; then
+    [[ $(uname -m) == aarch64 ]]
+    release=$(< /job/kernel-release)
+    # Same relative layout as the RPM build tree, so path prefixes are identical.
+    work=$(mktemp -d) && cd "$work"
+    tar -xJf /job/rpmbuild/SOURCES/senemos-uke-boot-recipe.tar.xz
+    cmp boot-recipe/lock.json /job/rpmbuild/SOURCES/boot-payload.json
+    (cd boot-recipe; jq -r '.source_assets[] | .sha256 + "  " + .path' lock.json | sha256sum -c -)
+    bash boot-recipe/src/boot/make-initramfs-base.sh /job/rpmbuild/boot-userspace "$release"
+    mkdir -p /job/prebuilt
+    clang++ -std=c++17 -O2 -Wall -Wextra -Werror -ffile-prefix-map="$PWD"=. \
+        boot-recipe/src/boot/offline-switch-root.cpp -o /job/prebuilt/uke-offline-switch-root
+    readelf -h /job/prebuilt/uke-offline-switch-root | grep -E 'Machine:.*AArch64' >/dev/null
+    # Newer kernel sources also ship an AArch64 touch client that the spec links against target libraries.
+    touch_runtime=$(compgen -G '/job/rpmbuild/SOURCES/senemos-uke-touch-runtime-*.tar.xz' || :)
+    if [[ -n $touch_runtime ]]; then
+        tar -xJf "$touch_runtime"
+        (cd touch-runtime; sha256sum --check --strict --quiet SOURCE-SHA256SUMS)
+        # shellcheck disable=SC2046
+        g++ $(rpm --eval '%{build_cxxflags}') -std=c++20 -Wall -Wextra -Werror -ffile-prefix-map="$PWD"=. \
+            touch-runtime/capture/touch-capture.cpp touch-runtime/capture/upstream/nt36532-thp/nvt_touch_core.cpp \
+            -lcrypto -lsystemd -o /job/prebuilt/uke-touch-capture $(rpm --eval '%{build_ldflags}')
+        readelf -h /job/prebuilt/uke-touch-capture | grep -E 'Machine:.*AArch64' >/dev/null
+    fi
+    exit
+fi
+# Re-run only the packaging checks on RPMs a finished kernel-build left in /job/rpmbuild.
+if [[ $stage == kernel-collect ]]; then
+    source=/cache/kernel-$source_commit
+    [[ -d $source/.git && -n $(compgen -G '/job/rpmbuild/RPMS/aarch64/*.rpm') ]]
+    kernel_collect
+    exit
+fi
+if [[ $stage == kernel-build ]]; then
+    source=/cache/kernel-$source_commit
+    [[ -d $source/.git ]]
+    spec=(/job/rpmbuild/SPECS/*.spec)
+    [[ ${#spec[@]} == 1 && -d /job/rpmbuild/boot-userspace && -f /job/prebuilt/uke-offline-switch-root ]]
+    # Cross compilation: LLVM targets arm64 from this host; BuildRequires are provided by the worker image.
+    [[ ! -f /job/prebuilt/uke-touch-capture ]] || export UKE_PREBUILT_TOUCH_CAPTURE=/job/prebuilt/uke-touch-capture
+    UKE_PREBUILT_SWITCH_ROOT=/job/prebuilt/uke-offline-switch-root \
+        rpmbuild -bb --nodeps --target aarch64 --define '_topdir /job/rpmbuild' \
+        --define "_smp_build_ncpus $jobs" --define 'dist .fc46' "${spec[0]}"
+    kernel_collect
     exit
 fi
 if [[ $stage == hardware ]]; then
@@ -127,7 +235,11 @@ if [[ $stage == filesystem ]]; then
     bash /builder/src/public/filesystem.sh
     exit
 fi
-[[ $(uname -m) == aarch64 ]]
+arch_flags=()
+if [[ $(uname -m) != aarch64 ]]; then
+    # Native dnf and rpm install the AArch64 root; the host binfmt handler runs its scriptlets and chroot commands.
+    arch_flags=(--forcearch=aarch64)
+fi
 root=/job/root
 [[ ! -e $root ]]
 mkdir -p "$root" /job/original-fedora /job/keydb
@@ -168,7 +280,7 @@ else
     packages+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
         gnome-control-center gnome-software gnome-console nautilus)
 fi
-release=$(jq -er .kernel.release "$policy")
+release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
 base=senemos-uke-linux-kernel-mainline
 local_rpms=()
 for component in '' -core -modules -dtbs -boot; do
@@ -180,16 +292,26 @@ if [[ $partition == userdata ]]; then
     local_rpms+=("/job/artifacts/kernel/$base-singleboot-$release.fc46.aarch64.rpm")
 fi
 # Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
-dnf=(dnf5 "${cache_flags[@]}" --use-host-config --installroot="$root" --releasever=rawhide
+dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-config --installroot="$root" --releasever=rawhide
     --disable-repo='*' --enable-repo=rawhide --enable-repo=uke-selected
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
     --setopt=install_weak_deps=False --setopt=gpgcheck=True --setopt=installonly_limit=0
+    # Uke packages require files such as /usr/lib/systemd/systemd-growfs, which only the filelists metadata resolves.
+    --setopt=optional_metadata_types=filelists --setopt=max_parallel_downloads=10
     --setopt=tsflags=nodocs --setopt=excludepkgs='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-kvm*,senemos-uke-linux-kernel-mainline-unstable*')
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
 fi
-"${dnf[@]}" -y install "${local_rpms[@]}" "${packages[@]}"
+"${dnf[@]}" -y install "${local_rpms[@]}" "${packages[@]}" 2>&1 | tee /job/root-install.log
+if ((${#arch_flags[@]})); then
+    # Emulated scriptlets must have run; a silent failure would leave an incomplete root.
+    chroot "$root" /usr/bin/true
+    if grep -F 'scriptlet failed' /job/root-install.log; then
+        echo 'Package scriptlets failed under AArch64 emulation; see root-install.log' >&2
+        exit 1
+    fi
+fi
 "${dnf[@]}" check
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
 [[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$release.fc46" ]]
@@ -199,16 +321,18 @@ cp "$bundle/$partition.img" /job/artifacts/boot.img
 cmp /job/artifacts/boot.img "/job/artifacts/boot-$partition.img"
 # Prove Python exceptions against independently signature-verified Fedora bytes.
 rpmkeys --dbpath /job/keydb --import /builder/configs/keys/fedora-46.asc
-: > /job/artifacts/fedora-inputs.tsv
+: > /job/fedora-inputs.tsv
+# Only archives whose exact NEVRA is installed in the root count as its original bytes.
+declare -A installed=()
+while IFS=$'\t' read -r nevra _; do installed[$nevra]=1; done < /job/artifacts/installed-rpms.tsv
 while IFS= read -r -d '' archive; do
-    [[ $(rpm -qp --qf '%{VENDOR}' "$archive") == 'Fedora Project' ]] || continue
-    name=$(rpm -qp --qf '%{NAME}' "$archive")
-    [[ $(rpm --root "$root" -q "$name" --qf '%{NEVRA}' 2>/dev/null) == "$(rpm -qp --qf '%{NEVRA}' "$archive")" ]] || continue
+    IFS=$'\t' read -r vendor nevra < <(rpm -qp --qf '%{VENDOR}\t%{NEVRA}\n' "$archive")
+    [[ $vendor == 'Fedora Project' && -n ${installed[$nevra]:-} ]] || continue
     rpmkeys --dbpath /job/keydb --checksig "$archive" | grep -F 'signatures OK'
-    printf '%s\t%s\n' "$(rpm -qp --qf '%{NEVRA}' "$archive")" "$(sha256sum "$archive" | cut -d ' ' -f1)" >> /job/artifacts/fedora-inputs.tsv
-    rpm2cpio "$archive" > /job/payload.cpio
-    (cd /job/original-fedora; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
+    printf '%s\t%s\n' "$nevra" "$(sha256sum "$archive" | cut -d ' ' -f1)" >> /job/fedora-inputs.tsv
+    rpm2cpio "$archive" | (cd /job/original-fedora; cpio -idmu --quiet --no-absolute-filenames)
 done < <(find "/cache/dnf-$channel" -type f -name '*.rpm' -print0)
+LC_ALL=C sort /job/fedora-inputs.tsv > /job/artifacts/fedora-inputs.tsv
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
 bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
 chroot "$root" /usr/sbin/usermod -L root
