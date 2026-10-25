@@ -14,6 +14,9 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --channel stable|testing|unstable Uke RPM channel (Fedora remains Rawhide)
   --kernel VERSION|latest|lastest   Linux version to build; latest is kernel.org's newest stable
                                     release and needs a reviewed Uke profile (default: policy version)
+  --kernel-profile normal|el2-require|el2-exit-experimental
+                                    Explicit kernel family; firmware exit is not admitted
+  --skip-tests                     Defer kernel tests; keep source/payload integrity checks
   --out DIRECTORY                   Default: ./out in the invoking directory
   --linux-size MIB                  Root image size; default 16384, minimum 8192
   --jobs N                          Compiler workers; default all online CPUs
@@ -72,6 +75,7 @@ public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing
     local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior='' kernel_request=''
     local -A selected=()
+    KERNEL_PROFILE=normal RUN_TESTS=1 KERNEL_CONFIG_SHA=''
     JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1) OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 REUSE_KERNEL=0 ENGINE='' CID='' PAUSED=0
     # Preserve explicit historical commands without making them the default path.
     for argument in "$@"; do
@@ -86,9 +90,10 @@ public_main() {
         case $1 in
             --help|-h) public_help; return;;
             --self-test) bash "$BUILDER/tests/public-build-contract.sh"; return;;
+            --skip-tests) RUN_TESTS=0;;
             --yes) UKE_ASSUME_YES=1;; --reuse-kernel) REUSE_KERNEL=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;;
-            --build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--kernel=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
-            --build|--mode|--filesystem|--desktop|--channel|--kernel|--out|--jobs|--linux-size|--touch-reference)
+            --build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--kernel=*|--kernel-profile=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
+            --build|--mode|--filesystem|--desktop|--channel|--kernel|--kernel-profile|--out|--jobs|--linux-size|--touch-reference)
                 key=$1; shift; (($#)) || die "Missing value for $key"; value=$1;;
             *) die "Unknown option: $1";;
         esac
@@ -98,6 +103,7 @@ public_main() {
             --filesystem) filesystem=$value; selected[filesystem]=1;;
             --desktop) desktop=$value; selected[desktop]=1;; --channel) channel=$value; selected[channel]=1;; --out) output=$value; out_given=1;;
             --kernel) kernel_request=$value;;
+            --kernel-profile) KERNEL_PROFILE=$value;;
             --jobs) JOBS=$value;; --linux-size) root_mib=$value;; --touch-reference) reference=$value;;
         esac
         shift
@@ -115,6 +121,12 @@ public_main() {
     case $filesystem in ext4|f2fs|btrfs|xfs) :;; *) die 'Unsupported root filesystem';; esac
     case $desktop in kde|gnome) :;; *) die 'Desktop must be kde or gnome';; esac
     case $channel in stable|testing|unstable) :;; *) die 'Unknown package channel';; esac
+    case $KERNEL_PROFILE in
+        normal|el2-require) ;;
+        el2-exit-experimental) die 'Firmware exit is not admitted: exact Uke firmware/ownership contract is unverified';;
+        *) die 'Unknown kernel profile';;
+    esac
+    [[ $KERNEL_PROFILE == normal || $channel == testing ]] || die 'EL2 candidates require --channel testing'
     [[ -z $kernel_request || $kernel_request =~ ^(latest|lastest|[0-9]+\.[0-9]+(\.[0-9]+)?)$ ]] ||
         die 'Kernel must be an explicit version such as 7.2.12, latest or lastest'
     [[ $REUSE_KERNEL == 0 || $target == image ]] || die '--reuse-kernel applies to image builds only'
@@ -132,7 +144,7 @@ public_main() {
     [[ $mode != singleboot ]] || partition=userdata
     say "$target: Fedora Rawhide AArch64; $mode; $filesystem; $desktop; $channel; $JOBS workers"
     say "Output parent: $output (a new run directory is created; existing output is preserved)"
-    say 'One kernel source and version is common to all channels; channel names select the Uke RPM repository.'
+    say "Kernel profile: $KERNEL_PROFILE; kernel tests enabled: $RUN_TESTS"
     say 'REQUIRED after first Fedora boot: sudo dnf update --refresh'
     # An explicit local checkout must be valid; it is never silently ignored.
     local kernel_repo=''
@@ -161,24 +173,31 @@ public_main() {
     # Freeze the source recipe before any container operation.
     cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/tests" "$WORK/recipe/"
     # Resolve the kernel version and source revision once; every stage and the cache use these exact values.
-    local policy_file=$WORK/recipe/configs/public-build.json kernel_url bundle=''
-    [[ -n $kernel_request ]] || kernel_request=$(jq -er .kernel.default_version "$policy_file")
+    local policy_file=$WORK/recipe/configs/public-build.json kernel_url bundle='' kernel_ref
+    kernel_ref=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].ref // .kernel.ref' "$policy_file")
+    KERNEL_CONFIG_SHA=$(jq -r --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].native_config_sha256 // empty' "$policy_file")
+    [[ -n $kernel_request ]] || kernel_request=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].default_version // .kernel.default_version' "$policy_file")
     KERNEL_VERSION=$(kernel_version_resolve "$kernel_request" "$WORK/inputs/releases.json" "$output/cache/releases/releases.json" "$OFFLINE") || exit 1
     kernel_url=$(jq -er .kernel.url "$policy_file")
     if [[ -n $kernel_repo ]]; then
         KERNEL_COMMIT=$(git -C "$kernel_repo" rev-parse HEAD)
+        if [[ -f $kernel_repo/packaging/native/native.config ]]; then
+            KERNEL_CONFIG_SHA=$(sha256sum "$kernel_repo/packaging/native/native.config" | cut -d ' ' -f1)
+        fi
         kernel_repo_bundle "$kernel_repo" "$WORK/inputs/kernel.bundle"
         bundle=inputs/kernel.bundle
     else
-        KERNEL_COMMIT=$(kernel_commit_resolve "$kernel_url" "$(jq -er .kernel.ref "$policy_file")" "$OFFLINE" "$output/cache") || exit 1
+        KERNEL_COMMIT=$(kernel_commit_resolve "$kernel_url" "$kernel_ref" "$OFFLINE" "$output/cache") || exit 1
     fi
     say "Kernel source ${KERNEL_COMMIT:0:12}, Linux $KERNEL_VERSION (requested: $kernel_request)"
     jq -n --arg target "$target" --arg mode "$mode" --arg fs "$filesystem" --arg desktop "$desktop" \
         --arg channel "$channel" --arg partition "$partition" --argjson size "$root_mib" \
         --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" --arg commit "$KERNEL_COMMIT" \
+        --arg profile "$KERNEL_PROFILE" --arg config "$KERNEL_CONFIG_SHA" --argjson tests "$RUN_TESTS" \
         --arg version "$KERNEL_VERSION" --arg requested "$kernel_request" --arg url "$kernel_url" --arg bundle "$bundle" \
         '{target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder,
-          kernel_commit:$commit,kernel_version:$version,kernel_requested:$requested,kernel_url:$url}
+          kernel_commit:$commit,kernel_version:$version,kernel_requested:$requested,kernel_url:$url,
+          kernel_profile:$profile,kernel_native_config_sha256:$config,run_kernel_tests:($tests==1)}
          + (if $bundle == "" then {} else {kernel_bundle:$bundle} end)' > "$WORK/request.json"
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha

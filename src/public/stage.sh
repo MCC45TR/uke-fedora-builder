@@ -22,6 +22,11 @@ source /builder/src/public/kernel-source.sh
 # The host resolved the exact source commit and Linux version once; the release is derived from the source below.
 source_commit=$(jq -er .kernel_commit "$request")
 kernel_version=$(jq -er .kernel_version "$request")
+KERNEL_PROFILE=$(jq -r '.kernel_profile // "normal"' "$request")
+KERNEL_CONFIG_SHA=$(jq -r '.kernel_native_config_sha256 // empty' "$request")
+RUN_TESTS=$(jq -r 'if .run_kernel_tests == false then 0 else 1 end' "$request")
+case $KERNEL_PROFILE in normal|el2-require) ;; *) die 'Unadmitted kernel profile';; esac
+kernel_family=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].family' "$policy")
 [[ $source_commit =~ ^[0-9a-f]{40}$ && $kernel_version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
 cache_flags=()
 [[ ${UKE_OFFLINE:-0} != 1 ]] || cache_flags+=(--cacheonly)
@@ -66,7 +71,7 @@ kernel_checkout() {
 }
 kernel_srpm() {
     # The signed upstream source and every adaptation hash are checked by make srpm.
-    make -C "$source" srpm outdir=/job/srpm version="$kernel_version"
+    make -C "$source" srpm outdir=/job/srpm version="$kernel_version" run_tests="$RUN_TESTS" el2_profile="$KERNEL_PROFILE"
     mkdir -p /job/rpmbuild
     srpms=(/job/srpm/*.src.rpm)
     [[ ${#srpms[@]} == 1 && -f ${srpms[0]} ]]
@@ -77,8 +82,16 @@ kernel_spec() {
     spec=(/job/rpmbuild/SPECS/*.spec)
     [[ ${#spec[@]} == 1 ]]
     # The release comes from the selected source, so the initramfs, RPMs and module paths share one name.
-    release=$(rpmspec -q --srpm --qf '%{VERSION}-%{RELEASE}\n' --define '_topdir /job/rpmbuild' --define 'dist %{nil}' "${spec[0]}")
-    [[ $release =~ ^${kernel_version//./\\.}-[0-9A-Za-z._+]+$ ]] || die "Unexpected kernel release from the source spec: $release"
+    rpm_release=$(rpmspec -q --srpm --qf '%{VERSION}-%{RELEASE}\n' --define '_topdir /job/rpmbuild' --define 'dist %{nil}' "${spec[0]}")
+    [[ $rpm_release =~ ^${kernel_version//./\\.}-[0-9A-Za-z._+]+$ ]] || die "Unexpected kernel release from the source spec: $rpm_release"
+    [[ $(rpmspec -q --srpm --qf '%{NAME}' "${spec[0]}") == "$kernel_family" ]] || die 'Source package family differs from the selected profile'
+    release=$(rpmspec -q --qf '[%{PROVIDENAME}\n]' --define 'dist %{nil}' "${spec[0]}" | sed -n 's/^kernel-uname-r(\([^)]*\))$/\1/p')
+    [[ -n $release ]] || release=$rpm_release
+    case $KERNEL_PROFILE in
+        normal) [[ $release == "$rpm_release" ]] || die 'Unexpected ordinary Image ABI';;
+        el2-require) [[ $release == "$rpm_release-kvm" ]] || die 'Expected the canonical -kvm Image ABI';;
+    esac
+    printf '%s\n' "$rpm_release" > /job/kernel-rpm-release
     printf '%s\n' "$release" > /job/kernel-release
     say "Kernel release $release (Linux $kernel_version from ${source_commit:0:12})"
     # Older pinned specs clamp compiler jobs to 8; lift only that clamp so every requested CPU is used.
@@ -100,7 +113,8 @@ kernel_collect() {
         (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
     done
     release=$(< /job/kernel-release)
-    [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}' /job/artifacts/kernel/senemos-uke-linux-kernel-mainline-core-*.aarch64.rpm) == "$release.fc46" ]] ||
+    rpm_release=$(< /job/kernel-rpm-release)
+    [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}' /job/artifacts/kernel/"$kernel_family"-core-*.aarch64.rpm) == "$rpm_release.fc46" ]] ||
         die "Built kernel RPMs do not match release $release"
     bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release
     modules=/job/kernel-payload/usr/lib/modules/$release
@@ -113,10 +127,17 @@ kernel_collect() {
         cmp "$modules/vmlinuz" "/job/$profile.Image"
         cp "$bundle/$profile.img" "/job/artifacts/boot-$profile.img"
     done
+    if [[ $KERNEL_PROFILE != normal ]]; then
+        jq -e --arg profile "$KERNEL_PROFILE" --arg source "$source_commit" --arg release "$release" \
+            '.el2_profile == $profile and .kernel_source_commit == $source and .kernel_release == $release and .firmware_exit_enabled == false' \
+            "$bundle/el2-build.json" >/dev/null || die 'Built EL2 profile differs from the request'
+        cp "$bundle/el2-build.json" /job/artifacts/kernel/
+    fi
     # The native RPM producer audits its linked initramfs with no Python exception.
     jq -n --arg source "$source_commit" --arg release "$release" --arg version "$kernel_version" \
+        --arg profile "$KERNEL_PROFILE" --arg family "$kernel_family" --arg rpm "$rpm_release" \
         --arg requested "$(jq -er .kernel_requested "$request")" \
-        '{kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,kernel_rpms_locally_built:true,
+        '{kernel_profile:$profile,kernel_family:$family,rpm_version_release:$rpm,kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,kernel_rpms_locally_built:true,
           local_kernel_rpm_signature:"unsigned local build; signed upstream source verified by producer",
           physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' \
         > /job/artifacts/kernel/kernel-info.json
@@ -282,24 +303,33 @@ else
         gnome-control-center gnome-software gnome-console nautilus)
 fi
 release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
-base=senemos-uke-linux-kernel-mainline
+base=$kernel_family
+rpm_release=$(jq -er '.rpm_version_release // .kernel_release' /job/artifacts/kernel/kernel-info.json)
 local_rpms=()
 for component in '' -core -modules -dtbs -boot; do
-    package=/job/artifacts/kernel/$base$component-$release.fc46.aarch64.rpm
+    package=/job/artifacts/kernel/$base$component-$rpm_release.fc46.aarch64.rpm
     [[ -f $package ]]
     local_rpms+=("$package")
 done
 if [[ $partition == userdata ]]; then
-    local_rpms+=("/job/artifacts/kernel/$base-singleboot-$release.fc46.aarch64.rpm")
+    local_rpms+=("/job/artifacts/kernel/$base-singleboot-$rpm_release.fc46.aarch64.rpm")
 fi
 # Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
+excluded='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-unstable*'
+if [[ $KERNEL_PROFILE == normal ]]; then
+    excluded+=',senemos-uke-linux-kernel-mainline-kvm*'
+else
+    for component in '' -core -modules -dtbs -boot -singleboot; do
+        excluded+=",senemos-uke-linux-kernel-mainline$component"
+    done
+fi
 dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-config --installroot="$root" --releasever=rawhide
     --disable-repo='*' --enable-repo=rawhide --enable-repo=uke-selected
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
     --setopt=install_weak_deps=False --setopt=gpgcheck=True --setopt=installonly_limit=0
     # Uke packages require files such as /usr/lib/systemd/systemd-growfs, which only the filelists metadata resolves.
     --setopt=optional_metadata_types=filelists --setopt=max_parallel_downloads=10
-    --setopt=tsflags=nodocs --setopt=excludepkgs='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-kvm*,senemos-uke-linux-kernel-mainline-unstable*')
+    --setopt=tsflags=nodocs --setopt="excludepkgs=$excluded")
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
@@ -315,7 +345,7 @@ if ((${#arch_flags[@]})); then
 fi
 "${dnf[@]}" check
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
-[[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$release.fc46" ]]
+[[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$rpm_release.fc46" ]]
 bundle=$root/usr/lib/senemos/kernel-updates/$release
 (cd "$root/usr/lib/modules/$release"; sha256sum -c "$bundle/modules.sha256")
 cp "$bundle/$partition.img" /job/artifacts/boot.img

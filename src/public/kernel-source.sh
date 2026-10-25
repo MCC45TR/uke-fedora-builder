@@ -39,6 +39,7 @@ kernel_version_resolve() {
         version=$(jq -er '.latest_stable.version' "$snapshot" 2>/dev/null) || die 'kernel.org release list has no latest stable version'
     fi
     [[ $version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]] || die "Invalid stable kernel version: $request"
+    [[ ! $version =~ ^[0-9]+\.[0-9]+$ ]] || version+=.0
     printf '%s\n' "$version"
 }
 
@@ -61,7 +62,20 @@ kernel_commit_resolve() {
 kernel_source_check() {
     local source=$1 version=$2 plan
     [[ -f $source/Makefile ]] || die "This kernel source has no SRPM Makefile to validate Linux $version"
-    if ! plan=$(make -s -C "$source" validate version="$version" 2>&1); then
+    if [[ -f $source/src/boot/admit-el2-profile.sh ]]; then
+        bash "$source/src/boot/admit-el2-profile.sh" "${KERNEL_PROFILE:-normal}" || die 'Kernel source refuses this profile'
+    else
+        [[ ${KERNEL_PROFILE:-normal} == normal ]] || die 'This source has no explicit EL2 profile producer'
+    fi
+    if [[ -n ${KERNEL_CONFIG_SHA:-} ]]; then
+        [[ $(sha256sum "$source/packaging/native/native.config" | cut -d ' ' -f1) == "$KERNEL_CONFIG_SHA" ]] || die 'Native config differs from the requested source profile'
+    fi
+    if [[ ${RUN_TESTS:-1} == 0 ]]; then
+        grep -Eq '^run_tests [?:]?=' "$source/Makefile" || die 'Selected source has no explicit test-deferral producer'
+        jq -e --arg version "$version" '.version == $version and .hardware_tested == false' "$source/manifests/linux-$version.json" >/dev/null || die 'Source manifest does not admit the requested Linux version'
+        return
+    fi
+    if ! plan=$(make -s -C "$source" validate version="$version" el2_profile="${KERNEL_PROFILE:-normal}" 2>&1); then
         printf '%s\n' "$plan" >&2
         die "The kernel SRPM producer does not admit Linux $version; select a version supported by this source"
     fi
@@ -78,7 +92,9 @@ kernel_recipe_hash() {
 kernel_producer_json() {
     local route=$1 recipe=$2
     shift 2
-    jq -nSc --arg route "$route" --arg recipe "$recipe" '{route:$route,recipe_sha256:$recipe,worker_images:$ARGS.positional}' --args "$@"
+    jq -nSc --arg route "$route" --arg recipe "$recipe" --arg profile "${KERNEL_PROFILE:-normal}" \
+        --arg config "${KERNEL_CONFIG_SHA:-}" --argjson tests "${RUN_TESTS:-1}" \
+        '{route:$route,recipe_sha256:$recipe,kernel_profile:$profile,native_config_sha256:$config,run_kernel_tests:($tests==1),worker_images:$ARGS.positional}' --args "$@"
 }
 kernel_producer_sha() {
     jq -cS . "$1" | sha256sum | cut -d ' ' -f1
@@ -96,8 +112,8 @@ kernel_cache_check() {
         [[ -f $dir/$file ]] || { KERNEL_CACHE_WHY="missing $file"; return 1; }
     done
     (cd "$dir" && sha256sum -c --quiet SHA256SUMS) > /dev/null 2>&1 || { KERNEL_CACHE_WHY='checksum mismatch'; return 1; }
-    jq -e --arg commit "$KERNEL_COMMIT" --arg version "$KERNEL_VERSION" \
-        '.kernel_source_commit == $commit and .kernel_version == $version' "$dir/kernel/kernel-info.json" > /dev/null 2>&1 ||
+    jq -e --arg commit "$KERNEL_COMMIT" --arg version "$KERNEL_VERSION" --arg profile "${KERNEL_PROFILE:-normal}" \
+        '.kernel_source_commit == $commit and .kernel_version == $version and (.kernel_profile // "normal") == $profile' "$dir/kernel/kernel-info.json" > /dev/null 2>&1 ||
         { KERNEL_CACHE_WHY='metadata names a different source'; return 1; }
     [[ $(kernel_producer_sha "$dir/kernel/producer.json") == "$KERNEL_PRODUCER_SHA" ]] ||
         { KERNEL_CACHE_WHY='built by a different producer'; return 1; }
