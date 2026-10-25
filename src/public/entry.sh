@@ -219,7 +219,8 @@ public_main() {
     # x86_64 hosts run every step that executes no AArch64 code in a native worker; the
     # host's binfmt handler still runs RPM scriptlets and chroot commands. UKE_CROSS=0 emulates all steps.
     local cross=0 cross_image=localhost/uke-public-cross:${recipe_sha:0:16} root_image=$arm_image root_platform=linux/arm64
-    if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 ]]; then
+    # shortcut: KVM helpers build on AArch64; enable cross after porting their prebuilt paths.
+    if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $KERNEL_PROFILE == normal ]]; then
         cross=1 root_image=$cross_image root_platform=$host_platform
         public_worker "$cross_image" "$host_platform" "$native_base" Containerfile.public
     fi
