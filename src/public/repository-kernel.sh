@@ -25,7 +25,8 @@ REPO
 dnf=(dnf5 --forcearch=aarch64 --disable-repo='*' --enable-repo=uke-kernel
     --setopt=cachedir=/cache/kernel-repository --setopt=keepcache=True)
 [[ ${UKE_OFFLINE:-0} != 1 ]] || dnf+=(--cacheonly)
-release=$("${dnf[@]}" repoquery --arch=aarch64 --latest-limit=1 --queryformat '%{version}-%{release}' "$base-core")
+# Freeze this release branch; remote package updates must not change its kernel tuple.
+release=7.3.0-16.fc46
 [[ $release =~ ^[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.fc46$ ]]
 packages=()
 for component in '' -core -modules -dtbs -boot -singleboot; do

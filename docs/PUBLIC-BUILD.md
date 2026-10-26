@@ -80,7 +80,7 @@ be slow. No generic ARM64 kernel is substituted.
 | `testing` | Signed packages from `mcc45tr/uke-linux-test`; the installed control channel is named `test`. |
 | `unstable` | The test repository with the installed control channel named `unstable`. |
 
-Testing image builds retrieve the latest signed mainline kernel family from
+Testing image builds on this release branch retrieve signed Linux `7.3.0-16` from
 `mcc45tr/uke-linux-test`, verify its signing key, every RPM signature, matching
 versions, module hashes and both boot payloads. The exact RPMs and checksums are
 retained. This release branch pins `uke-core` and its exact Control dependency
