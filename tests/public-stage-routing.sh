@@ -36,8 +36,9 @@ for pair in 'linux/amd64 root' 'linux/amd64 kernel' 'linux/amd64 filesystem' 'li
     if [[ $pair == 'linux/amd64 root' ]]; then
         [[ $namespace == 1 && $capability == 1 ]]
     else
-        [[ $namespace == 0 && $capability == 0 ]]
+        [[ $namespace == 0 ]]
     fi
+    if [[ $stage == root ]]; then [[ $capability == 1 ]]; else [[ $capability == 0 ]]; fi
     [[ ${arguments[-1]} == "$stage" ]]
 done
-printf 'Only x86_64 cross-install root stages request a private user namespace: passed\n'
+printf 'Root stages allow temporary proc mounts; only x86_64 cross-install roots use a private user namespace: passed\n'

@@ -175,6 +175,20 @@ root=/var/tmp/uke-target-root
 original=/var/tmp/uke-original-fedora
 [[ ! -e $root ]]
 mkdir -p "$root" "$original" /job/keydb
+mkdir -p "$root/proc"
+# shellcheck source=root-proc.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-proc.sh
+public_root_exit() {
+    local status=$?
+    public_root_proc_unmount "$root" || status=1
+    if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then
+        chown -R "$UKE_OUTPUT_OWNER" /job/artifacts || status=1
+    fi
+    exit "$status"
+}
+trap public_root_exit EXIT
+public_root_proc_mount "$root"
 printf '%%_install_langs all\n' > /etc/rpm/macros.zz-uke-languages
 [[ $(rpm --eval '%{_install_langs}') == all ]]
 project=$(jq -er --arg channel "$channel" '.channels[$channel].project' "$policy")
@@ -314,6 +328,7 @@ for file in etc/machine-id var/lib/dbus/machine-id var/lib/systemd/random-seed; 
     rm -f "$root/$file"
 done
 : > "$root/etc/machine-id"
+public_root_proc_unmount "$root"
 for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then
         echo 'Mounted runtime tree refused during offline finalization' >&2; exit 1

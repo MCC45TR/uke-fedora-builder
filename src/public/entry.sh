@@ -279,8 +279,10 @@ public_stage() {
     wait_idle
     local -a capabilities=() stage_command=(bash /builder/src/public/stage.sh "$stage")
     # A distinct user namespace keeps rootful and concurrent workers' binfmt separate.
-    if [[ $stage == root && $platform == linux/amd64 ]]; then
+    if [[ $stage == root ]]; then
         capabilities+=(--cap-add SYS_ADMIN)
+    fi
+    if [[ $stage == root && $platform == linux/amd64 ]]; then
         stage_command=(bash /builder/src/public/worker-namespace.sh "${stage_command[@]}")
     fi
     CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable "${capabilities[@]}" \
