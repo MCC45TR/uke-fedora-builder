@@ -92,6 +92,13 @@ user namespace. No initial host binfmt registration is changed by this stage.
 The kernel and runtime must permit user-namespace binfmt mounts; a failure
 stops this stage rather than using the initial host registry.
 
+26 October 2026: root workers temporarily expose read-only procfs to RPM
+scriptlets. Systemd uses `/proc/self/fd` when reopening hardware-database inputs;
+an absent procfs can produce an empty database even when the command exits zero.
+The complete inherited proc tree is detached before runtime directories are
+cleaned and before the root archive is created. Mount, read-only, descriptor,
+cleanup and symlink-refusal checks run in a disposable worker.
+
 24 October 2026: two concurrent rootless Podman probes pass namespace separation,
 synthetic binfmt execution and full UID/GID-range preservation. This change has
 not completed a new full image build or Docker runtime test. The preceding clean
