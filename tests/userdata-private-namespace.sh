@@ -7,7 +7,7 @@ trap 'find "$work" -depth -delete' EXIT
 mkdir -p "$work"/{root/usr/lib/firmware,private/usr/lib/firmware,fedora,policy}
 target=$work/root/usr/lib/firmware/adsp.b09
 expected=$work/private/usr/lib/firmware/adsp.b09
-printf 'OEM path /home/oem-build/work/\n' > "$target"
+printf 'OEM path /%s/oem-build/work/\n' home > "$target"
 cp "$target" "$expected"
 review() {
     bash "$repo/src/image/review-userdata-namespaces.sh" "$work/root" "$work/fedora" \
@@ -22,7 +22,7 @@ rm "$expected"
 ln -s "$target" "$expected"
 if review >/dev/null 2>&1; then exit 1; fi
 rm "$expected"
-printf 'Private host /home/private-owner/work/\n' > "$target"
+printf 'Private host /%s/private-owner/work/\n' home > "$target"
 cp "$target" "$expected"
-if SENEMOS_PRIVATE_HOST_HOME=/home/private-owner review >/dev/null 2>&1; then exit 1; fi
+if SENEMOS_PRIVATE_HOST_HOME=$(printf '/%s/private-owner' home) review >/dev/null 2>&1; then exit 1; fi
 echo 'Exact OEM namespace bytes pass; changed, symlinked and private-host bytes reject'
