@@ -64,6 +64,9 @@ chmod 644 "$fixture/reference.bin"
 reject --touch-reference "$fixture/reference.bin" --dry-run
 chmod 600 "$fixture/reference.bin"
 public_main --touch-reference "$fixture/reference.bin" --dry-run >/dev/null
+public_main --defer-touch-reference --dry-run >/dev/null
+reject --build kernel --defer-touch-reference --dry-run
+reject --touch-reference "$fixture/reference.bin" --defer-touch-reference --dry-run
 ln -s reference.bin "$fixture/link.bin"
 reject --touch-reference "$fixture/link.bin" --dry-run
 truncate -s 5431 "$fixture/reference.bin"
@@ -85,6 +88,9 @@ for partition in linux userdata; do
     public_flash_help "$partition" > "$fixture/flash"
     grep -Fx "       fastboot flash $partition $partition.img" "$fixture/flash" >/dev/null
     grep -F 'sudo dnf update --refresh' "$fixture/flash" >/dev/null
+    public_flash_help "$partition" 1 > "$fixture/deferred-flash"
+    grep -F 'image contains no touch reference' "$fixture/deferred-flash" >/dev/null
+    grep -F 'local provisioning/recovery route is required' "$fixture/deferred-flash" >/dev/null
     if grep -E 'fastboot (erase|format)|fastboot flash (boot_a|persist|xbl|abl)' "$fixture/flash"; then exit 1; fi
 done
 # Host package consent must precede the package manager, including without a TTY.

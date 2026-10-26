@@ -41,6 +41,12 @@ For actual image builds, replace `./reference.bin` with that device's already
 qualified private touch reference. Its required size is 5432 bytes and its mode
 must be 0600. Kernel builds and dry-run planning need no reference.
 
+For a generic image that omits device-private data, replace `--touch-reference
+./reference.bin` with `--defer-touch-reference`. This requires a working local
+recovery/provisioning route: install that tablet's own accepted reference at
+`/var/lib/uke-touch/reference.bin`, owned by `root:root` with mode 0600, before
+touchscreen account setup. The image does not supply or qualify that capture.
+
 ```sh
 ./ukelinux.sh --build image --mode multiboot --filesystem ext4 \
   --desktop kde --channel testing --touch-reference ./reference.bin --out ./out
@@ -189,8 +195,10 @@ never substitutes an unsigned download for a missing signed package.
 
 ## Device-local inputs
 
-Image builds require the target device's accepted touch reference for first
-account setup. A missing reference stops before host preparation. Dry-run
+Private image builds require the target device's accepted touch reference for first
+account setup. A missing reference stops before host preparation unless
+`--defer-touch-reference` is explicitly selected. The two options cannot be combined,
+and deferred provisioning is invalid for kernel-only builds. Dry-run
 planning and kernel-only builds need no reference. Generic OEM firmware is
 installed from the public signed firmware package. Its notices and
 redistribution review remain separate from source availability.
@@ -205,11 +213,15 @@ The public probe source is in `uke-sensors/src/touch-normal-probe.cpp`; its
 panel/GPIO admission and physical capture acceptance remain prerequisites.
 This workflow does not assert that a new device has completed them.
 
-The resulting image contains private data and is only for that device; do not
-publish it as a generic image. USB keyboard/mouse setup remains unavailable
+An image built with `--touch-reference` contains private data and is only for that
+device; do not publish it as a generic image. With `--defer-touch-reference`, no
+reference is copied, the manifest records `device_private_data_included:false`
+and `setup_input:local-provisioning-required`, and touch remains conditional on
+the local file. This does not establish first-run input or physical boot acceptance.
+USB keyboard/mouse setup remains unavailable
 until the exact host/VBUS profile passes physical acceptance. A public image
-without private touch data still requires that separate input work and is not
-provided by this path. File shape/permission checks do not qualify actual
+without private touch data still requires local provisioning and separate input
+acceptance. File shape/permission checks do not qualify actual
 touchscreen account setup. No password, human account, SSH host key or remote root
 login is shipped. SSH is installed but disabled. Stock persist is mounted
 read-only by the existing explicit fstab policy. Automatic kernel activation

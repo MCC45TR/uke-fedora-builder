@@ -12,7 +12,8 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --out DIRECTORY                   Default: ./out in the invoking directory
   --linux-size MIB                  Root image size; default 16384, minimum 8192
   --jobs N, --jN                    Parallel workers; default: available CPUs
-  --touch-reference FILE            Device-local 5432-byte reference; required for images
+  --touch-reference FILE            Private image with the device's 5432-byte reference
+  --defer-touch-reference           Omit private data; provision touch locally before setup
   --yes                             Consent to listed host preparation operations
   --offline                         Reuse prepared worker images and kernel inputs
   --dry-run                         Print selections; no installation or build
@@ -28,6 +29,7 @@ Existing core, boot, boot-pair and --check-device commands remain available.
 Run sudo dnf update --refresh after the first Fedora boot. This is required.
 Build output is unqualified until its separate physical installation test.
 Image builds need the device's accepted touch reference for account setup.
+Redistributable images use --defer-touch-reference and require local provisioning.
 USB keyboard/mouse setup is not supported by the current hardware profile.
 HELP
 }
@@ -39,7 +41,7 @@ public_choice() {
     [[ -z $answer ]] || printf -v "$name" '%s' "$answer"
 }
 public_flash_help() {
-    local partition=$1
+    local partition=$1 defer_reference=${2:-0}
     cat <<TEXT
 Manual installation of this exact output (no command below was executed):
   1. Unlock the Uke bootloader and retain verified backups and a working recovery route.
@@ -59,9 +61,17 @@ TEXT
         printf '%s\n' '     WARNING: flashing linux replaces the existing Linux filesystem.'
     fi
     printf '       fastboot flash %s %s.img\n' "$partition" "$partition"
-    printf '%s\n' '       fastboot flash boot_b boot.img' '       fastboot set_active b' '       fastboot reboot' \
-        '  4. Use this private image only on the device that supplied its touch reference.' \
-        '     Complete the original desktop account setup using the touchscreen.' \
+    printf '%s\n' '       fastboot flash boot_b boot.img' '       fastboot set_active b' '       fastboot reboot'
+    if ((defer_reference)); then
+        printf '%s\n' '  4. Before account setup, provision the target tablet with its own accepted 5432-byte touch reference' \
+            '     at /var/lib/uke-touch/reference.bin with owner root:root and mode 0600.' \
+            '     The image contains no touch reference. Touch startup remains conditional on this file.' \
+            '     A working local provisioning/recovery route is required; USB setup is not qualified.'
+    else
+        printf '%s\n' '  4. Use this private image only on the device that supplied its touch reference.' \
+            '     Complete the original desktop account setup using the touchscreen.'
+    fi
+    printf '%s\n' \
         '     REQUIRED: run sudo dnf update --refresh in Fedora after the first boot.' \
         '     Automatic kernel activation stays disabled. Updates do not authorize a slot write.' \
         '     The initial raw filesystem size is recorded in manifest.json.' \
@@ -69,7 +79,7 @@ TEXT
 }
 public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing
-    local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior=''
+    local output=$PWD/out out_given=0 reference='' defer_reference=0 root_mib=16384 key value argument prior=''
     local -A selected=()
     JOBS=$(nproc 2>/dev/null || getconf _NPROCESSORS_ONLN 2>/dev/null || printf '1\n')
     OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 ENGINE='' CID='' PAUSED=0
@@ -87,6 +97,7 @@ public_main() {
             --help|-h) public_help; return;;
             --self-test) bash "$BUILDER/tests/public-build-contract.sh"; return;;
             --yes) UKE_ASSUME_YES=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;;
+            --defer-touch-reference) defer_reference=1;;
             --j[0-9]*) key=--jobs; value=${1#--j};;
             --build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
             --build|--mode|--filesystem|--desktop|--channel|--out|--jobs|--linux-size|--touch-reference)
@@ -119,6 +130,9 @@ public_main() {
     [[ $root_mib =~ ^[1-9][0-9]{3,4}$ ]] || die 'Root size must be 8192..65536 MiB'
     ((root_mib >= 8192 && root_mib <= 65536)) || die 'Root size must be 8192..65536 MiB'
     [[ -n $output && $output != *:* && $output != *,* && $output != *$'\n'* ]] || die 'Output path must be nonempty and contain no colon, comma or newline'
+    if ((defer_reference)); then
+        [[ $target == image && -z $reference ]] || die 'Deferred touch provisioning is image-only and cannot include --touch-reference'
+    fi
     if [[ -n $reference ]]; then
         [[ $target == image && -f $reference && ! -L $reference ]] || die 'Touch reference must be a regular file for an image build'
         [[ $(stat -c %s "$reference") == 5432 && $(stat -c %a "$reference") == 600 ]] || die 'Touch reference must be exactly 5432 bytes with mode 0600'
@@ -130,7 +144,7 @@ public_main() {
     say 'Testing images use the latest signed mainline kernel from uke-linux-test; source builds retain the explicit kernel pin.'
     say 'REQUIRED after first Fedora boot: sudo dnf update --refresh'
     ((DRY_RUN == 0)) || return 0
-    [[ $target != image || -n $reference ]] || die 'Image account setup requires --touch-reference from this device; USB input is not yet supported'
+    [[ $target != image || -n $reference || $defer_reference == 1 ]] || die 'Image account setup requires --touch-reference or explicit --defer-touch-reference; USB input is not yet supported'
     bootstrap
     architecture=$(uname -m)
     case $architecture in x86_64) host_platform=linux/amd64;; aarch64) host_platform=linux/arm64;; *) die 'Supported architectures: x86_64 and AArch64';; esac
@@ -154,8 +168,8 @@ public_main() {
     (cd "$WORK" && find recipe -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$WORK/recipe.SHA256SUMS"
     jq -n --arg target "$target" --arg mode "$mode" --arg fs "$filesystem" --arg desktop "$desktop" \
         --arg channel "$channel" --arg partition "$partition" --argjson size "$root_mib" \
-        --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" \
-        '{device:"uke",architecture:"aarch64",distribution:"fedora",release:"rawhide",target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder}' > "$WORK/request.json"
+        --argjson jobs "$JOBS" --argjson defer_reference "$defer_reference" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" \
+        '{device:"uke",architecture:"aarch64",distribution:"fedora",release:"rawhide",target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder,defer_touch_reference:($defer_reference==1)}' > "$WORK/request.json"
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha
     native_base=$(jq -er --arg arch "$architecture" '.fedora_rawhide_images[$arch]' "$WORK/recipe/configs/build-rules.json")
@@ -206,7 +220,7 @@ public_main() {
                            aarch64:("inputs/worker-"+($arm|ltrimstr("sha256:"))+".tar")},
           release_reproducibility_tested:false}' "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
     mv "$WORK/manifest.tmp" "$WORK/artifacts/manifest.json"
-    if [[ $target == image ]]; then public_flash_help "$partition" > "$WORK/artifacts/FLASHING.txt";
+    if [[ $target == image ]]; then public_flash_help "$partition" "$defer_reference" > "$WORK/artifacts/FLASHING.txt";
     else
         cat > "$WORK/artifacts/FLASHING.txt" <<'TEXT'
 Kernel-only manual installation (none of these commands was executed):

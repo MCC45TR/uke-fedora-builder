@@ -163,9 +163,14 @@ else
     [[ $(uname -m) == aarch64 ]]
 fi
 reference=/job/inputs/reference.bin
+defer_reference=$(jq -er '(.defer_touch_reference // false) | tostring' "$request")
+if [[ $defer_reference == true ]]; then
+    [[ ! -e $reference ]] || { echo 'Deferred provisioning must not include private touch data' >&2; exit 1; }
+else
 [[ -f $reference && ! -L $reference && $(stat -c %s "$reference") == 5432 && $(stat -c %a "$reference") == 600 ]] || {
     echo 'Image account setup requires a private device-local touch reference' >&2; exit 1;
 }
+fi
 root=/var/tmp/uke-target-root
 original=/var/tmp/uke-original-fedora
 [[ ! -e $root ]]
@@ -292,7 +297,11 @@ install_weak_deps=False
 installonly_limit=0
 excludepkgs=kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource
 DNF
-install -m600 "$reference" "$root/var/lib/uke-touch/reference.bin"
+if [[ $defer_reference == true ]]; then
+    [[ ! -e $root/var/lib/uke-touch/reference.bin ]] || { echo 'Private touch data found in generic root' >&2; exit 1; }
+else
+    install -m600 "$reference" "$root/var/lib/uke-touch/reference.bin"
+fi
 mkdir -p "$root/etc/systemd/system/uke-touchscreen.service.d"
 printf '[Unit]\nConditionPathExists=/var/lib/uke-touch/reference.bin\n' > "$root/etc/systemd/system/uke-touchscreen.service.d/local-data.conf"
 for unit in uke-touchscreen.service uke-wifi-factory.service uke-install-profile.service; do
@@ -311,7 +320,8 @@ for tree in dev proc sys run; do
     fi
     find "$root/$tree" -xdev -mindepth 1 -depth -delete
 done
-jq '. + {device_private_data_included:true,setup_input:"device-local-touch-reference",setup_input_physical_tested:false,
+jq --argjson deferred "$defer_reference" '. + {device_private_data_included:($deferred|not),
+    setup_input:(if $deferred then "local-provisioning-required" else "device-local-touch-reference" end),setup_input_physical_tested:false,
     oem_firmware_included:true,redistribution_review_required:true,
     touch_reference_validation:"shape and permissions only; physical acceptance is separate",
     python_policy:"only byte-identical signature-verified original Fedora packages",
