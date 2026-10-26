@@ -31,7 +31,8 @@ jobs:
           shellcheck --exclude=SC2015 src/public/*.sh src/image/*.sh src/boot/*.sh src/boot-pair/*.sh src/boot-pair/dracut/*.sh src/audit/*.sh tests/*.sh
           bash tests/public-build-contract.sh
           bash tests/public-worker-snapshot.sh docker
-          sudo bash tests/public-worker-namespace.sh
+          # Match the Fedora worker's util-linux; Ubuntu 24.04 routes full-range maps through newuidmap.
+          docker run --rm --privileged -v "$PWD:/builder:ro" -w /builder registry.fedoraproject.org/fedora@sha256:f7d3478d02965da40131211c19fb827b4d6e3de0904e9d582a9354af47949c14 bash -c 'dnf5 -y --setopt=install_weak_deps=False install util-linux diffutils && bash tests/public-worker-namespace.sh'
           bash tests/image-contract.sh
           bash tests/boot-contract.sh
           bash tests/boot-pair-contract.sh
