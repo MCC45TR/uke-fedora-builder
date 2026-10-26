@@ -16,13 +16,15 @@ Run `./ukelinux.sh` from the [workspace](https://github.com/MCC45TR/uke-linux)
 for image or kernel builds. The [public build guide](docs/PUBLIC-BUILD.md) covers
 Ubuntu/Fedora/openSUSE/Arch/Alpine hosts, both boot layouts, four filesystems,
 KDE/GNOME, three package channels, prerequisite consent and output selection.
-The 24 October KDE EXT4 singleboot export passes host image checks; exact-export
-tablet acceptance remains open. A Linux 7.3 replacement is building on the
-[release branch](https://github.com/MCC45TR/uke-fedora-builder/tree/release/kde73-20261026).
-Its explicit deferred-touch option omits private data and requires local
-provisioning before account setup. Both CI jobs pass at `c23bfbb`; no completed
-new image follows from that result. The earlier testing release currently has
-no attached assets. Historical recipes below retain their dated scope.
+The 26 October KDE EXT4 singleboot export passes host content/metadata, SELinux,
+both sparse-decoder and compression checks with signed Linux 7.3.0-16 and
+Control 1.15.0-2. Use its [frozen release recipe](https://github.com/MCC45TR/uke-fedora-builder/blob/b0fd2380b07dbaaf37403c057b74796faf8f5ed3/docs/PUBLIC-BUILD.md)
+and [output records](https://github.com/MCC45TR/uke-linux-images/tree/main/releases/prebuild-fedora-kde-singleboot-ext4-20261026-k7.3.0-16-testing)
+for the exact inputs; this default branch has its own source-build workflow.
+The deferred-touch option omits private data and requires local provisioning
+before account setup. Both release-recipe CI jobs pass. First setup and
+exact-export tablet acceptance remain open. Historical recipes below retain
+their dated scope.
 
 ## Status — 14 October 2026
 
