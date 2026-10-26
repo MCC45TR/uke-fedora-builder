@@ -83,7 +83,10 @@ be slow. No generic ARM64 kernel is substituted.
 Testing image builds retrieve the latest signed mainline kernel family from
 `mcc45tr/uke-linux-test`, verify its signing key, every RPM signature, matching
 versions, module hashes and both boot payloads. The exact RPMs and checksums are
-retained. These builds use native host package tools and an AArch64 installroot;
+retained. This release branch pins `uke-core` and its exact Control dependency
+to signed `1.15.0-2.fc46`, which corrects the offline D-Bus callback. A concurrent
+newer repository version cannot replace that reviewed callback during composition.
+These builds use native host package tools and an AArch64 installroot;
 on x86_64, each root stage enters a new user and mount namespace before
 registering the original Fedora QEMU interpreter. All existing numeric UID/GID
 ranges are preserved. Concurrent workers therefore keep distinct binfmt tables

@@ -223,6 +223,8 @@ packages=(fedora-release fedora-repos bash coreutils dnf5 dnf5-plugins glibc-all
     uke-core uke-hw uke-power uke-sensors uke-additional uke-firmware
     uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
     uke-charge-control uke-offline-charge)
+# Freeze the release's offline-install correction against concurrent COPR updates.
+[[ $channel != testing ]] || packages+=(uke-core-1.15.0-2.fc46.aarch64)
 desktop=$(jq -er .desktop "$request")
 if [[ $desktop == kde ]]; then
     packages+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin)
