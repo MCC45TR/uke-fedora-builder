@@ -277,7 +277,6 @@ while IFS= read -r -d '' archive; do
     (cd "$original"; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /var/tmp/uke-payload.cpio)
 done < <(find /job/artifacts/transactions/root -type f -name '*.rpm' -print0)
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
-bash /builder/src/audit/check-target-payload.sh --original-kde-payload "$original" "$root"
 chroot "$root" /usr/sbin/usermod -L root
 systemctl --root="$root" enable NetworkManager.service firewalld.service bluetooth.service chronyd.service
 systemctl --root="$root" disable sshd.service sshd.socket
@@ -337,6 +336,8 @@ for tree in dev proc sys run; do
     fi
     find "$root/$tree" -xdev -mindepth 1 -depth -delete
 done
+# Audit only the finalized image tree, after temporary procfs has been detached.
+bash /builder/src/audit/check-target-payload.sh --original-kde-payload "$original" "$root"
 jq --argjson deferred "$defer_reference" '. + {device_private_data_included:($deferred|not),
     setup_input:(if $deferred then "local-provisioning-required" else "device-local-touch-reference" end),setup_input_physical_tested:false,
     oem_firmware_included:true,redistribution_review_required:true,
