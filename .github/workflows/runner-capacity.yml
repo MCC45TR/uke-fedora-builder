@@ -1,0 +1,27 @@
+name: ARM64 image runner capacity
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  capacity:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - name: Measure native runner resources
+        run: |
+          set -euo pipefail
+          uname -m
+          nproc
+          free -h
+          df -h / /mnt
+          docker info --format '{{.Architecture}} {{.DockerRootDir}}'
+          sudo du -sh /usr/share/dotnet /usr/local/lib/android /opt/hostedtoolcache /usr/local/share/boost 2>/dev/null || true
+      - name: Reclaim unused SDKs on this disposable build runner
+        run: |
+          set -euo pipefail
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /usr/local/share/boost
+          docker image prune --all --force
+          df -h / /mnt
+          available=$(df -Pm / | awk 'NR==2 {print $4}')
+          printf 'Available after SDK cleanup: %s MiB\n' "$available" >> "$GITHUB_STEP_SUMMARY"
