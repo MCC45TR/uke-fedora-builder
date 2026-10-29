@@ -66,7 +66,7 @@ jq --arg raw "$(cut -d ' ' -f1 /job/root.raw.sha256)" --argjson bytes "$(stat -c
     --arg boot "$(sha256sum /job/artifacts/boot.img | cut -d ' ' -f1)" \
     --argjson boot_bytes "$(stat -c %s /job/artifacts/boot.img)" \
     '. + {root_raw_bytes:$bytes,root_raw_sha256:$raw,root_sparse_sha256:$sparse,boot_sha256:$boot,boot_bytes:$boot_bytes,
-      filesystem_contents_readback:true,filesystem_metadata_readback:true,selinux_relabel_performed:true,
+      image_built:true,filesystem_contents_readback:true,filesystem_metadata_readback:true,selinux_relabel_performed:true,
       sparse_roundtrip_verified:true,independent_aosp_decoder_verified:true,physical_boot_tested:false,hardware_tested:false}' \
     /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json

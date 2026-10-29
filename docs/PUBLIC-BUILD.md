@@ -1,13 +1,46 @@
 # Public source and image builds
 
-23 October 2026. This host workflow starts from public source and an empty Fedora
-Rawhide AArch64 root. It does not consume a prepared private root, historical
-Core cache, a stock boot dump or a pre-existing local container ID.
+29 October 2026: the public builder accepts Fedora 44, Fedora 45 and Rawhide as
+separate targets, and Bash, Fish or Zsh as the new normal user's login shell.
+The default remains Rawhide, KDE and Bash. Fedora 44/45 image composition stops
+before host preparation until signed Uke family builds and dependency resolution
+are validated. Cutefish image composition also stops: its graphical login and
+secure first-account flow are unvalidated. Dry-run selection is not image support.
 
-The implementation has shell syntax, CLI and source-integrity checks. Kernel,
-container and image builds were not run for this change. None of the 48 image
-selections has new physical acceptance from this work. Mutable Rawhide/COPR
-repositories also prevent a promise of identical bytes on future builds.
+The three targets use reviewed per-architecture Fedora image digests in
+`configs/build-rules.json`. Public RPM stages derive the dist tag from that
+worker, use release-specific Fedora/COPR repositories and segregate package and
+kernel caches by release and channel. The default kernel is pinned to the
+reviewed Uke Linux 7.3.0-33 source commit; no generic Fedora kernel is substituted.
+The legacy Core command retains its original Rawhide-only contract.
+
+`--shell` installs the original Fedora shell, validates the executable from the
+target RPM and `/etc/shells`, and updates `useradd -D` in the new root.
+AccountsService 26.27.3 calls useradd without a shell override. Existing accounts
+and root keep their shells. Graphical setup and AArch64 first-user acceptance
+remain separate from native x86_64 container user-creation tests.
+
+`--release` (alias `--fedora-version`) selects Fedora, independently of
+`--channel`. Explicit desktop/shell flags are rejected for kernel-only builds.
+Testing and unstable share `uke-linux-test`; they are not separate repositories.
+Builds never flash a device. Singleboot flashing destroys Android userdata;
+multiboot requires an existing physical `linux` partition.
+
+```sh
+./ukelinux.sh --build image --release 44 --desktop kde --shell bash --dry-run
+./ukelinux.sh --build image --release 45 --desktop cutefish --shell fish --dry-run
+./ukelinux.sh --build image --release rawhide --desktop gnome --shell zsh --dry-run
+./ukelinux.sh --build kernel --release 45 --channel testing
+./ukelinux.sh --self-test
+```
+
+All 648 release/desktop/shell/layout/filesystem/channel plans are checked without
+network or host preparation. The Cutefish meta package selects the real,
+separately packaged upstream desktop; it enables no display manager and cannot
+establish image or tablet support. Fedora 44/45 chroots were enabled in
+`mcc45tr/uke-linux`, `mcc45tr/uke-linux-test` and `mcc45tr/cutefish`.
+Compatibility builds 11222490 and 11222501–11222510 failed after source preparation,
+without published binary logs. No Fedora 44/45 stable RPM promotion was performed.
 
 ## Start
 
@@ -57,12 +90,11 @@ failed under emulation. Set `UKE_CROSS=0` to emulate every AArch64 step instead.
 
 `--kernel VERSION|latest|lastest` selects the Linux version. The default is `kernel.default_version` in the policy. `latest` is kernel.org's newest stable release; it is resolved once per build, before any worker starts, and `lastest` is accepted as an alias. The selected source must pass its actual SRPM producer's `make validate version=VERSION` checks before source downloads. A profile accepted by another host build route does not admit this native RPM route. Unsupported versions stop explicitly without substituting a generic or older kernel. The kernel release (for example `7.2.12-20`) is read from the selected source's spec, so the initramfs, RPMs and module paths match. `manifest.json` records the requested selection, the resolved version, the source commit and the release.
 
-24 October 2026: the current native SRPM producer admits Linux 7.2.12. Kernel.org
-`latest` resolves to 7.3, which needs a reviewed native Uke profile and producer
-update before this route can build it. Older profiles in the standalone kernel
-entry do not establish support in this producer.
-
-The kernel source is the head of `kernel.ref` in the policy repository, resolved once when the build starts. `UKE_KERNEL_REPO=PATH` uses a local checkout at its committed `HEAD` instead (`none` keeps the policy repository). Git validates the path, so a linked worktree is accepted; an invalid path or a checkout with uncommitted changes stops the build. Workers receive a snapshot of that commit. Offline builds use the newest cached source and kernel.org list unless a checkout is given.
+The policy source is pinned to Uke Linux 7.3.0-33. `UKE_KERNEL_REPO=PATH` uses a
+committed local checkout instead; an invalid or modified checkout is refused.
+Offline builds require the exact pinned source, or that explicit local checkout.
+Workers receive an immutable source snapshot. `latest` still needs a profile
+admitted by the selected SRPM producer.
 
 ## Selections
 
@@ -202,11 +234,12 @@ separately guarded operation.
 
 ## Validation scope
 
-The public shell fixtures cover all 48 selections, three kernel channels,
+The public shell fixtures cover all 648 selection plans, three kernel channels,
 invalid input, package-consent refusal, missing-`jq` planning and output paths.
 The source change also extends parser fixtures for the explicit Linux profile.
-No new container, kernel, filesystem image, VM boot or tablet run was executed
-for the 22 October implementation. First full builds, package resolution on each
-channel, desktop setup and recoverable tablet boot remain necessary acceptance
-checks. Historical `core`, `boot` and `boot-pair` commands remain available for
+Native x86_64 Fedora 44, Fedora 45 and Rawhide container user-creation checks
+passed for Bash, Fish and Zsh. Fedora 44 libdnf5 5.4.6 compilation and signed local
+repository fixtures passed. These checks do not validate AArch64 execution, a
+graphical first-account flow, image composition or tablet hardware. Those remain
+required acceptance checks. Historical `core`, `boot` and `boot-pair` commands remain available for
 their dated frozen contracts; their old caches are not prerequisites here.

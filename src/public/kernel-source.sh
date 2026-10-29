@@ -46,6 +46,11 @@ kernel_version_resolve() {
 # newest source already cached under CACHE.
 kernel_commit_resolve() {
     local url=$1 ref=$2 offline=$3 cache=$4 commit='' entry
+    if [[ $ref =~ ^[0-9a-f]{40}$ ]]; then
+        [[ $offline == 0 || -d $cache/kernel-$ref/.git ]] || die 'Offline builds need the exact pinned kernel source'
+        printf '%s\n' "$ref"
+        return
+    fi
     if ((offline)); then
         entry=$(find "$cache" -maxdepth 1 -type d -regextype posix-extended -regex '.*/kernel-[0-9a-f]{40}' -printf '%T@ %f\n' 2>/dev/null | sort -rn | head -n 1)
         [[ -n $entry ]] || die 'Offline builds need a cached kernel source or UKE_KERNEL_REPO'
@@ -87,7 +92,7 @@ kernel_producer_sha() {
 # Cache key: source commit, exact version and producer. The release is derived from the source and recorded in it.
 kernel_cache_dir() {
     # shellcheck disable=SC2154
-    printf '%s/cache/kernel-builds/%s-%s-%s\n' "$output" "$KERNEL_COMMIT" "$KERNEL_VERSION" "${KERNEL_PRODUCER_SHA:0:16}"
+    printf '%s/cache/kernel-builds/fedora-%s-%s-aarch64/%s-%s-%s\n' "$output" "${FEDORA_TARGET:-rawhide}" "${UKE_CACHE_CHANNEL:-testing}" "$KERNEL_COMMIT" "$KERNEL_VERSION" "${KERNEL_PRODUCER_SHA:0:16}"
 }
 # Succeeds only for an entry that is complete, checksummed and was produced for this source and producer.
 kernel_cache_check() {

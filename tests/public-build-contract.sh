@@ -20,11 +20,13 @@ reject() {
     ((status > 0 && status < 90)) || { echo 'Invalid request accepted or reached host preparation' >&2; exit 1; }
 }
 count=0
+for fedora_release in 44 45 rawhide; do
+for login_shell in bash fish zsh; do
 for mode in multiboot singleboot; do
     for filesystem in ext4 f2fs btrfs xfs; do
-        for desktop in kde gnome; do
+        for desktop in kde gnome cutefish; do
             for channel in stable testing unstable; do
-                (cd "$fixture"; public_main --build image --mode "$mode" --filesystem "$filesystem" --desktop "$desktop" --channel "$channel" --offline --dry-run) > "$fixture/plan"
+                (cd "$fixture"; public_main --build image --release "$fedora_release" --shell "$login_shell" --mode "$mode" --filesystem "$filesystem" --desktop "$desktop" --channel "$channel" --offline --dry-run) > "$fixture/plan"
                 grep -F "$mode; $filesystem; $desktop; $channel" "$fixture/plan" >/dev/null
                 grep -F "$fixture/out" "$fixture/plan" >/dev/null
                 ((count+=1))
@@ -32,12 +34,21 @@ for mode in multiboot singleboot; do
         done
     done
 done
-[[ $count == 48 && ! -e $fixture/out ]]
+done
+done
+[[ $count == 648 && ! -e $fixture/out ]]
 for channel in stable testing unstable; do
     public_main --build kernel --channel "$channel" --dry-run > "$fixture/plan"
     grep -F 'kernel: Fedora Rawhide AArch64' "$fixture/plan" >/dev/null
 done
-for pair in '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 99999' '--linux-size 65537'; do
+reject --release
+reject --shell
+reject --build kernel --shell bash --dry-run
+reject --build kernel --desktop kde --dry-run
+reject --desktop cutefish --yes
+reject --release 44 --yes
+reject --release 45 --yes
+for pair in '--release 46' '--release ../45' '--shell sh' '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 99999' '--linux-size 65537'; do
     # Intentional fixture word splitting of fixed literal option/value pairs.
     # shellcheck disable=SC2086
     reject $pair --dry-run
@@ -57,6 +68,18 @@ ln -s reference.bin "$fixture/link.bin"
 reject --touch-reference "$fixture/link.bin" --dry-run
 truncate -s 5431 "$fixture/reference.bin"
 reject --touch-reference "$fixture/reference.bin" --dry-run
+# Refuse a filesystem that cannot protect private image inputs before copying them.
+truncate -s 5432 "$fixture/reference.bin"
+(
+    bootstrap() { :; }
+    df() { printf 'Filesystem 1024-blocks Used Available Capacity Mounted\nfixture 999999999 0 999999999 0%% /\n'; }
+    stat() {
+        if [[ $1 == -c && $2 == %a && $3 == "$fixture/refused-output/"* ]]; then printf '775\n'
+        else command stat "$@"; fi
+    }
+    install() { echo 'Private input copy reached an inadmissible filesystem' >&2; exit 94; }
+    reject --build image --yes --out "$fixture/refused-output" --touch-reference "$fixture/reference.bin"
+)
 for partition in linux userdata; do
     public_flash_help "$partition" > "$fixture/flash"
     grep -Fx "       fastboot flash $partition $partition.img" "$fixture/flash" >/dev/null
@@ -86,7 +109,7 @@ jq -e '.kernel | (.ref|type=="string") and (.default_version|test("^[0-9]+\\.[0-
     "$root/configs/public-build.json" >/dev/null
 bash -n "$root"/src/public/*.sh
 bash "$root/tests/public-source-inputs.sh"
-printf '%s\n' '48 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
+printf '%s\n' '648 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
 quiet_fail() { if ("$@") > /dev/null 2>&1; then echo "Accepted: $*" >&2; exit 1; fi; }
 # Kernel selection: explicit versions, latest and its alias are accepted; anything else is refused before a build starts.
 for choice in 7.2.12 7.3 latest lastest; do public_main --kernel "$choice" --dry-run > /dev/null; done
@@ -147,12 +170,19 @@ MAKE
     UKE_KERNEL_REPO=none public_main --dry-run > /dev/null
     status=0; (UKE_KERNEL_REPO=$fixture/plain public_main --dry-run) > /dev/null 2>&1 || status=$?
     ((status > 0 && status < 90)) || { echo 'Invalid UKE_KERNEL_REPO was ignored' >&2; exit 1; }
+    # A reviewed commit is immutable; offline use requires that exact source.
+    pin=$(printf 'd%.0s' {1..40})
+    [[ $(kernel_commit_resolve "$repo" "$pin" 0 "$fixture/srcs") == "$pin" ]]
+    quiet_fail kernel_commit_resolve "$repo" "$pin" 1 "$fixture/srcs"
+    mkdir -p "$fixture/srcs/kernel-$pin/.git"
+    [[ $(kernel_commit_resolve "$repo" "$pin" 1 "$fixture/srcs") == "$pin" ]]
     # Source commit: the remote branch head online, the newest cached source offline.
     [[ $(kernel_commit_resolve "$repo" main 0 "$fixture/none") == "$(git -C "$repo" rev-parse main)" ]]
     quiet_fail kernel_commit_resolve "$repo" absent 0 "$fixture/none"
     quiet_fail kernel_commit_resolve "$repo" main 1 "$fixture/none"
     mkdir -p "$fixture/srcs/kernel-$(printf 'b%.0s' {1..40})" "$fixture/srcs/kernel-$(printf 'c%.0s' {1..40})"
     touch -d '2 days ago' "$fixture/srcs/kernel-$(printf 'b%.0s' {1..40})"
+    touch -d '3 days ago' "$fixture/srcs/kernel-$pin"
     [[ $(kernel_commit_resolve "$repo" main 1 "$fixture/srcs") == "$(printf 'c%.0s' {1..40})" ]]
 )
 # Kernel cache: restores byte-for-byte with its producer, is keyed by source, version and producer, and repairs damage.

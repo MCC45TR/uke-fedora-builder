@@ -1,14 +1,14 @@
 {
   "schema_version": 1,
-  "date": "2026-10-23",
+  "date": "2026-10-29",
   "distribution": "fedora",
   "release": "rawhide",
   "architecture": "aarch64",
   "kernel": {
     "url": "https://github.com/MCC45TR/senemos-uke-kernel-mainline.git",
-    "ref": "main",
-    "default_version": "7.2.12",
-    "policy": "All channels build one kernel: the head of ref in url at build start, at default_version unless --kernel selects another. The Linux version needs a reviewed Uke profile in that source, the release is read from its spec, and latest means the newest kernel.org stable release; channel names select RPM repositories only."
+    "ref": "b566637062d86fe2f2b0250b02fc9d91e05cddfc",
+    "default_version": "7.3.0",
+    "policy": "Reviewed Uke Linux 7.3.0-33 source profile; the exact source revision is shared by every Fedora release and channel. Release macros are resolved in each pinned Fedora worker. Explicit local sources remain separately admitted by their SRPM producer."
   },
   "channels": {
     "stable": {

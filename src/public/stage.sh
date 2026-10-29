@@ -5,6 +5,15 @@ set -Eeuo pipefail
 request=/job/request.json
 policy=/builder/configs/public-build.json
 stage=$1
+fedora_release=$(jq -er .fedora_release "$request")
+case $fedora_release in 44|45|rawhide) ;; *) echo "Unsupported Fedora target" >&2; exit 1;; esac
+# The worker is pinned to the requested distribution; derive its RPM macros there.
+fedora_number=$(rpm --eval '%{fedora}')
+dist=$(rpm --eval '%{?dist}')
+[[ $fedora_number =~ ^[0-9]+$ && $dist == ".fc$fedora_number" ]]
+[[ $fedora_release == rawhide || $fedora_number == "$fedora_release" ]]
+fedora_key=/builder/configs/keys/fedora-$fedora_number.asc
+[[ -s $fedora_key ]] || { echo "Unreviewed Fedora signing key: $fedora_number" >&2; exit 1; }
 if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then
     [[ $UKE_OUTPUT_OWNER =~ ^[0-9]+:[0-9]+$ ]]
     # Preserve the numeric owners in the staging root used for filesystem readback.
@@ -100,7 +109,7 @@ kernel_collect() {
         (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames < /job/payload.cpio)
     done
     release=$(< /job/kernel-release)
-    [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}' /job/artifacts/kernel/senemos-uke-linux-kernel-mainline-core-*.aarch64.rpm) == "$release.fc46" ]] ||
+    [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}' /job/artifacts/kernel/senemos-uke-linux-kernel-mainline-core-*.aarch64.rpm) == "$release$dist" ]] ||
         die "Built kernel RPMs do not match release $release"
     bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release
     modules=/job/kernel-payload/usr/lib/modules/$release
@@ -115,8 +124,8 @@ kernel_collect() {
     done
     # The native RPM producer audits its linked initramfs with no Python exception.
     jq -n --arg source "$source_commit" --arg release "$release" --arg version "$kernel_version" \
-        --arg requested "$(jq -er .kernel_requested "$request")" \
-        '{kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,kernel_rpms_locally_built:true,
+        --arg dist "$dist" --arg requested "$(jq -er .kernel_requested "$request")" \
+        '{rpm_dist:$dist,kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,kernel_rpms_locally_built:true,
           local_kernel_rpm_signature:"unsigned local build; signed upstream source verified by producer",
           physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' \
         > /job/artifacts/kernel/kernel-info.json
@@ -128,7 +137,7 @@ if [[ $stage == kernel ]]; then
     kernel_srpm
     kernel_spec
     rpmbuild -bb --target aarch64 --define '_topdir /job/rpmbuild' \
-        --define "_smp_build_ncpus $jobs" --define 'dist .fc46' "${spec[0]}"
+        --define "_smp_build_ncpus $jobs" --define "dist $dist" "${spec[0]}"
     kernel_collect
     exit
 fi
@@ -181,7 +190,7 @@ if [[ $stage == kernel-build ]]; then
     [[ ! -f /job/prebuilt/uke-touch-capture ]] || export UKE_PREBUILT_TOUCH_CAPTURE=/job/prebuilt/uke-touch-capture
     UKE_PREBUILT_SWITCH_ROOT=/job/prebuilt/uke-offline-switch-root \
         rpmbuild -bb --nodeps --target aarch64 --define '_topdir /job/rpmbuild' \
-        --define "_smp_build_ncpus $jobs" --define 'dist .fc46' "${spec[0]}"
+        --define "_smp_build_ncpus $jobs" --define "dist $dist" "${spec[0]}"
     kernel_collect
     exit
 fi
@@ -204,7 +213,7 @@ if [[ $stage == hardware ]]; then
     local_repository
     for family in uke-additional uke-sensors uke-hw uke-power uke-core uke-metas; do
         top=/job/hardware-$family
-        make -C "$hardware/packaging/families" srpm FAMILY="$family" outdir="$top/source"
+        FEDORA_TARGET="$fedora_release" make -C "$hardware/packaging/families" srpm FAMILY="$family" outdir="$top/source"
         srpms=("$top/source/SRPMS/"*.src.rpm)
         [[ ${#srpms[@]} == 1 && -f ${srpms[0]} ]]
         dnf5 "${cache_flags[@]}" -y builddep "${srpms[0]}"
@@ -212,7 +221,7 @@ if [[ $stage == hardware ]]; then
             printf 'Building %s, dependency pass %s\n' "$family" "$attempt"
             result=0
             rpmbuild --rebuild --target aarch64 --define "_topdir $top" \
-                --define "_smp_build_ncpus $jobs" --define 'dist .fc46' "${srpms[0]}" || result=$?
+                --define "_smp_build_ncpus $jobs" --define "dist $dist" "${srpms[0]}" || result=$?
             [[ $result != 0 ]] || break
             [[ $result == 11 ]] || exit "$result"
             requirements=("$top/SRPMS/"*.buildreqs.nosrc.rpm)
@@ -253,11 +262,11 @@ if [[ ${UKE_OFFLINE:-0} != 1 ]]; then
 fi
 [[ $(gpg --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == "$fingerprint" ]]
 install -m644 "$key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
-install -m644 /builder/configs/keys/fedora-46.asc /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora46
+install -m644 "$fedora_key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora
 cat > /etc/yum.repos.d/uke-selected.repo <<REPO
 [uke-selected]
 name=Uke $channel
-baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-\$basearch/
+baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-$fedora_release-\$basearch/
 enabled=1
 gpgcheck=1
 repo_gpgcheck=0
@@ -266,7 +275,7 @@ skip_if_unavailable=False
 priority=40
 includepkgs=uke-*,senemos-uke-linux-kernel-*
 REPO
-packages=(fedora-release fedora-repos bash coreutils dnf5 dnf5-plugins glibc-all-langpacks
+packages=(fedora-release fedora-repos bash "$(jq -er .default_shell "$request")" coreutils dnf5 dnf5-plugins glibc-all-langpacks
     systemd systemd-udev systemd-pam NetworkManager NetworkManager-wifi bluez chrony
     firewalld openssh-server sudo shadow-utils selinux-policy-targeted policycoreutils
     e2fsprogs f2fs-tools btrfs-progs xfsprogs util-linux kbd less nano fastfetch
@@ -274,7 +283,9 @@ packages=(fedora-release fedora-repos bash coreutils dnf5 dnf5-plugins glibc-all
     uke-core uke-hw uke-power uke-sensors uke-additional uke-firmware
     uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
     uke-charge-control uke-offline-charge)
+[[ $fedora_release != rawhide ]] || packages+=(fedora-repos-rawhide)
 desktop=$(jq -er .desktop "$request")
+[[ $desktop == kde || $desktop == gnome ]] || die "Unsupported desktop image: $desktop"
 if [[ $desktop == kde ]]; then
     packages+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin)
 else
@@ -285,21 +296,22 @@ release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
 base=senemos-uke-linux-kernel-mainline
 local_rpms=()
 for component in '' -core -modules -dtbs -boot; do
-    package=/job/artifacts/kernel/$base$component-$release.fc46.aarch64.rpm
+    package=/job/artifacts/kernel/$base$component-$release$dist.aarch64.rpm
     [[ -f $package ]]
     local_rpms+=("$package")
 done
 if [[ $partition == userdata ]]; then
-    local_rpms+=("/job/artifacts/kernel/$base-singleboot-$release.fc46.aarch64.rpm")
+    local_rpms+=("/job/artifacts/kernel/$base-singleboot-$release$dist.aarch64.rpm")
 fi
 # Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
-dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-config --installroot="$root" --releasever=rawhide
-    --disable-repo='*' --enable-repo=rawhide --enable-repo=uke-selected
+dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-config --installroot="$root" --releasever="$fedora_release"
+    --disable-repo='*' --enable-repo=uke-selected
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
     --setopt=install_weak_deps=False --setopt=gpgcheck=True --setopt=installonly_limit=0
     # Uke packages require files such as /usr/lib/systemd/systemd-growfs, which only the filelists metadata resolves.
     --setopt=optional_metadata_types=filelists --setopt=max_parallel_downloads=10
     --setopt=tsflags=nodocs --setopt=excludepkgs='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-kvm*,senemos-uke-linux-kernel-mainline-unstable*')
+while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
@@ -315,13 +327,13 @@ if ((${#arch_flags[@]})); then
 fi
 "${dnf[@]}" check
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
-[[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$release.fc46" ]]
+[[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$release$dist" ]]
 bundle=$root/usr/lib/senemos/kernel-updates/$release
 (cd "$root/usr/lib/modules/$release"; sha256sum -c "$bundle/modules.sha256")
 cp "$bundle/$partition.img" /job/artifacts/boot.img
 cmp /job/artifacts/boot.img "/job/artifacts/boot-$partition.img"
 # Prove Python exceptions against independently signature-verified Fedora bytes.
-rpmkeys --dbpath /job/keydb --import /builder/configs/keys/fedora-46.asc
+rpmkeys --dbpath /job/keydb --import "$fedora_key"
 : > /job/fedora-inputs.tsv
 # Only archives whose exact NEVRA is installed in the root count as its original bytes.
 declare -A installed=()
@@ -336,6 +348,12 @@ done < <(find "/cache/dnf-$channel" -type f -name '*.rpm' -print0)
 LC_ALL=C sort /job/fedora-inputs.tsv > /job/artifacts/fedora-inputs.tsv
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
 bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
+bash /builder/src/public/login-shell.sh "$root" "$(jq -er .default_shell "$request")" > /job/artifacts/login-shell.json
+[[ $(rpm --root "$root" -q fedora-release-common --qf '%{VERSION}') == "$fedora_number" ]]
+# Official Fedora carry-over builds are admitted only through verified Fedora RPM bytes.
+while IFS=$'\t' read -r name rpm_release; do
+    case $name in uke-*|senemos-uke-*) [[ $rpm_release == *"$dist" || $rpm_release == *"$dist".* ]] || die "Foreign-release Uke package: $name-$rpm_release";; esac
+done < <(rpm --root "$root" -qa --qf '%{NAME}\t%{RELEASE}\n')
 chroot "$root" /usr/sbin/usermod -L root
 systemctl --root="$root" enable NetworkManager.service firewalld.service bluetooth.service chronyd.service
 systemctl --root="$root" disable sshd.service sshd.socket
@@ -387,7 +405,7 @@ for file in etc/machine-id var/lib/dbus/machine-id var/lib/systemd/random-seed; 
 done
 : > "$root/etc/machine-id"
 [[ ! -e $root/var/lib/uke-touch/reference.bin || $private == true ]]
-jq --argjson private "$private" '. + {device_private_data_included:$private,
+jq --argjson private "$private" --slurpfile shell /job/artifacts/login-shell.json --arg dist "$dist" '. + {default_shell_path:$shell[0].path,shell_provisioning:$shell[0].provisioning,rpm_dist:$dist,rpm_transaction_validated:true,source_checked:true,device_private_data_included:$private,
     oem_firmware_included:true,redistribution_review_required:true,
     touch_reference_validation:"shape and permissions only; physical acceptance is separate",
     python_policy:"only byte-identical signature-verified original Fedora packages",
