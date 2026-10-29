@@ -246,3 +246,18 @@ cache_fixture=$(mktemp -d)
 )
 rm -rf -- "$cache_fixture"
 reject --build kernel --reuse-kernel --dry-run
+
+# Run orchestration up to the first worker without installing or starting a container.
+# shellcheck disable=SC2317,SC2329
+(
+    bootstrap() { :; }
+    df() { printf 'Filesystem 1024-blocks Used Available Capacity Mounted\nfixture 999999999 0 999999999 0%% /\n'; }
+    public_worker() { printf '%s %s\n' "$1" "$3" >> "$fixture/worker-targets"; exit 91; }
+    for release in 44 45; do
+        status=0
+        (public_main --build kernel --release "$release" --yes --out "$fixture/worker-$release") > /dev/null 2>&1 || status=$?
+        [[ $status == 91 ]]
+    done
+    [[ $(awk '{print $1}' "$fixture/worker-targets" | sort -u | wc -l) == 2 ]]
+    [[ $(awk '{print $2}' "$fixture/worker-targets" | sort -u | wc -l) == 2 ]]
+)

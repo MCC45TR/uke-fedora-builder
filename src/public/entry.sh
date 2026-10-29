@@ -206,7 +206,7 @@ public_main() {
     local native_image arm_image native_base arm_base recipe_sha
     native_base=$(jq -er --arg release "$fedora_release" --arg arch "$architecture" '.fedora_targets[$release].images[$arch]' "$WORK/recipe/configs/build-rules.json")
     arm_base=$(jq -er --arg release "$fedora_release" '.fedora_targets[$release].images.aarch64' "$WORK/recipe/configs/build-rules.json")
-    recipe_sha=$(cat "$WORK/recipe/configs/Containerfile.public" "$WORK/recipe/configs/Containerfile.public-native" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json" | sha256sum | cut -d ' ' -f1)
+    recipe_sha=$({ printf '%s\n' "$fedora_release" "$native_base" "$arm_base"; cat "$WORK/recipe/configs/Containerfile.public" "$WORK/recipe/configs/Containerfile.public-native" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json"; } | sha256sum | cut -d ' ' -f1)
     native_image=localhost/uke-public-native:${recipe_sha:0:16}-$architecture
     arm_image=localhost/uke-public-arm64:${recipe_sha:0:16}
     public_worker "$native_image" "$host_platform" "$native_base" Containerfile.public-native
