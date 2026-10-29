@@ -1,5 +1,9 @@
 # Fedora for POCO Pad X1 and Xiaomi Pad 7
 
+The `experiment/el2-kvm` branch retains current main and the separate generic
+ARM64 EL1/EL2 fixtures in `tests/el2-kvm-qemu*.sh`. Emulation results are recorded
+in `reports/EL2-KVM-2026-10-12.json`; they do not establish physical Uke EL2 boot.
+
 Fedora Rawhide AArch64 image recipes and validation tools for `uke` / SM7675.
 Kernel sources and RPM rules are maintained in the [Senemos repository](https://github.com/MCC45TR/senemos-uke-kernel-mainline).
 
@@ -149,3 +153,9 @@ identity, normal ordered journaling, write barriers and commit interval. The
 first option avoids access-time writes; the second protects an errored root
 from further writes. Periodic trimming remains separate from continuous
 mount-time discard. Source checks do not qualify a newly exported image.
+The RAM-only full Linux acceptance runner is `tests/kvm-linux-guest.sh`. It
+requires an ARM64 host with actual KVM and the kernel component's native guest
+initramfs. It starts one then two vCPUs with `-accel kvm`, checks timer wakeup,
+migration and poweroff, and supplies no disk, network or TCG fallback. This
+runner's presence does not establish physical Uke EL2 handoff. See the kernel
+experiment's `EL2.md` for the firmware and host-regression gates.
