@@ -62,6 +62,17 @@ done
 cmp /job/rootfs.files /job/root-readback.files
 c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse
 /job/android-sparse encode /job/root.raw "/job/artifacts/$partition.img"
+if jq -e '(.kernel_rpm_request // "") != ""' /job/request.json >/dev/null; then
+    # Hosted runner: keep one decoder output at a time and discard verified tar copies.
+    rm /job/rootfs.tar /job/root-readback.tar
+    sha256sum /job/root.raw > /job/root.raw.sha256
+    /job/android-sparse decode "/job/artifacts/$partition.img" /job/expanded.raw
+    dd if=/job/root.raw bs=4M status=none | cmp - /job/expanded.raw
+    rm /job/expanded.raw
+    simg2img "/job/artifacts/$partition.img" /job/aosp-expanded.raw
+    dd if=/job/root.raw bs=4M status=none | cmp - /job/aosp-expanded.raw
+    rm /job/aosp-expanded.raw
+else
 # Both decoders and the raw-image hash read the same files; run them together.
 sha256sum /job/root.raw > /job/root.raw.sha256 &
 hash_pid=$!
@@ -72,6 +83,7 @@ aosp_pid=$!
 wait "$hash_pid"
 wait "$ours_pid"
 wait "$aosp_pid"
+fi
 jq --arg fs "$filesystem" --arg raw "$(cut -d ' ' -f1 /job/root.raw.sha256)" --argjson bytes "$(stat -c %s /job/root.raw)" \
     --arg sparse "$(sha256sum "/job/artifacts/$partition.img" | cut -d ' ' -f1)" \
     --arg boot "$(sha256sum /job/artifacts/boot.img | cut -d ' ' -f1)" \

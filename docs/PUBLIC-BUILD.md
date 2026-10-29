@@ -288,3 +288,30 @@ trial; it does not establish Android, GPU or container acceptance. The upstream
 Python container startup service needs a project policy decision before any
 Waydroid installation. Preserve the accepted kernel/modules and physical
 recovery route before any separately authorized activation.
+
+## Hosted EXT4 singleboot image releases
+
+Use the manual image-release workflow in `MCC45TR/uke-linux`. It selects the
+recorded workspace/component revisions and runs natively on `ubuntu-24.04-arm`.
+The image path is `--kernel-rpm latest --channel testing`: signed Fedora/COPR
+binary packages supply the kernel and hardware userspace. No kernel or hardware
+source build is performed. An exact `7.3.x-N.fc46` kernel tuple can replace
+`latest`; one selected tuple supplies all six matching RPMs. The kernel key
+fingerprint, each RPM signature, module inventory and both embedded boot Images
+are checked before composition. The actual source and tuple replace provisional
+source defaults in the run receipt. This route cannot combine a local source,
+explicit `--kernel`, KVM profile, kernel-only build or kernel-cache reuse.
+
+The hosted job uses Docker (`UKE_CONTAINER_ENGINE=docker`). The binary-package
+path needs 16 GiB plus twice the requested root capacity; it uses a smaller
+worker and validates one independent sparse decoder output at a time. The source
+build path retains its original capacity requirement. Runner capacities can
+change: the job checks actual free space rather than assuming a hosted label
+provides enough storage. The 29 October probe measured 115 GiB free after unused
+SDK cleanup; that observation is not a future capacity guarantee.
+
+No touch reference, account credentials or SSH host keys are supplied. Before
+any release is published, artifacts must pass metadata/content readback,
+SELinux context verification, both sparse decoders, Zstandard readback and
+checksums. Releases are marked as experimental pre-releases; these host checks
+do not qualify tablet boot, first-account setup, charging or recovery.

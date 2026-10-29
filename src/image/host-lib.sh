@@ -60,6 +60,12 @@ bootstrap() {
         command -v "$cmd" >/dev/null 2>&1 || die "Host prerequisite still missing after installation: $cmd"
     done
     ((require_engine)) || return 0
+    case ${UKE_CONTAINER_ENGINE:-auto} in
+        docker) docker info >/dev/null 2>&1 || die 'Requested Docker engine is unavailable'; ENGINE=docker; return;;
+        podman) podman info >/dev/null 2>&1 || die 'Requested Podman engine is unavailable'; ENGINE=podman; return;;
+        auto) ;;
+        *) die 'UKE_CONTAINER_ENGINE must be auto, docker or podman';;
+    esac
     if command -v podman >/dev/null 2>&1 && podman info >/dev/null 2>&1; then ENGINE=podman;
     elif command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then ENGINE=docker;
     else

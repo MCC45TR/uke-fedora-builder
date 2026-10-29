@@ -153,6 +153,10 @@ kernel_collect() {
         > /job/artifacts/kernel/kernel-info.json
     jq --slurpfile info /job/artifacts/kernel/kernel-info.json '. + $info[0]' "$request" > /job/artifacts/manifest.json
 }
+if [[ $stage == repository-kernel ]]; then
+    bash /builder/src/public/repository-kernel.sh
+    exit
+fi
 if [[ $stage == kernel ]]; then
     [[ $(uname -m) == aarch64 ]]
     kernel_checkout
@@ -275,6 +279,19 @@ fi
 root=/job/root
 [[ ! -e $root ]]
 mkdir -p "$root" /job/original-fedora /job/keydb
+mkdir -p "$root/proc"
+# shellcheck source=root-proc.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-proc.sh
+root_cleanup() {
+    local status=$?
+    public_root_proc_unmount "$root" || status=1
+    if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then chown -R "$UKE_OUTPUT_OWNER" /job/artifacts || status=1; fi
+    exit "$status"
+}
+trap root_cleanup EXIT
+public_root_proc_mount "$root"
+
 project=$(jq -er --arg channel "$channel" '.channels[$channel].project' "$policy")
 fingerprint=$(jq -er --arg channel "$channel" '.channels[$channel].fingerprint' "$policy")
 key=/cache/$project.asc
@@ -442,4 +459,9 @@ jq --argjson private "$private" --slurpfile shell /job/artifacts/login-shell.jso
     python_policy:"only byte-identical signature-verified original Fedora packages",
     credentials_included:false,ssh_enabled:false}' /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
+public_root_proc_unmount "$root"
+for tree in dev proc sys run; do
+    if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then die 'Mounted runtime tree during export'; fi
+    find "$root/$tree" -xdev -mindepth 1 -depth -delete
+done
 tar --create --numeric-owner --one-file-system --sort=name --acls --xattrs --xattrs-include=security.capability -f /job/rootfs.tar -C "$root" .

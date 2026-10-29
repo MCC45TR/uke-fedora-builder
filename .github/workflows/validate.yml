@@ -21,6 +21,7 @@ jobs:
           # The pinned host validation also checks all default diagnostics.
           shellcheck --exclude=SC2015 src/public/*.sh src/image/*.sh src/boot/*.sh src/boot-pair/*.sh src/boot-pair/dracut/*.sh src/audit/*.sh tests/*.sh
           bash tests/public-build-contract.sh
+          bash tests/repository-kernel-plan.sh
           bash tests/public-login-shell.sh
           bash tests/image-contract.sh
           bash tests/boot-contract.sh
