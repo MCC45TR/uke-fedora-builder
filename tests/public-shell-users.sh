@@ -15,6 +15,8 @@ for shell in bash fish zsh; do
     [[ $selected == /usr/bin/"$shell" || $selected == /bin/"$shell" ]]
     grep -Fxq "$selected" /etc/shells
     rpm -qf "$selected"
+    # PATH must expand in the new login shell.
+    # shellcheck disable=SC2016
     runuser -l "$name" -c 'test -n "$PATH"'
     [[ $(getent passwd root) == "$root_before" && $(getent passwd uke-existing-shell) == "$existing_before" ]]
 done

@@ -70,6 +70,7 @@ truncate -s 5431 "$fixture/reference.bin"
 reject --touch-reference "$fixture/reference.bin" --dry-run
 # Refuse a filesystem that cannot protect private image inputs before copying them.
 truncate -s 5432 "$fixture/reference.bin"
+# shellcheck disable=SC2317,SC2329
 (
     bootstrap() { :; }
     df() { printf 'Filesystem 1024-blocks Used Available Capacity Mounted\nfixture 999999999 0 999999999 0%% /\n'; }
