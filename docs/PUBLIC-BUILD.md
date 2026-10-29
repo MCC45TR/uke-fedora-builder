@@ -243,3 +243,45 @@ repository fixtures passed. These checks do not validate AArch64 execution, a
 graphical first-account flow, image composition or tablet hardware. Those remain
 required acceptance checks. Historical `core`, `boot` and `boot-pair` commands remain available for
 their dated frozen contracts; their old caches are not prerequisites here.
+
+## Explicit EL2/KVM profiles
+
+25 October 2026: source preparation only; the profile changes below have not
+been tested. `--kernel-profile normal` remains the default and keeps the existing
+ordinary source/family policy. `--kernel-profile el2-require --channel testing`
+selects the isolated Linux 7.3 KVM producer. Linux `7.3` is normalized to package
+version `7.3.0`. `--kernel` selects a version; `--channel` selects the RPM
+repository; neither substitutes for a kernel profile.
+
+```bash
+./ukelinux.sh --build kernel --kernel 7.3 --kernel-profile el2-require --channel testing --skip-tests
+```
+
+`--skip-tests` records explicit deferral of kernel fixtures and RPM checks;
+source signatures, hashes, payload/privacy checks and profile admission remain
+mandatory. Sources without explicit test-deferral support are refused. Default
+builds retain their tests. This preparation did not invoke the command above or
+build an image. The source RPM was produced separately and submitted to COPR.
+
+The request, producer/cache identity and output manifest carry the selected
+profile, source commit and native-config hash. The cache also separates builds
+with deferred tests from builds with tests enabled. RPM version/release is
+read separately from the exact `kernel-uname-r` capability; KVM's `-kvm` suffix
+belongs to the Image/module/bundle ABI. Image composition selects only the
+matching local family and preserves ordinary composition's KVM exclusions.
+Neither profile installation nor this builder activates a connected device.
+
+`el2-require` checks existing EL2 on primary and secondary entry. It parks on
+EL1 and never performs a firmware-exit call. The historical EL1 firmware result
+therefore remains a physical blocker. `el2-exit-experimental` is explicitly
+refused: there is no accepted exact Uke firmware service, all-CPU return or
+RAM/DMA/SMMU ownership contract. No allowlist entry was invented. Early debugger
+registers do not provide persistent failure logs or recover a non-returning SMC.
+
+The existing native probe and KVM-only Linux guest tools on
+`experiment/el2-kvm` remain the next authorized acceptance tools. No guest test
+was run. Binder/BinderFS preparation supports a later original-Fedora Waydroid
+trial; it does not establish Android, GPU or container acceptance. The upstream
+Python container startup service needs a project policy decision before any
+Waydroid installation. Preserve the accepted kernel/modules and physical
+recovery route before any separately authorized activation.

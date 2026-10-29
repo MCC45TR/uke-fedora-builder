@@ -8,7 +8,24 @@
     "url": "https://github.com/MCC45TR/senemos-uke-kernel-mainline.git",
     "ref": "b566637062d86fe2f2b0250b02fc9d91e05cddfc",
     "default_version": "7.3.0",
-    "policy": "Reviewed Uke Linux 7.3.0-33 source profile; the exact source revision is shared by every Fedora release and channel. Release macros are resolved in each pinned Fedora worker. Explicit local sources remain separately admitted by their SRPM producer."
+    "policy": "Reviewed Uke Linux 7.3.0-33 source profile; the exact source revision is shared by every Fedora release and channel. Release macros are resolved in each pinned Fedora worker. Explicit local sources remain separately admitted by their SRPM producer.",
+    "profiles": {
+      "normal": {
+        "ref": "b566637062d86fe2f2b0250b02fc9d91e05cddfc",
+        "default_version": "7.3.0",
+        "family": "senemos-uke-linux-kernel-mainline"
+      },
+      "el2-require": {
+        "ref": "KVM",
+        "default_version": "7.3.0",
+        "family": "senemos-uke-linux-kernel-mainline-kvm",
+        "native_config_sha256": "53041328987bc2f208285d95052de37eda0d1d34f2aa873b400c6a520b122097"
+      },
+      "el2-exit-experimental": {
+        "admitted": false,
+        "reason": "No accepted Uke firmware service, all-CPU return or DMA/SMMU ownership contract"
+      }
+    }
   },
   "channels": {
     "stable": {
