@@ -210,3 +210,29 @@ for the 22 October implementation. First full builds, package resolution on each
 channel, desktop setup and recoverable tablet boot remain necessary acceptance
 checks. Historical `core`, `boot` and `boot-pair` commands remain available for
 their dated frozen contracts; their old caches are not prerequisites here.
+
+## Manual CI source selection
+
+The `Public image build (manual)` workflow requires `workspace_commit`, a full
+40-character `MCC45TR/uke-linux` commit, and `kernel_version`, an explicit Linux
+version supported by that commit's kernel component. Moving branch names and
+`latest` are refused. The workspace is checked out detached and its recorded
+submodule commits are initialized without following component branches. The
+kernel source comes from that selected workspace through `UKE_KERNEL_REPO`.
+
+The workflow revision controls acquisition; the selected aggregate's builder
+revision performs the build. The local `source-identity.txt` receipt names both,
+the requested Linux version and every initialized component commit, including
+when the later build fails. Retain this receipt beside the produced manifests.
+A commit without the builder's local-kernel selection contract is not an
+admitted historical build recipe; inspect compatibility before dispatch.
+
+This freezes project source selection, not the entire package universe. Stable
+hardware sources retain the builder policy's explicit commit; testing/unstable
+RPM repositories and Fedora Rawhide may change. Archive the actual signed RPM
+set, repository metadata, container digests and output hashes before claiming
+reproducibility. This workflow neither publishes nor proves tablet acceptance.
+
+From this repository, `bash tests/workspace-source.sh` checks selection against
+moving aggregate/component branches using disposable local Git repositories;
+it also refuses branch aliases, missing commits and occupied destinations.
