@@ -1,6 +1,13 @@
 #!/usr/bin/env bash
 # Only a new regular file is attached to an isolated libguestfs appliance.
 set -Eeuo pipefail
+# shellcheck source=cohort.sh
+# shellcheck disable=SC1091
+source /builder/src/public/cohort.sh
+cohort_identity /job/request.json /job/artifacts/kernel/kernel-info.json /job/artifacts/manifest.json
+jq -e '.cohort_validation.kernel_modules_config_dt == "matched-producer-payload-bytes" and
+  .cohort_validation.boot_kernel == "extracted-and-matched" and
+  .cohort_validation.root_selector == "matched-fstab"' /job/artifacts/manifest.json >/dev/null
 filesystem=$(jq -er .filesystem /job/request.json)
 partition=$(jq -er .partition /job/request.json)
 size=$(jq -er .size_mib /job/request.json)
@@ -67,6 +74,7 @@ jq --arg raw "$(cut -d ' ' -f1 /job/root.raw.sha256)" --argjson bytes "$(stat -c
     --argjson boot_bytes "$(stat -c %s /job/artifacts/boot.img)" \
     '. + {root_raw_bytes:$bytes,root_raw_sha256:$raw,root_sparse_sha256:$sparse,boot_sha256:$boot,boot_bytes:$boot_bytes,
       filesystem_contents_readback:true,filesystem_metadata_readback:true,selinux_relabel_performed:true,
-      sparse_roundtrip_verified:true,independent_aosp_decoder_verified:true,physical_boot_tested:false,hardware_tested:false}' \
+      sparse_roundtrip_verified:true,independent_aosp_decoder_verified:true,physical_boot_tested:false,hardware_tested:false}
+      | .cohort_validation.final_filesystem_hashes_verified = true' \
     /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json

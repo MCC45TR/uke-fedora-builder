@@ -19,6 +19,9 @@ say() { printf 'stage: %s\n' "$*"; }
 # shellcheck source=kernel-source.sh
 # shellcheck disable=SC1091
 source /builder/src/public/kernel-source.sh
+# shellcheck source=cohort.sh
+# shellcheck disable=SC1091
+source /builder/src/public/cohort.sh
 # The host resolved the exact source commit and Linux version once; the release is derived from the source below.
 source_commit=$(jq -er .kernel_commit "$request")
 kernel_version=$(jq -er .kernel_version "$request")
@@ -114,9 +117,11 @@ kernel_collect() {
         cp "$bundle/$profile.img" "/job/artifacts/boot-$profile.img"
     done
     # The native RPM producer audits its linked initramfs with no Python exception.
+    cohort_payload_inventory "$modules" > /job/artifacts/kernel/payload.sha256
     jq -n --arg source "$source_commit" --arg release "$release" --arg version "$kernel_version" \
+        --arg payload "$(sha256sum /job/artifacts/kernel/payload.sha256 | cut -d ' ' -f1)" \
         --arg requested "$(jq -er .kernel_requested "$request")" \
-        '{kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,kernel_rpms_locally_built:true,
+        '{kernel_source_commit:$source,kernel_version:$version,kernel_requested:$requested,kernel_release:$release,payload_sha256:$payload,kernel_rpms_locally_built:true,
           local_kernel_rpm_signature:"unsigned local build; signed upstream source verified by producer",
           physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' \
         > /job/artifacts/kernel/kernel-info.json
@@ -392,5 +397,11 @@ jq --argjson private "$private" '. + {device_private_data_included:$private,
     touch_reference_validation:"shape and permissions only; physical acceptance is separate",
     python_policy:"only byte-identical signature-verified original Fedora packages",
     credentials_included:false,ssh_enabled:false}' /job/artifacts/manifest.json > /job/manifest.tmp
+mv /job/manifest.tmp /job/artifacts/manifest.json
+c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot/boot-image.cpp -o /job/cohort-boot-image
+cohort_root_check "$request" /job/artifacts "$root" /job/cohort-boot-image \
+    /job/artifacts/kernel/packages.tsv /job/artifacts/installed-rpms.tsv > /job/cohort-validation.json
+jq --slurpfile cohort /job/cohort-validation.json '. + {cohort_validation:$cohort[0]}' \
+    /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
 tar --create --numeric-owner --one-file-system --sort=name --acls --xattrs --xattrs-include=security.capability -f /job/rootfs.tar -C "$root" .

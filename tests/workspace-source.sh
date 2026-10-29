@@ -36,3 +36,16 @@ printf keep > "$fixture/selected/keep"
 reject "$selected" "$fixture/selected"
 [[ $(cat "$fixture/selected/keep") == keep ]]
 echo 'Moved aggregate/component branches retained selected pins; invalid refs and occupied destinations refused'
+# Never execute an old aggregate whose builder silently ignores the source override.
+if admit_release_builder "$fixture/selected" >/dev/null 2>&1; then exit 1; fi
+mkdir -p "$fixture/selected/uke-fedora-builder/configs"
+capability=$fixture/selected/uke-fedora-builder/configs/source-selection.json
+cp "$root/configs/source-selection.json" "$capability"
+admit_release_builder "$fixture/selected"
+for field in local_kernel_repository explicit_kernel_version cohort_validation; do
+    jq --arg field "$field" '.[$field]=false' "$root/configs/source-selection.json" > "$capability"
+    if admit_release_builder "$fixture/selected" >/dev/null 2>&1; then exit 1; fi
+done
+jq '.schema_version=2' "$root/configs/source-selection.json" > "$capability"
+if admit_release_builder "$fixture/selected" >/dev/null 2>&1; then exit 1; fi
+echo 'Legacy/missing/disabled/unknown source-selection capabilities refused before recipe execution'

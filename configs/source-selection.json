@@ -1,0 +1,6 @@
+{
+  "schema_version": 1,
+  "local_kernel_repository": true,
+  "explicit_kernel_version": true,
+  "cohort_validation": true
+}

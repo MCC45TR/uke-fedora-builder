@@ -236,3 +236,27 @@ reproducibility. This workflow neither publishes nor proves tablet acceptance.
 From this repository, `bash tests/workspace-source.sh` checks selection against
 moving aggregate/component branches using disposable local Git repositories;
 it also refuses branch aliases, missing commits and occupied destinations.
+
+### Cohort admission for the current recipe
+
+Historical aggregates must declare version 1 in the selected builder's
+`configs/source-selection.json`; absent, disabled or unknown capabilities are
+refused before its build entry runs. Select a reviewed aggregate that pins this
+builder revision. The declaration is a compatibility contract, not a signature
+or evidence that arbitrary third-party code implements the contract correctly.
+
+The existing kernel metadata now binds `kernel/payload.sha256`, a producer byte
+inventory of the Image, config, modules and DT files. Before creating rootfs.tar,
+the builder compares the installed fresh root against that inventory, the producer
+RPM NEVRA/source-RPM records, selected boot files and extracted kernel Image.
+Boot header root selection and fstab must agree with the request. The existing
+manifest gains `cohort_validation`; its final filesystem flag is set only after
+the existing independent readback and sparse decoder checks succeed.
+
+`bash tests/cohort.sh` uses tiny synthetic payloads and the real boot codec to
+refuse changed source/release metadata, package records, module/config/DT bytes,
+extra/missing/symlink modules, boot files, embedded Image and root selection.
+This checks producer/consumer consistency, not ELF vermagic semantics, physical DT
+correctness, firmware compatibility, signature trust, rollback or tablet boot.
+Those facts remain explicitly unverified. Old kernel caches without the new
+producer inventory cannot pass root admission; rebuild the matching kernel.
