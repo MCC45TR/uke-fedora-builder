@@ -168,6 +168,17 @@ cache_fixture=$(mktemp -d)
     cp -a "$root/src" "$root/configs" "$cache_fixture/recipe/"
     recipe_a=$(kernel_recipe_hash "$cache_fixture/recipe")
     [[ $recipe_a == "$(kernel_recipe_hash "$root")" ]]
+    printf '\n# Fixture producer inventory change\n' >> "$cache_fixture/recipe/src/public/cohort.sh"
+    cohort_recipe=$(kernel_recipe_hash "$cache_fixture/recipe")
+    [[ $recipe_a != "$cohort_recipe" ]]
+    kernel_producer_json cross "$recipe_a" worker-1 worker-2 > "$cache_fixture/producer-before.json"
+    kernel_producer_json cross "$cohort_recipe" worker-1 worker-2 > "$cache_fixture/producer-after.json"
+    [[ $(kernel_producer_sha "$cache_fixture/producer-before.json") != "$(kernel_producer_sha "$cache_fixture/producer-after.json")" ]]
+    KERNEL_PRODUCER_SHA=$(kernel_producer_sha "$cache_fixture/producer-before.json")
+    cohort_cache_before=$(kernel_cache_dir)
+    KERNEL_PRODUCER_SHA=$(kernel_producer_sha "$cache_fixture/producer-after.json")
+    [[ $cohort_cache_before != "$(kernel_cache_dir)" ]]
+    cp "$root/src/public/cohort.sh" "$cache_fixture/recipe/src/public/cohort.sh"
     sed -i 's/clang++ -std=c++17 -O2/clang++ -std=c++17 -O0/' "$cache_fixture/recipe/src/public/stage.sh"
     recipe_b=$(kernel_recipe_hash "$cache_fixture/recipe")
     [[ $recipe_a != "$recipe_b" ]]

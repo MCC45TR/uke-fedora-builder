@@ -25,16 +25,19 @@ cohort_identity() {
 # Canonical producer/root byte inventory. Do not parse filenames supplied by a receipt.
 cohort_payload_inventory() (
     set -Eeuo pipefail
-    local modules=$1
+    local modules=$1 discovered
     [[ -d $modules && ! -L $modules ]]
     cd -- "$modules"
     for path in vmlinuz config dtb/qcom/sm7675-xiaomi-uke.dtb; do
         [[ -f $path && ! -L $path ]]
     done
     [[ -d kernel && -d dtb ]]
-    [[ -z $(find kernel dtb -type l -print -quit) ]]
-    [[ -n $(find kernel -type f -name '*.ko*' -print -quit) ]]
-    [[ -z $(find kernel dtb ! -type d ! -type f -print -quit) ]]
+    discovered=$(find kernel dtb -type l -print -quit) || exit 1
+    [[ -z $discovered ]]
+    discovered=$(find kernel -type f -name '*.ko*' -print -quit) || exit 1
+    [[ -n $discovered ]]
+    discovered=$(find kernel dtb ! -type d ! -type f -print -quit) || exit 1
+    [[ -z $discovered ]]
     { printf 'vmlinuz\0config\0'; find kernel dtb -type f -print0; } |
         LC_ALL=C sort -z | xargs -0 sha256sum
 )
@@ -51,14 +54,15 @@ cohort_root_check_main() (
     local request=$1 artifacts=$2 root=$3 codec=$4 expected_packages=$5 installed_packages=$6
     local info=$artifacts/kernel/kernel-info.json manifest=$artifacts/manifest.json
     cohort_identity "$request" "$info" "$manifest"
-    local release partition filesystem modules bundle scratch hash component nevra expected actual
+    local release partition filesystem modules bundle scratch hash component nevra expected actual releases
     release=$(jq -er .kernel_release "$info")
     partition=$(jq -er .partition "$request")
     filesystem=$(jq -er .filesystem "$request")
     modules=$root/usr/lib/modules/$release
     bundle=$root/usr/lib/senemos/kernel-updates/$release
     # This gate is for a fresh image root, not a live system retaining rollback releases.
-    [[ $(find "$root/usr/lib/modules" -mindepth 1 -maxdepth 1 -printf '%f\n') == "$release" ]]
+    releases=$(find "$root/usr/lib/modules" -mindepth 1 -maxdepth 1 -printf '%f\n') || exit 1
+    [[ $releases == "$release" ]]
     [[ -d $bundle && ! -L $bundle ]]
     [[ -f $artifacts/kernel/payload.sha256 && ! -L $artifacts/kernel/payload.sha256 ]]
     hash=$(sha256sum "$artifacts/kernel/payload.sha256"); hash=${hash%% *}

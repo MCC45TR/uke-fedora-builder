@@ -36,6 +36,39 @@ check() { cohort_root_check "$fixture/request.json" "$artifacts" "$root" "$fixtu
 reject() { if check > "$fixture/rejected.log" 2>&1; then echo "Invalid cohort accepted: $1" >&2; exit 1; fi; }
 check > "$fixture/receipt.json"
 jq -e '.physical_boot_tested==false and .rollback_tested==false and .final_filesystem_hashes_verified==false and .runtime_firmware_compatibility=="unverified"' "$fixture/receipt.json" >/dev/null
+# Each enumeration must complete, even when its partial output looks admissible.
+mkdir "$fixture/bin"
+cat > "$fixture/bin/find" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+phase=other
+if [[ $1 == "$UKE_FIND_ROOT/usr/lib/modules" ]]; then phase=releases
+elif [[ $1 == kernel && $2 == dtb && $3 == -type && $4 == l ]]; then phase=symlinks
+elif [[ $1 == kernel && $2 == -type ]]; then phase=modules
+elif [[ $1 == kernel && $2 == dtb && $3 == '!' ]]; then phase=special
+elif [[ $1 == kernel && $2 == dtb && $3 == -type && $4 == f ]]; then phase=inventory
+fi
+if [[ $phase == "$UKE_FIND_PHASE" ]]; then
+    if [[ $UKE_FIND_OUTPUT == partial ]]; then "$UKE_REAL_FIND" "$@"; fi
+    exit 1
+fi
+exec "$UKE_REAL_FIND" "$@"
+SH
+chmod +x "$fixture/bin/find"
+real_find=$(command -v find)
+for phase in releases symlinks modules special inventory; do
+ for output in empty partial; do
+  if PATH="$fixture/bin:$PATH" UKE_FIND_ROOT="$root" UKE_FIND_PHASE=$phase \
+      UKE_FIND_OUTPUT=$output UKE_REAL_FIND="$real_find" check > "$fixture/find-output" 2>&1; then
+   echo "Failed traversal accepted: $phase/$output" >&2; exit 1
+  fi
+  if grep -q 'matched-request-and-producer' "$fixture/find-output"; then
+   echo "Failed traversal produced a success receipt: $phase/$output" >&2; exit 1
+  fi
+ done
+done
+echo 'Ten empty/partial traversal failures rejected without a success receipt'
+check >/dev/null
 cp "$fixture/request.json" "$fixture/request.original"
 "$fixture/codec" create "$modules/vmlinuz" "$bundle/linux.img"
 cp "$bundle/linux.img" "$artifacts/boot-linux.img"

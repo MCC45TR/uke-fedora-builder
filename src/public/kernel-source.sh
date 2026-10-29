@@ -71,7 +71,7 @@ kernel_source_check() {
 kernel_recipe_hash() {
     (cd -- "$1" && sha256sum configs/Containerfile.public configs/Containerfile.public-native \
         configs/public-build.json configs/build-rules.json \
-        src/public/entry.sh src/public/stage.sh src/public/kernel-source.sh) | sha256sum | cut -d ' ' -f1
+        src/public/entry.sh src/public/stage.sh src/public/kernel-source.sh src/public/cohort.sh) | sha256sum | cut -d ' ' -f1
 }
 
 # The producer is what compiles the kernel and links its initramfs: the route, the recipe and the worker images.
