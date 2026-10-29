@@ -11,7 +11,7 @@ chmod 640 "$work/root/file"
 ln -s /file "$work/root/link"
 printf '/.* system_u:object_r:default_t:s0\n' > "$work/contexts"
 truncate -s 32M "$work/root.img"
-mkfs.ext4 -q -F -d "$work/root" "$work/root.img"
+mkfs.ext4 -q -F -E "root_owner=$(id -u):$(id -g)" -d "$work/root" "$work/root.img"
 if "$labeler" verify "$work/root.img" "$work/root" "$work/contexts" > "$work/unlabeled.log" 2>&1; then
     echo 'Unlabeled image was accepted' >&2; exit 1
 fi
