@@ -282,7 +282,7 @@ RAM/DMA/SMMU ownership contract. No allowlist entry was invented. Early debugger
 registers do not provide persistent failure logs or recover a non-returning SMC.
 
 The existing native probe and KVM-only Linux guest tools on
-`experiment/el2-kvm` remain the next authorized acceptance tools. No guest test
+`main` retain the isolated EL2/KVM acceptance tools. No guest test
 was run. Binder/BinderFS preparation supports a later original-Fedora Waydroid
 trial; it does not establish Android, GPU or container acceptance. The upstream
 Python container startup service needs a project policy decision before any
