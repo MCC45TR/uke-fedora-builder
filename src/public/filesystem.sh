@@ -34,7 +34,8 @@ if [[ $filesystem == ext4 ]]; then
     # The appliance skips virtual directories; label image inodes offline.
     c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
         -o /job/ext4-labels -lext2fs -lcom_err -lselinux
-    contexts=/job/root/etc/selinux/targeted/contexts/files/file_contexts
+    expected=/job/root
+    contexts=$expected/etc/selinux/targeted/contexts/files/file_contexts
     /job/ext4-labels apply /job/root.raw "$expected" "$contexts"
     /job/ext4-labels verify /job/root.raw "$expected" "$contexts"
 fi
