@@ -8,11 +8,20 @@ if [[ ${1:-} == --original-kde-payload ]]; then
   original=$(realpath -- "$2"); shift 2
 fi
 [[ $# == 1 && -d $1 ]] || { echo 'Usage: check-target-payload.sh [--original-kde-payload VERIFIED_ORIGINAL_DIRECTORY] EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
-for tool in realpath find readlink grep readelf cmp; do
+for tool in realpath find readlink readelf cmp mktemp rm; do
   command -v "$tool" >/dev/null || { printf 'Missing host audit tool: %s\n' "$tool" >&2; exit 2; }
 done
 root=$(realpath -- "$1")
 [[ $original != "$root" ]] || exit 2
+# Finish discovery before issuing any acceptance result. Process substitution
+# would hide find's exit status and could silently omit an unreadable subtree.
+listing=$(mktemp)
+trap 'rm -f -- "$listing"' EXIT
+if ! find "$root" -mindepth 1 \( -type f -o -type l \) -print0 > "$listing"; then
+  echo 'Target traversal failed; payload audit is incomplete' >&2
+  exit 1
+fi
+python_needed=$'NEEDED[^\n]*libpython'
 failed=0
 python_payload() {
   local path=$1 expected
@@ -44,12 +53,12 @@ while IFS= read -r -d '' path; do
     elif [[ ${header:0:4} == $'\177ELF' ]]; then
       if ! dynamic=$(readelf -d -- "$path" 2>/dev/null); then
         printf 'Unreadable target ELF rejected: %s\n' "${path#"$root/"}" >&2; failed=1
-      elif grep 'NEEDED.*libpython' <<< "$dynamic" >/dev/null; then
+      elif [[ $dynamic =~ $python_needed ]]; then
         python_payload "$path"
       fi
     fi
   fi
-done < <(find "$root" -mindepth 1 \( -type f -o -type l \) -print0)
+done < "$listing"
 ((failed==0)) || exit 1
 if [[ -n $original ]]; then
   echo 'Extracted target payload: Python limited to byte-identical verified original KDE closure'

@@ -31,6 +31,7 @@ jobs:
           bash tests/kernel-config-contract.sh
           bash tests/kernel-export-contract.sh
           bash tests/original-kde-payload.sh
+          bash tests/payload-traversal.sh
           bash tests/kernel-dt-admission.sh
           g++ -std=c++20 -O2 -Wall -Wextra -Werror src/image/ext4-labels.cpp -o /tmp/ext4-labels -lext2fs -lcom_err -lselinux
           g++ -std=c++20 -O2 -Wall -Wextra -Werror src/boot/boot-image.cpp -o /tmp/boot-image
