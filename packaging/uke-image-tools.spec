@@ -77,6 +77,7 @@ bash tests/android-sparse-contract.sh build-tools/android-sparse "$PWD/build-too
 %changelog
 * Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-16
 - Refuse ambiguous repeated NEVRAs in complete frozen root catalogs.
+- Keep frozen repository URLs out of the delivered root and match its requested kernel source.
 
 * Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-15
 - Share the SDK transport with the complete offline production root entry.

@@ -317,20 +317,12 @@ fi
 [[ $(gpg --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == "$fingerprint" ]]
 install -m644 "$key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
 install -m644 "$fedora_key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora
-root_repository=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-$fedora_release-\$basearch/
-[[ -z $copr_inputs ]] || root_repository=file:///inputs/target/rpms/uke
-cat > /etc/yum.repos.d/uke-selected.repo <<REPO
-[uke-selected]
-name=Uke $channel
-baseurl=$root_repository
-enabled=1
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
-skip_if_unavailable=False
-priority=40
-includepkgs=uke-*,senemos-uke-linux-kernel-*
-REPO
+# shellcheck source=root-repository.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-repository.sh
+repository_mode=public
+[[ -z $copr_inputs ]] || repository_mode=copr-frozen
+public_root_repository /etc/yum.repos.d/uke-selected.repo "$project" "$fedora_release" "$repository_mode"
 desktop=$(jq -er .desktop "$request")
 # shellcheck source=root-packages.sh
 # shellcheck disable=SC1091
@@ -427,7 +419,7 @@ mkdir -p "$root/mnt/vendor/persist"
 chmod 700 "$root/mnt/vendor/persist"
 printf 'SELINUX=enforcing\nSELINUXTYPE=targeted\n' > "$root/etc/selinux/config"
 install -m644 /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected "$root/etc/pki/rpm-gpg/"
-install -m644 /etc/yum.repos.d/uke-selected.repo "$root/etc/yum.repos.d/"
+public_root_repository "$root/etc/yum.repos.d/uke-selected.repo" "$project" "$fedora_release"
 cat > "$root/etc/dnf/dnf.conf" <<'DNF'
 [main]
 install_weak_deps=False

@@ -11,6 +11,9 @@ source "$root/src/public/guest-runtime.sh"
 # shellcheck source=../src/public/copr-sdk.sh
 # shellcheck disable=SC1091
 source "$root/src/public/copr-sdk.sh"
+# shellcheck source=../src/public/root-repository.sh
+# shellcheck disable=SC1091
+source "$root/src/public/root-repository.sh"
 work=$(mktemp -d)
 trap 'find "$work" -depth -delete' EXIT
 mkdir "$work/target" "$work/audit"
@@ -22,7 +25,7 @@ jq -n '{device:"uke",architecture:"aarch64",distribution:"fedora",fedora_release
 public_copr_root_request "$work/request.json"
 for mutation in '.channel="testing"' '.fedora_release="45"' '.kernel_rpm_request="latest"' \
     '.partition="userdata"' '.size_mib=65537' '.size_mib=8192.5' '.jobs=0' '.kernel_commit="unknown"' \
-    '.touch_reference="private"' '.kernel_bundle="local"'; do
+    '.touch_reference="private"' '.kernel_bundle="local"' '.kernel_version="7.3.1"'; do
     jq "$mutation" "$work/request.json" > "$work/invalid.json"
     if public_copr_root_request "$work/invalid.json" > "$work/refusal.log" 2>&1; then exit 1; fi
 done
@@ -63,4 +66,16 @@ if UKE_COPR_WORKER_AUDIT=1 public_copr_guest_run rw "$work/mock-disk" "$work/moc
 grep -Fxq KEEP_LOG "$work/existing.log"
 if UKE_COPR_WORKER_AUDIT=1 public_copr_guest_run invalid "$work/mock-disk" "$work/mock-commands" "$work/new.log" 60; then exit 1; fi
 [[ ! -e $work/forbidden-operation && ! -e $work/new.log ]]
+for project in uke-linux uke-linux-test uke-linux-unstable; do
+    public_root_repository "$work/runtime.repo" "$project" rawhide
+    grep -Fxq "baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-\$basearch/" "$work/runtime.repo"
+    grep -Fxq 'gpgcheck=1' "$work/runtime.repo"
+done
+public_root_repository "$work/worker.repo" uke-linux-unstable rawhide copr-frozen
+grep -Fxq 'baseurl=file:///inputs/target/rpms/uke' "$work/worker.repo"
+public_root_repository "$work/runtime.repo" uke-linux-unstable rawhide
+if grep -Fq '/inputs/' "$work/runtime.repo"; then echo 'Worker repository escaped into runtime' >&2; exit 1; fi
+if public_root_repository "$work/invalid.repo" uke-linux-unstable 45; then exit 1; fi
+if public_root_repository "$work/invalid.repo" uke-linux-test rawhide copr-frozen; then exit 1; fi
+[[ ! -e $work/invalid.repo ]]
 echo 'Frozen full-root schema, private/foreign/unpinned request and incomplete-rights/metadata-only/host-mount refusals passed; no guest or target RPM ran.'

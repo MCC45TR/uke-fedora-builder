@@ -60,6 +60,13 @@ version=${release%-*}
 rpm_release=$release
 source_commit=$(cat "/job/kernel-payload/usr/share/senemos/uke/$release/source-commit")
 [[ $source_commit =~ ^[0-9a-f]{40}$ ]]
+if [[ -n ${UKE_COPR_ROOT_INPUTS:-} ]]; then
+    [[ $(jq -er .kernel_commit /job/request.json) == "$source_commit" &&
+       $(jq -er .kernel_version /job/request.json) == "$version" ]] || {
+        echo 'Frozen kernel source or version differs from the requested tuple' >&2
+        exit 1
+    }
+fi
 bundle=/job/kernel-payload/usr/lib/senemos/kernel-updates/$release
 modules=/job/kernel-payload/usr/lib/modules/$release
 [[ -f $bundle/linux.img && -f $bundle/userdata.img && -f $modules/vmlinuz ]]

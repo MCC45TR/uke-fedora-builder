@@ -12,6 +12,7 @@ public_copr_root_request() {
         (.kernel_commit|test("^[0-9a-f]{40}$")) and
         (.kernel_version|test("^[0-9]+[.][0-9]+([.][0-9]+)?$")) and
         (.kernel_rpm_request|test("^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$")) and
+        (.kernel_rpm_request|split("-")[0])==.kernel_version and
         (.firmware_review_sha256|test("^[0-9a-f]{64}$")) and
         (has("kernel_bundle")|not) and (has("touch_reference")|not)' "$1" >/dev/null
 }
