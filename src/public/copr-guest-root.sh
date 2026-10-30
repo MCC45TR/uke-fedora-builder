@@ -15,11 +15,17 @@ rpmkeys --dbpath "$work/keydb" --import "$recipe/configs/keys/fedora-46.asc"
 shopt -s nullglob
 archives=("$inputs/rpms/"*.rpm)
 (( ${#archives[@]} > 0 ))
-tar -cf "$work/sdk.tar" --files-from /dev/null
 for archive in "${archives[@]}"; do
     [[ $(rpm -qp --qf '%{VENDOR}' "$archive") == 'Fedora Project' ]]
     case $(rpm -qp --qf '%{ARCH}' "$archive") in aarch64|noarch) ;; *) exit 1;; esac
     rpmkeys --dbpath "$work/keydb" --checksig "$archive" | grep -F 'signatures OK'
+done
+tar -cf "$work/sdk.tar" --files-from /dev/null
+mapfile -t sdk_names < "$inputs/closures/sdk-rpms.list"
+(( ${#sdk_names[@]} > 0 ))
+for name in "${sdk_names[@]}"; do
+    [[ $name =~ ^[A-Za-z0-9+_.:-]+[.]rpm$ && -f $inputs/rpms/$name && ! -L $inputs/rpms/$name ]]
+    archive=$inputs/rpms/$name
     rpm2cpio "$archive" > "$work/payload.cpio"
     bsdtar -tf "$work/payload.cpio" > "$work/payload.paths"
     awk '/^\// || /(^|\/)\.\.(\/|$)/ {bad=1} END {exit bad}' "$work/payload.paths"
@@ -31,6 +37,7 @@ done
 tar -cf "$work/recipe.tar" -C "$recipe" src/public/root-proc.sh src/public/root-transaction.sh \
     src/public/ext4-filesystem.sh src/public/root-metadata.sh \
     tests/copr-guest-transaction.sh tests/copr-guest-compare.sh configs/keys/fedora-46.asc \
+    configs/copr-image-fixture-packages.json \
     build-tools/ext4-labels build-tools/compare-root-metadata
 tar -cf "$work/inputs.tar" -C "$inputs" .
 truncate -s 8G "$work/guest.raw"

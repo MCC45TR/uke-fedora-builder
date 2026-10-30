@@ -51,7 +51,7 @@ dnf=(dnf5 --use-host-config --installroot=/job/root --releasever=rawhide
     --setopt=install_weak_deps=False --setopt=gpgcheck=True
     --setopt=keepcache=True --setopt=installonly_limit=0 --setopt=tsflags=nodocs)
 rpms=()
-packages=(bash coreutils systemd chrony selinux-policy-targeted)
+mapfile -t packages < <(jq -er '.[]' /builder/configs/copr-image-fixture-packages.json)
 public_root_proc_mount /job/root
 target_proc_mounted=1
 public_root_transaction /job/root /job/root-install.log dnf rpms packages
