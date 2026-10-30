@@ -1,11 +1,12 @@
 # COPR image assembly prerequisites
 
 On 30 October 2026, Fedora Rawhide AArch64
-[COPR 11231975](https://copr.fedorainfracloud.org/coprs/build/11231975/) verified
+[COPR 11232234](https://copr.fedorainfracloud.org/coprs/build/11232234/) verified
 the native image helpers, an offline guest root transaction and a 1 GiB EXT4
-fixture. The signed helper is `uke-image-tools-1.0.0-12.fc46.aarch64`, source
-`aa74ffd45029420383d767b9dea5499ec0f76658`. This extends revision 7's guest
-transaction evidence with actual image population and metadata comparison.
+fixture. The signed helper is `uke-image-tools-1.0.0-14.fc46.aarch64`, source
+`15272418bb25a58b659ac50c057ad82ea02ca54e`. Its native program sources are
+unchanged from revision 12. The build also checks the complete declared desktop
+package policy before accepting its SDK inputs.
 
 The full image root stage and the integration check use the same
 `root-transaction.sh` function. It preserves the caller's package and repository
@@ -51,14 +52,13 @@ The isolation approach follows the
 [libguestfs architecture](https://libguestfs.org/guestfs-faq.1.html#How-does-libguestfs-compare-to-other-tools)
 and [guestfish command interface](https://libguestfs.org/guestfish.1.html).
 
-The next input audit shares the production package and exclusion policy with
-the source worker. It resolves the complete KDE/GNOME selections, three login
-shells and both root profiles against the pinned kernel 60 RPMs. DNF stops at
-its confirmation boundary with `--assumeno`; only solver metadata is retained.
-Device-local touch and video-firmware RPMs are excluded from generic images.
-COPR 11232209 stops before SRPM production: the original explicit Fedora
-PipeWire request conflicts with Core's Uke provider. The unstable selection now
-names `uke-pipewire` and `uke-pipewire-pulseaudio` directly, preserving normal
-solver policy. Fresh revision 14 remains pending. Dependency resolution alone
-does not verify target RPM signatures, firmware rights, installation or full
-composition.
+The source worker and production stage share the package and exclusion policy.
+All 12 KDE/GNOME, Bash/Fish/Zsh and linux/userdata goals resolve against the
+exact kernel 60 parts. The KDE closures contain 961–965 packages; GNOME has
+768–772. DNF stops at its confirmation boundary with `--assumeno`; only solver
+metadata is retained, with empty target databases and RPM caches. The unstable
+selection explicitly names `uke-pipewire` and `uke-pipewire-pulseaudio`, avoiding
+a conflicting newer Fedora provider without relaxing solver policy. Device-local
+touch and video-firmware RPMs are excluded from generic images. These metadata
+results do not verify target RPM signatures, firmware rights, installation or
+full composition.
