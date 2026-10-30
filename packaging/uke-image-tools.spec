@@ -1,6 +1,6 @@
 Name:           uke-image-tools
 Version:        1.0.0
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Native tools for isolated Uke image assembly and verification
 License:        MIT
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -11,6 +11,7 @@ BuildRequires:  gcc-c++ e2fsprogs-devel libselinux-devel openssl-devel libzstd-d
 BuildRequires:  bash jq coreutils findutils diffutils grep sed gawk tar xz cpio
 BuildRequires:  rpm-build ripgrep dtc git-core make f2fs-tools e2fsprogs xfsprogs btrfs-progs zstd
 BuildRequires:  util-linux-core util-linux shadow-utils
+BuildRequires:  libguestfs-tools-c kernel-core kernel-modules qemu-kvm-core
 
 %description
 Image codecs, payload validation, language auditing and offline EXT4 labels.
@@ -36,6 +37,7 @@ install -Dm644 %{SOURCE1} %{buildroot}%{_datadir}/%{name}/source-identity.json
 
 %check
 UKE_COPR_WORKER_AUDIT=1 bash tests/copr-image-worker.sh
+UKE_COPR_WORKER_AUDIT=1 bash tests/copr-image-appliance.sh
 bash tests/public-build-contract.sh
 bash tests/public-channel-contract.sh
 bash tests/image-contract.sh
@@ -60,6 +62,9 @@ bash tests/android-sparse-contract.sh build-tools/android-sparse "$PWD/build-too
 %{_datadir}/%{name}/source-identity.json
 
 %changelog
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-3
+- Probe an unprivileged TCG appliance with numeric owners, labels and separate readback.
+
 * Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-2
 - Record bounded COPR namespace and numeric-owner prerequisites without changing worker policy.
 
