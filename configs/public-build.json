@@ -61,6 +61,6 @@
   "build_tools": {
     "project": "uke-linux-unstable",
     "fingerprint": "2204A661EA630A5303500085538797E72A3E4ECA",
-    "nevra": "uke-image-tools-1.0.0-1.fc46.aarch64"
+    "nevra": "uke-image-tools-1.0.0-3.fc46.aarch64"
   }
 }
