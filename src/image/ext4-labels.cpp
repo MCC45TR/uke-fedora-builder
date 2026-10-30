@@ -18,6 +18,7 @@ static void check(errcode_t code, const char *operation) {
 }
 int main(int argc, char **argv) {
     try {
+        initialize_ext2_error_table();
         if (argc != 5 || (std::strcmp(argv[1], "apply") && std::strcmp(argv[1], "verify")))
             throw std::runtime_error("Usage: ext4-labels apply|verify IMAGE ROOT FILE_CONTEXTS");
         struct stat image_stat {};

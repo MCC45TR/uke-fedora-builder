@@ -33,6 +33,8 @@ guest_mounts+=(/sys)
 mount -t tmpfs -o nosuid,nodev tmpfs /run
 guest_mounts+=(/run)
 if grep -q '^chrony:' /etc/passwd; then echo 'SDK identity contaminated the target proof' >&2; exit 1; fi
+sha256sum -c /job/mke2fs.sha256 >&2
+[[ $(stat -c '%i' /usr/bin/mke2fs) == "$(stat -c '%i' /usr/bin/mkfs.ext4)" ]]
 rpm --initdb
 cat > /etc/yum.repos.d/copr-public-fedora.repo <<'REPO'
 [copr-public-fedora]

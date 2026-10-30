@@ -19,7 +19,12 @@ for archive in "${archives[@]}"; do
     [[ $(rpm -qp --qf '%{VENDOR}' "$archive") == 'Fedora Project' ]]
     case $(rpm -qp --qf '%{ARCH}' "$archive") in aarch64|noarch) ;; *) exit 1;; esac
     rpmkeys --dbpath "$work/keydb" --checksig "$archive" | grep -F 'signatures OK'
+    if [[ $(rpm -qp --qf '%{NAME}' "$archive") == e2fsprogs ]]; then
+        rpm -qp --qf '[%{FILENAMES}\t%{FILEDIGESTS}\n]' "$archive" \
+            | awk -F '\t' '$1=="/usr/bin/mke2fs" {print $2 "  " $1}' > "$work/mke2fs.sha256"
+    fi
 done
+[[ -s $work/mke2fs.sha256 ]]
 tar -cf "$work/sdk.tar" --files-from /dev/null
 mapfile -t sdk_names < "$inputs/closures/sdk-rpms.list"
 (( ${#sdk_names[@]} > 0 ))
@@ -29,9 +34,10 @@ for name in "${sdk_names[@]}"; do
     rpm2cpio "$archive" > "$work/payload.cpio"
     bsdtar -tf "$work/payload.cpio" > "$work/payload.paths"
     awk '/^\// || /(^|\/)\.\.(\/|$)/ {bad=1} END {exit bad}' "$work/payload.paths"
-    # libarchive imports CPIO metadata directly, including numeric owners and links.
-    # No host chown, fakeroot, mutable configuration or installed RPM DB is involved.
-    bsdtar --format=gnutar -cf "$work/payload.tar" "@$work/payload.cpio"
+    # Resolve data-last CPIO link groups before writing TAR hard-link headers.
+    # No host extraction/chown, mutable configuration or installed DB is involved.
+    [[ ! -e $work/payload.tar ]] || unlink "$work/payload.tar"
+    "$recipe/build-fixtures/cpio-sdk-tar" "$work/payload.cpio" "$work/payload.tar"
     tar --concatenate -f "$work/sdk.tar" "$work/payload.tar"
 done
 tar -cf "$work/recipe.tar" -C "$recipe" src/public/root-proc.sh src/public/root-transaction.sh \
@@ -54,6 +60,7 @@ tar-in $work/recipe.tar /builder
 mkdir-p /inputs
 tar-in $work/inputs.tar /inputs
 mkdir-p /job
+upload $work/mke2fs.sha256 /job/mke2fs.sha256
 command-out "/usr/bin/bash /builder/tests/copr-guest-transaction.sh" -
 download /job/report.json $work/report.json
 download /job/installed-rpms.tsv $work/installed-rpms.tsv
