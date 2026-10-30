@@ -23,9 +23,13 @@ public_copr_root_inputs() {
         [[ -f $target/$path && ! -L $target/$path ]] || return 1
     done
     public_copr_root_request "$target/request.json" || return
-    jq -e '.schema_version==1 and .purpose=="full-public-uke-root" and .metadata_only==false and
+    if ! jq -e '.schema_version==1 and .purpose=="full-public-uke-root" and .metadata_only==false and
         (.request_sha256|test("^[0-9a-f]{64}$")) and (.rpms|type=="array" and length>0) and
-        (.root_nevras|type=="array" and length>0)' "$target/manifest.json" >/dev/null || return
+        (.root_nevras|type=="array" and length>0) and
+        (.rpms|map(.nevra)|unique|length)==(.rpms|length)' "$target/manifest.json" >/dev/null; then
+        echo 'Invalid frozen root schema or duplicate RPM NEVRA' >&2
+        return 1
+    fi
     [[ $(sha256sum "$target/request.json" | cut -d ' ' -f1) == "$(jq -er .request_sha256 "$target/manifest.json")" ]] || return 1
     [[ $(sha256sum "$target/firmware-review.json" | cut -d ' ' -f1) == "$(jq -er .firmware_review_sha256 "$target/request.json")" ]] || return 1
     if ! jq -e '.redistribution_review_complete==true and .firmware_blob_package_ready==true and

@@ -34,7 +34,7 @@ jq --arg hash "$(sha256sum "$work/target/firmware-review.json" | cut -d ' ' -f1)
 : > "$work/target/uke-key.asc"
 jq -n --arg hash "$(sha256sum "$work/target/request.json" | cut -d ' ' -f1)" \
     '{schema_version:1,purpose:"full-public-uke-root",metadata_only:false,request_sha256:$hash,
-      rpms:[{path:"rpms/uke/never-downloaded.rpm"}],root_nevras:["never-installed"]}' > "$work/target/manifest.json"
+      rpms:[{path:"rpms/uke/never-downloaded.rpm",nevra:"never-installed"}],root_nevras:["never-installed"]}' > "$work/target/manifest.json"
 # A refusal must happen before any trust-store, RPM or guest operation.
 gpg() { : > "$work/forbidden-operation"; return 97; }
 rpmkeys() { : > "$work/forbidden-operation"; return 97; }
@@ -43,6 +43,13 @@ timeout() { : > "$work/forbidden-operation"; return 97; }
 if public_copr_root_inputs "$root" "$work/target" "$work/audit" > "$work/refusal.log" 2>&1; then exit 1; fi
 grep -Fq 'Complete firmware redistribution evidence is required' "$work/refusal.log"
 [[ ! -e $work/forbidden-operation ]]
+jq '.rpms += [(.rpms[0]|.path="rpms/uke/different-name.rpm")]' "$work/target/manifest.json" > "$work/duplicate.json"
+cp "$work/target/manifest.json" "$work/original-manifest.json"
+mv "$work/duplicate.json" "$work/target/manifest.json"
+if public_copr_root_inputs "$root" "$work/target" "$work/audit" > "$work/refusal.log" 2>&1; then exit 1; fi
+grep -Fq 'duplicate RPM NEVRA' "$work/refusal.log"
+[[ ! -e $work/forbidden-operation ]]
+cp "$work/original-manifest.json" "$work/target/manifest.json"
 jq '.metadata_only=true' "$work/target/manifest.json" > "$work/metadata.json"
 mv "$work/metadata.json" "$work/target/manifest.json"
 if public_copr_root_inputs "$root" "$work/target" "$work/audit" > "$work/refusal.log" 2>&1; then exit 1; fi
