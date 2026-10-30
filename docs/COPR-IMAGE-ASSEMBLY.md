@@ -1,52 +1,42 @@
 # COPR image assembly prerequisites
 
-On 30 October 2026, Fedora Rawhide AArch64 COPR builds verified the native image
-helpers separately from the environment needed to compose an operating system.
-The helper RPM is `uke-image-tools-1.0.0-3.fc46.aarch64`, source
-`fc7b5181ee49f5c27379ee257bd3981b13e59953`, built in
-[COPR 11231022](https://copr.fedorainfracloud.org/coprs/build/11231022/).
+On 30 October 2026, Fedora Rawhide AArch64
+[COPR 11231490](https://copr.fedorainfracloud.org/coprs/build/11231490/) verified
+the native image helpers and an offline guest root transaction. The signed
+helper is `uke-image-tools-1.0.0-7.fc46.aarch64`, source
+`bf39fb75fd396421623842b77027177ad8fa805a`. Its five C++ program sources are
+unchanged from revision3; the existing native helper checks also pass.
 
-The current privileged root-stage wrapper cannot run as that non-root worker.
-Both mapped-root and subordinate-ID namespace attempts return
-`Operation not permitted`. No worker policy or project network setting was
-changed to obtain a result.
+The full image root stage and the integration check use the same
+`root-transaction.sh` function. It preserves the caller's package and repository
+policy, rejects logged RPM scriptlet failures even when DNF returns success,
+checks native target execution and runs the dependency check. The full desktop
+package selection and subsequent provenance, payload and privacy audits remain
+in the image stage.
 
-A separate libguestfs appliance using the direct backend and TCG creates a
-disposable 64 MiB EXT4 image without host mounts or physical devices. Numeric
-UID/GID 65534, a `security.selinux` attribute and fixed contents survive a
-separate read-only appliance. The host image hash remains unchanged after that
-readback. Guest networking is disabled. The existing native helper checks also
-pass; the five helper programs have no source changes.
+The COPR source worker supplies213 individually signed public Fedora RPMs and
+local repository metadata. A build-only SDK imports their CPIO payloads through
+TAR without host-user extraction. Inside a direct/TCG libguestfs appliance,
+native DNF performs a normal signature-checked installation with scriptlets.
+The bounded root records66 installed RPM entries. Fedora creates the chrony
+account, and its shipped tmpfiles rule creates the ghost state directory as
+UID/GID997. A separate read-only appliance verifies that ownership and account;
+the backing image hash remains unchanged. Virtual filesystems are mounted only
+inside the appliance. Native worker and guest networking remain disabled.
 
-This proves an appliance prerequisite, not a complete Fedora image. Native
-DNF/scriptlet execution, the full signed desktop package closure, original
-Fedora payload comparisons, filesystem metadata and SELinux policy audits,
-privacy, matched boot/module provenance and recovery remain required. The
-current root-stage integration has not been replaced or qualified by this
-probe. COPR native networking remains disabled; a future guest composer must
-use source-worker-prefetched, individually verified RPM inputs.
+A separate64MiB EXT4 check also preserves numeric UID/GID65534, a SELinux
+attribute and fixed data through independent readback. The helper RPM contains
+only the five native tools, documentation, license and source identity. The SDK,
+RPM inputs, QEMU and probes are not runtime payloads or dependencies.
 
-No tablet boot, display, charging or recovery result follows from these checks.
-Unreviewed firmware redistribution and device-private data remain separate
-release gates.
+These bounded checks leave full desktop composition open. The privileged
+container wrapper still cannot run as the COPR worker: mapped-root and
+subordinate-ID attempts return `Operation not permitted`. Production guest
+transport, the complete signed desktop closure, original Fedora byte checks,
+filesystem metadata and SELinux audits, privacy and exact boot/module provenance
+must pass together. Qualified firmware redistribution, device-private inputs,
+recovery and physical acceptance remain separate release gates.
 
 The isolation approach follows the
 [libguestfs architecture](https://libguestfs.org/guestfs-faq.1.html#How-does-libguestfs-compare-to-other-tools)
 and [guestfish command interface](https://libguestfs.org/guestfish.1.html).
-
-The next source candidate factors the existing DNF install and dependency check
-into `root-transaction.sh`. The full image stage keeps its existing desktop,
-package and provenance policy. The shared helper rejects failed scriptlets even
-when DNF returns success, and verifies that target native commands execute.
-
-Its COPR integration check uses a build-only SDK made from individually signed
-Fedora Rawhide AArch64 RPM payloads. CPIO-to-TAR conversion preserves numeric
-metadata without extracting files as the host user. The source worker resolves
-all dependencies and supplies a local repository; native worker and guest
-networking remain disabled. Guest DNF uses ordinary signature checks and RPM
-scriptlets. A bounded selection includes chrony to check persistent system-user
-creation and directory ownership in a separate read-only appliance. Fedora's
-shipped tmpfiles rule creates its ghost state directories using those identities.
-This check
-does not compose the complete desktop image. Its source is prepared; a successful
-COPR result is still required before this route is accepted.
