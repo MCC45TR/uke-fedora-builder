@@ -335,11 +335,16 @@ separate policies; this change does not qualify those routes or alter their
 COPR definitions. Native helper fixtures run in COPR; GitHub checks source only.
 
 The shared EXT4 path passed a 1 GiB COPR guest fixture in
-[build 11231975](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-unstable/build/11231975/).
+[build 11232234](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-unstable/build/11232234/).
 Normal Fedora RPM scriptlets, numeric owners, SELinux labels, content, exact
 mtimes, ACLs and capabilities survived independent image readback. Deliberate
 metadata corruptions were rejected; both sparse decoders reproduced the raw
-image. The assembly policy pins signed `uke-image-tools-1.0.0-12.fc46.aarch64`.
+image. The assembly policy pins signed `uke-image-tools-1.0.0-14.fc46.aarch64`.
+
+The same build resolves all 12 complete KDE/GNOME, shell and root-profile goals
+from the production package policy. These metadata checks stop before target
+RPM downloads or installation. Unstable requests the owning Uke PipeWire
+providers directly; normal dependency policy stays enabled.
 
 This fixture does not compose the complete desktop root. Production guest
 transport, full image composition and an independent rebuild remain required,

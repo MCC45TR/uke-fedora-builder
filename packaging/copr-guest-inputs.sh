@@ -6,6 +6,7 @@ recipe=$1 output=$2
 mkdir -p "$output/rpms" "$output/keydb" "$output/closures" "$output/download-cache"
 key=$recipe/configs/keys/fedora-46.asc
 [[ $(gpg --batch --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == D924B10D3E810DABDD8B56B596E7E91491211FCE ]]
+bash "$recipe/packaging/copr-root-closure.sh" "$recipe" "$output/closures/full-root" "$output/download-cache"
 # Resolve every dependency, including packages already installed on this worker.
 # The SDK is build-only; no worker filesystem, database or identity is archived.
 sdk_packages=(bash coreutils dnf5 dnf5-plugins rpm rpm-build fedora-release-common
