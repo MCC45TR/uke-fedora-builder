@@ -1,0 +1,7 @@
+[
+  "bash",
+  "coreutils",
+  "systemd",
+  "chrony",
+  "selinux-policy-targeted"
+]

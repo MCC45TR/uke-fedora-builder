@@ -1,6 +1,6 @@
 Name:           uke-image-tools
 Version:        1.0.0
-Release:        7%{?dist}
+Release:        12%{?dist}
 Summary:        Native tools for isolated Uke image assembly and verification
 License:        MIT
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -14,6 +14,8 @@ BuildRequires:  rpm-build ripgrep dtc git-core make f2fs-tools e2fsprogs xfsprog
 BuildRequires:  util-linux-core util-linux shadow-utils
 BuildRequires:  libguestfs-tools-c kernel-core kernel-modules qemu-kvm-core
 BuildRequires:  bsdtar gnupg2
+BuildRequires:  android-tools
+BuildRequires:  libarchive-devel
 
 %description
 Image codecs, payload validation, language auditing and offline EXT4 labels.
@@ -31,6 +33,9 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/boot-pair/android-sparse.cpp 
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/image/ext4-labels.cpp -o build-tools/ext4-labels $LDFLAGS -lext2fs -lcom_err -lselinux
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/image/check-userdata-payload.cpp -o build-tools/check-userdata-payload $LDFLAGS -lcrypto -lzstd
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/image/audit-languages.cpp -o build-tools/audit-languages $LDFLAGS
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/image/compare-root-metadata.cpp -o build-tools/compare-root-metadata $LDFLAGS
+mkdir -p build-fixtures
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/build/cpio-sdk-tar.cpp -o build-fixtures/cpio-sdk-tar $LDFLAGS -larchive
 
 %install
 install -d %{buildroot}%{_libexecdir}/%{name}
@@ -69,6 +74,21 @@ bash tests/android-sparse-contract.sh build-tools/android-sparse "$PWD/build-too
 %{_datadir}/%{name}/source-identity.json
 
 %changelog
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-12
+- Preserve exact source mtimes and retain failed readback diagnostics.
+
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-11
+- Preserve CPIO data-last hard links while bootstrapping the disposable SDK.
+
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-10
+- Place the transaction-store option on its install command.
+
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-9
+- Prefetch complete SDK and target transactions with conditional dependencies.
+
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-8
+- Populate EXT4 from the owned guest root and check labels, metadata and sparse readback.
+
 * Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-7
 - Use Fedora's shipped tmpfiles rule to validate ghost state directory ownership.
 

@@ -39,7 +39,7 @@ rpmkeys --dbpath /job/tools-keydb --checksig "$tools_archive" | grep -F 'signatu
 rpm2cpio "$tools_archive" > /job/tools-payload.cpio
 (cd /job/tools-payload; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /job/tools-payload.cpio)
 export UKE_IMAGE_TOOLS=/job/tools-payload/usr/libexec/uke-image-tools
-for tools_binary in boot-image android-sparse ext4-labels check-userdata-payload audit-languages; do
+for tools_binary in boot-image android-sparse ext4-labels check-userdata-payload audit-languages compare-root-metadata; do
     [[ -f $UKE_IMAGE_TOOLS/$tools_binary && ! -L $UKE_IMAGE_TOOLS/$tools_binary && -x $UKE_IMAGE_TOOLS/$tools_binary ]]
 done
 rpm -qp --qf '%{NEVRA}\t%{SOURCERPM}\n' "$tools_archive" > /job/artifacts/tools/packages.tsv
