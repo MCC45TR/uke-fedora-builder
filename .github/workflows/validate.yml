@@ -23,6 +23,8 @@ jobs:
           bash tests/public-build-contract.sh
           bash tests/workspace-source.sh
           bash tests/cohort.sh
+          bash tests/repository-kernel-plan.sh
+          bash tests/public-login-shell.sh
           bash tests/image-contract.sh
           bash tests/boot-contract.sh
           bash tests/boot-pair-contract.sh
@@ -34,6 +36,7 @@ jobs:
           bash tests/payload-traversal.sh
           bash tests/kernel-dt-admission.sh
           g++ -std=c++20 -O2 -Wall -Wextra -Werror src/image/ext4-labels.cpp -o /tmp/ext4-labels -lext2fs -lcom_err -lselinux
+          bash tests/ext4-labels-contract.sh /tmp/ext4-labels
           g++ -std=c++20 -O2 -Wall -Wextra -Werror src/boot/boot-image.cpp -o /tmp/boot-image
           bash tests/boot-image-contract.sh /tmp/boot-image
           g++ -std=c++20 -O2 -Wall -Wextra -Werror src/image/check-userdata-payload.cpp -o /tmp/check-userdata-payload -lcrypto -lzstd
@@ -42,3 +45,26 @@ jobs:
           bash tests/userdata-filesystem-payload.sh /tmp/check-userdata-payload /tmp/boot-image
           g++ -std=c++20 -O2 -Wall -Wextra -Werror src/boot-pair/android-sparse.cpp -o /tmp/android-sparse
           bash tests/android-sparse-contract.sh /tmp/android-sparse /tmp/android-sparse-fixtures
+  fedora-target-matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      targets: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - id: targets
+        run: echo "matrix=$(jq -c '{include:[.fedora_targets|to_entries[]|{release:.key,image:.value.images.x86_64}]}' configs/build-rules.json)" >> "$GITHUB_OUTPUT"
+  fedora-login-shells:
+    needs: fedora-target-matrix
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.fedora-target-matrix.outputs.targets) }}
+    container: ${{ matrix.image }}
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install original Fedora shell fixture tools
+        run: dnf5 -y --setopt=install_weak_deps=False install jq shadow-utils fish zsh util-linux
+      - name: Verify new-account shells in a disposable Fedora container
+        env:
+          UKE_DISPOSABLE_SHELL_TEST: '1'
+        run: bash tests/public-shell-users.sh

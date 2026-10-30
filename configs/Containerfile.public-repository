@@ -1,0 +1,9 @@
+ARG BASE_IMAGE=scratch
+FROM ${BASE_IMAGE}
+# Compose from signed binary RPMs. No upstream kernel compiler or source cache.
+RUN dnf5 -y --setopt=install_weak_deps=False install \
+    dnf5-plugins rpm-build git-core curl jq gnupg2 tar xz cpio zstd gcc-c++ \
+    binutils coreutils findutils util-linux attr acl policycoreutils ripgrep \
+    systemd systemd-udev kmod createrepo_c shadow-utils \
+    && dnf5 clean all
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC

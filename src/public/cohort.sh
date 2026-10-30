@@ -7,13 +7,27 @@ cohort_identity() {
       ($r.builder_commit | type == "string" and test("^[0-9a-f]{40}$")) and
       ($r.kernel_commit | type == "string" and test("^[0-9a-f]{40}$")) and
       ($r.kernel_version | type == "string" and test("^[0-9]+\\.[0-9]+(\\.[0-9]+)?$")) and
-      ($k.kernel_release | type == "string" and test("^[0-9]+\\.[0-9]+(\\.[0-9]+)?-[0-9A-Za-z._+]+$")) and
+      ($k.rpm_version_release | type == "string" and test("^[0-9]+\\.[0-9]+(\\.[0-9]+)?-[0-9A-Za-z._+]+$")) and
+      ($k.rpm_dist | type == "string" and test("^[.]fc[0-9]+$")) and
+      (($r.fedora_release == "44" and $k.rpm_dist == ".fc44") or
+       ($r.fedora_release == "45" and $k.rpm_dist == ".fc45") or
+       ($r.fedora_release == "rawhide")) and
+      $r.kernel_profile == $k.kernel_profile and
+      (($k.kernel_profile == "normal" and
+        $k.kernel_family == "senemos-uke-linux-kernel-mainline" and
+        $k.kernel_release == $k.rpm_version_release) or
+       ($k.kernel_profile == "el2-require" and
+        $k.kernel_family == "senemos-uke-linux-kernel-mainline-kvm" and
+        $k.kernel_release == ($k.rpm_version_release + "-kvm"))) and
       ($k.kernel_release | startswith($r.kernel_version + "-")) and
       ($k.payload_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
       $k.kernel_source_commit == $r.kernel_commit and $k.kernel_version == $r.kernel_version and
       .builder_commit == $r.builder_commit and .kernel_commit == $r.kernel_commit and
       .kernel_source_commit == $k.kernel_source_commit and .kernel_version == $k.kernel_version and
       .kernel_release == $k.kernel_release and .payload_sha256 == $k.payload_sha256 and
+      .rpm_dist == $k.rpm_dist and .rpm_version_release == $k.rpm_version_release and
+      .kernel_profile == $k.kernel_profile and .kernel_family == $k.kernel_family and
+      .fedora_release == $r.fedora_release and
       .partition == $r.partition and .filesystem == $r.filesystem and .mode == $r.mode and
       .target == "image" and $r.target == "image" and
       (.filesystem | IN("ext4", "f2fs", "xfs", "btrfs")) and
@@ -54,8 +68,11 @@ cohort_root_check_main() (
     local request=$1 artifacts=$2 root=$3 codec=$4 expected_packages=$5 installed_packages=$6
     local info=$artifacts/kernel/kernel-info.json manifest=$artifacts/manifest.json
     cohort_identity "$request" "$info" "$manifest"
-    local release partition filesystem modules bundle scratch hash component nevra expected actual releases
+    local release partition filesystem modules bundle scratch hash component nevra expected actual releases family rpm_release dist
     release=$(jq -er .kernel_release "$info")
+    family=$(jq -er .kernel_family "$info")
+    rpm_release=$(jq -er .rpm_version_release "$info")
+    dist=$(jq -er .rpm_dist "$info")
     partition=$(jq -er .partition "$request")
     filesystem=$(jq -er .filesystem "$request")
     modules=$root/usr/lib/modules/$release
@@ -73,14 +90,14 @@ cohort_root_check_main() (
     cmp "$artifacts/kernel/payload.sha256" "$scratch/payload.sha256"
     # Compare installed package identity to the independently queried producer RPM set.
     for component in '' -core -modules -dtbs -boot; do
-        nevra=senemos-uke-linux-kernel-mainline$component-$release.fc46.aarch64
+        nevra=$family$component-$rpm_release$dist.aarch64
         expected=$(awk -F '\t' -v name="$nevra" '$1==name {print $1 "\t" $2}' "$expected_packages")
         actual=$(awk -F '\t' -v name="$nevra" '$1==name {print $1 "\t" $2}' "$installed_packages")
         [[ -n $expected && $expected != *$'\n'* && $expected == "$actual" && $expected != *$'\t' ]]
         printf '%s\n' "$expected" >> "$scratch/expected-packages"
     done
     if [[ $partition == userdata ]]; then
-        nevra=senemos-uke-linux-kernel-mainline-singleboot-$release.fc46.aarch64
+        nevra=$family-singleboot-$rpm_release$dist.aarch64
         expected=$(awk -F '\t' -v name="$nevra" '$1==name {print $1 "\t" $2}' "$expected_packages")
         actual=$(awk -F '\t' -v name="$nevra" '$1==name {print $1 "\t" $2}' "$installed_packages")
         [[ -n $expected && $expected != *$'\n'* && $expected == "$actual" && $expected != *$'\t' ]]

@@ -31,7 +31,7 @@ int main(int argc, char **argv) {
         selabel_handle *labels = selabel_open(SELABEL_CTX_FILE, options, 1);
         if (!labels) throw std::runtime_error("Cannot load the target file-context policy");
         const fs::path root = fs::canonical(argv[3]);
-        unsigned long count = 0;
+        unsigned long count = 0, excluded = 0;
         auto visit = [&](const std::string &path, const fs::path &source, bool generated) {
             ext2_ino_t number;
             check(ext2fs_namei(image, EXT2_ROOT_INO, EXT2_ROOT_INO, path.c_str(), &number), "resolve inode");
@@ -45,7 +45,8 @@ int main(int argc, char **argv) {
                     throw std::runtime_error("Ownership or mode differs at " + path);
             }
             char *context = nullptr;
-            if (selabel_lookup_raw(labels, &context, path.c_str(), inode.i_mode))
+            // ENOENT also represents the target policy's explicit <<none>> entries.
+            if (selabel_lookup_raw(labels, &context, path.c_str(), inode.i_mode) && errno != ENOENT)
                 throw std::runtime_error("Policy has no context for " + path);
             ext2_xattr_handle *attrs = nullptr;
             check(ext2fs_xattrs_open(image, number, &attrs), "open xattrs");
@@ -68,20 +69,21 @@ int main(int argc, char **argv) {
                 } else if (cap_error != EXT2_ET_EA_KEY_NOT_FOUND) check(cap_error, "get capability");
                 if (actual_cap) ext2fs_free_mem(&actual_cap);
             }
-            if (write) {
+            if (write && context) {
                 check(ext2fs_xattr_set(attrs, "security.selinux", context, std::strlen(context) + 1), "set context");
                 check(ext2fs_xattrs_write(attrs), "write xattrs");
-            } else {
+            } else if (context) {
                 void *actual = nullptr;
                 size_t length = 0;
-                check(ext2fs_xattr_get(attrs, "security.selinux", &actual, &length), "get context");
+                const std::string operation = "get context at " + path;
+                check(ext2fs_xattr_get(attrs, "security.selinux", &actual, &length), operation.c_str());
                 if (length != std::strlen(context) + 1 || std::memcmp(actual, context, length))
                     throw std::runtime_error("Context differs at " + path);
                 ext2fs_free_mem(&actual);
             }
             ext2fs_xattrs_close(&attrs);
-            freecon(context);
-            ++count;
+            if (context) { freecon(context); ++count; }
+            else ++excluded;
         };
         visit("/", root, false);
         for (const auto &entry : fs::recursive_directory_iterator(root)) {
@@ -92,7 +94,8 @@ int main(int argc, char **argv) {
         selabel_close(labels);
         check(ext2fs_close(image), "close ext4");
         std::cout << (write ? "Applied" : "Verified") << " " << count
-                  << " SELinux inode contexts; source ownership and modes preserved\n";
+                  << " SELinux inode contexts; " << excluded
+                  << " policy-excluded paths; source ownership, modes and capabilities preserved\n";
     } catch (const std::exception &error) {
         std::cerr << error.what() << '\n';
         return 1;

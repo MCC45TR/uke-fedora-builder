@@ -1,13 +1,46 @@
 # Public source and image builds
 
-23 October 2026. This host workflow starts from public source and an empty Fedora
-Rawhide AArch64 root. It does not consume a prepared private root, historical
-Core cache, a stock boot dump or a pre-existing local container ID.
+29 October 2026: the public builder accepts Fedora 44, Fedora 45 and Rawhide as
+separate targets, and Bash, Fish or Zsh as the new normal user's login shell.
+The default remains Rawhide, KDE and Bash. Fedora 44/45 image composition stops
+before host preparation until signed Uke family builds and dependency resolution
+are validated. Cutefish image composition also stops: its graphical login and
+secure first-account flow are unvalidated. Dry-run selection is not image support.
 
-The implementation has shell syntax, CLI and source-integrity checks. Kernel,
-container and image builds were not run for this change. None of the 48 image
-selections has new physical acceptance from this work. Mutable Rawhide/COPR
-repositories also prevent a promise of identical bytes on future builds.
+The three targets use reviewed per-architecture Fedora image digests in
+`configs/build-rules.json`. Public RPM stages derive the dist tag from that
+worker, use release-specific Fedora/COPR repositories and segregate package and
+kernel caches by release and channel. The default kernel is pinned to the
+reviewed Uke Linux 7.3.0-33 source commit; no generic Fedora kernel is substituted.
+The legacy Core command retains its original Rawhide-only contract.
+
+`--shell` installs the original Fedora shell, validates the executable from the
+target RPM and `/etc/shells`, and updates `useradd -D` in the new root.
+AccountsService 26.27.3 calls useradd without a shell override. Existing accounts
+and root keep their shells. Graphical setup and AArch64 first-user acceptance
+remain separate from native x86_64 container user-creation tests.
+
+`--release` (alias `--fedora-version`) selects Fedora, independently of
+`--channel`. Explicit desktop/shell flags are rejected for kernel-only builds.
+Testing and unstable share `uke-linux-test`; they are not separate repositories.
+Builds never flash a device. Singleboot flashing destroys Android userdata;
+multiboot requires an existing physical `linux` partition.
+
+```sh
+./ukelinux.sh --build image --release 44 --desktop kde --shell bash --dry-run
+./ukelinux.sh --build image --release 45 --desktop cutefish --shell fish --dry-run
+./ukelinux.sh --build image --release rawhide --desktop gnome --shell zsh --dry-run
+./ukelinux.sh --build kernel --release 45 --channel testing
+./ukelinux.sh --self-test
+```
+
+All 648 release/desktop/shell/layout/filesystem/channel plans are checked without
+network or host preparation. The Cutefish meta package selects the real,
+separately packaged upstream desktop; it enables no display manager and cannot
+establish image or tablet support. Fedora 44/45 chroots were enabled in
+`mcc45tr/uke-linux`, `mcc45tr/uke-linux-test` and `mcc45tr/cutefish`.
+Compatibility builds 11222490 and 11222501–11222510 failed after source preparation,
+without published binary logs. No Fedora 44/45 stable RPM promotion was performed.
 
 ## Start
 
@@ -27,6 +60,9 @@ channel and output directory. Explicit CLI selections are retained. The default
 output parent is `out` below the directory from which the command was invoked,
 including when the entry is invoked by an absolute path from elsewhere.
 Each invocation creates a new private run directory and preserves older output.
+The output filesystem must enforce a user-owned mode-0700 directory; otherwise
+the build refuses before copying any private input. A filesystem that ignores
+Unix permissions is unsuitable even if it has enough free space.
 
 ```sh
 ./ukelinux.sh --build image --mode multiboot --filesystem ext4 \
@@ -57,12 +93,11 @@ failed under emulation. Set `UKE_CROSS=0` to emulate every AArch64 step instead.
 
 `--kernel VERSION|latest|lastest` selects the Linux version. The default is `kernel.default_version` in the policy. `latest` is kernel.org's newest stable release; it is resolved once per build, before any worker starts, and `lastest` is accepted as an alias. The selected source must pass its actual SRPM producer's `make validate version=VERSION` checks before source downloads. A profile accepted by another host build route does not admit this native RPM route. Unsupported versions stop explicitly without substituting a generic or older kernel. The kernel release (for example `7.2.12-20`) is read from the selected source's spec, so the initramfs, RPMs and module paths match. `manifest.json` records the requested selection, the resolved version, the source commit and the release.
 
-24 October 2026: the current native SRPM producer admits Linux 7.2.12. Kernel.org
-`latest` resolves to 7.3, which needs a reviewed native Uke profile and producer
-update before this route can build it. Older profiles in the standalone kernel
-entry do not establish support in this producer.
-
-The kernel source is the head of `kernel.ref` in the policy repository, resolved once when the build starts. `UKE_KERNEL_REPO=PATH` uses a local checkout at its committed `HEAD` instead (`none` keeps the policy repository). Git validates the path, so a linked worktree is accepted; an invalid path or a checkout with uncommitted changes stops the build. Workers receive a snapshot of that commit. Offline builds use the newest cached source and kernel.org list unless a checkout is given.
+The policy source is pinned to Uke Linux 7.3.0-33. `UKE_KERNEL_REPO=PATH` uses a
+committed local checkout instead; an invalid or modified checkout is refused.
+Offline builds require the exact pinned source, or that explicit local checkout.
+Workers receive an immutable source snapshot. `latest` still needs a profile
+admitted by the selected SRPM producer.
 
 ## Selections
 
@@ -202,13 +237,14 @@ separately guarded operation.
 
 ## Validation scope
 
-The public shell fixtures cover all 48 selections, three kernel channels,
+The public shell fixtures cover all 648 selection plans, three kernel channels,
 invalid input, package-consent refusal, missing-`jq` planning and output paths.
 The source change also extends parser fixtures for the explicit Linux profile.
-No new container, kernel, filesystem image, VM boot or tablet run was executed
-for the 22 October implementation. First full builds, package resolution on each
-channel, desktop setup and recoverable tablet boot remain necessary acceptance
-checks. Historical `core`, `boot` and `boot-pair` commands remain available for
+Native x86_64 Fedora 44, Fedora 45 and Rawhide container user-creation checks
+passed for Bash, Fish and Zsh. Fedora 44 libdnf5 5.4.6 compilation and signed local
+repository fixtures passed. These checks do not validate AArch64 execution, a
+graphical first-account flow, image composition or tablet hardware. Those remain
+required acceptance checks. Historical `core`, `boot` and `boot-pair` commands remain available for
 their dated frozen contracts; their old caches are not prerequisites here.
 
 ## Manual CI source selection
@@ -260,3 +296,89 @@ This checks producer/consumer consistency, not ELF vermagic semantics, physical 
 correctness, firmware compatibility, signature trust, rollback or tablet boot.
 Those facts remain explicitly unverified. Old kernel caches without the new
 producer inventory cannot pass root admission; rebuild the matching kernel.
+## Explicit EL2/KVM profiles
+
+25 October 2026: source preparation only; the profile changes below have not
+been tested. `--kernel-profile normal` remains the default and keeps the existing
+ordinary source/family policy. `--kernel-profile el2-require --channel testing`
+selects the isolated Linux 7.3 KVM producer. Linux `7.3` is normalized to package
+version `7.3.0`. `--kernel` selects a version; `--channel` selects the RPM
+repository; neither substitutes for a kernel profile.
+
+```bash
+./ukelinux.sh --build kernel --kernel 7.3 --kernel-profile el2-require --channel testing --skip-tests
+```
+
+`--skip-tests` records explicit deferral of kernel fixtures and RPM checks;
+source signatures, hashes, payload/privacy checks and profile admission remain
+mandatory. Sources without explicit test-deferral support are refused. Default
+builds retain their tests. This preparation did not invoke the command above or
+build an image. The source RPM was produced separately and submitted to COPR.
+
+The request, producer/cache identity and output manifest carry the selected
+profile, source commit and native-config hash. The cache also separates builds
+with deferred tests from builds with tests enabled. RPM version/release is
+read separately from the exact `kernel-uname-r` capability; KVM's `-kvm` suffix
+belongs to the Image/module/bundle ABI. Image composition selects only the
+matching local family and preserves ordinary composition's KVM exclusions.
+Neither profile installation nor this builder activates a connected device.
+
+`el2-require` checks existing EL2 on primary and secondary entry. It parks on
+EL1 and never performs a firmware-exit call. The historical EL1 firmware result
+therefore remains a physical blocker. `el2-exit-experimental` is explicitly
+refused: there is no accepted exact Uke firmware service, all-CPU return or
+RAM/DMA/SMMU ownership contract. No allowlist entry was invented. Early debugger
+registers do not provide persistent failure logs or recover a non-returning SMC.
+
+The existing native probe and KVM-only Linux guest tools on
+`main` retain the isolated EL2/KVM acceptance tools. No guest test
+was run. Binder/BinderFS preparation supports a later original-Fedora Waydroid
+trial; it does not establish Android, GPU or container acceptance. The upstream
+Python container startup service needs a project policy decision before any
+Waydroid installation. Preserve the accepted kernel/modules and physical
+recovery route before any separately authorized activation.
+
+## Hosted EXT4 singleboot image releases
+
+Use the manual image-release workflow in `MCC45TR/uke-linux`. It selects the
+recorded workspace/component revisions and runs natively on `ubuntu-24.04-arm`.
+The image path is `--kernel-rpm latest --channel testing`: signed Fedora/COPR
+binary packages supply the kernel and hardware userspace. No kernel or hardware
+source build is performed. An exact `7.3.x-N.fc46` kernel tuple can replace
+`latest`; one selected tuple supplies all six matching RPMs. The kernel key
+fingerprint, each RPM signature, module inventory and both embedded boot Images
+are checked before composition. The actual source and tuple replace provisional
+source defaults in the run receipt. This route cannot combine a local source,
+explicit `--kernel`, KVM profile, kernel-only build or kernel-cache reuse.
+
+The hosted job uses Docker (`UKE_CONTAINER_ENGINE=docker`). The binary-package
+path needs 16 GiB plus twice the requested root capacity; it uses a smaller
+worker and validates one independent sparse decoder output at a time. The source
+build path retains its original capacity requirement. Runner capacities can
+change: the job checks actual free space rather than assuming a hosted label
+provides enough storage. The 29 October probe measured 115 GiB free after unused
+SDK cleanup; that observation is not a future capacity guarantee.
+
+No touch reference, account credentials or SSH host keys are supplied. Before
+any release is published, artifacts must pass metadata/content readback,
+SELinux context verification, both sparse decoders, Zstandard readback and
+checksums. Releases are marked as experimental pre-releases; these host checks
+do not qualify tablet boot, first-account setup, charging or recovery.
+
+## Cohort compatibility, 30 October 2026
+
+The fresh-root cohort gate uses the producer's RPM family, version-release and
+Fedora dist suffix separately from the module ABI. A normal kernel uses the
+base package family and identical RPM/module release; `el2-require` uses the
+`-kvm` family and a module ABI ending in `-kvm`. The request, producer and
+manifest must agree. Fedora 44/45 producer suffixes must match the requested
+target; Rawhide retains its worker-resolved suffix. This does not remove the
+entrypoint's existing restriction on stable-Fedora image composition.
+
+The signed repository route also records the canonical extracted kernel,
+configuration, module and DT inventory before deleting its temporary extraction.
+The installed root must match those bytes and the producer RPM identities.
+Missing metadata is refused rather than interpreted as a legacy default.
+Synthetic tests cover both profiles across three Fedora target labels,
+metadata mismatches and failed/partial traversal. They do not build packages,
+run a VM or qualify EL2 entry, firmware, boot or rollback.

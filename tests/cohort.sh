@@ -25,8 +25,8 @@ cp "$bundle/userdata.img" "$artifacts/boot.img"
 cp "$bundle/userdata.img" "$artifacts/boot-userdata.img"
 printf 'PARTLABEL=userdata / ext4 defaults 0 0\n' > "$root/etc/fstab"
 sha=$(printf 'a%.0s' {1..40})
-jq -n --arg sha "$sha" '{target:"image",builder_commit:$sha,kernel_commit:$sha,kernel_version:"7.3.0",partition:"userdata",mode:"singleboot",filesystem:"ext4"}' > "$fixture/request.json"
-jq -n --arg sha "$sha" --arg payload "$payload" '{kernel_source_commit:$sha,kernel_version:"7.3.0",kernel_release:"7.3.0-16",payload_sha256:$payload}' > "$artifacts/kernel/kernel-info.json"
+jq -n --arg sha "$sha" '{target:"image",fedora_release:"rawhide",kernel_profile:"normal",builder_commit:$sha,kernel_commit:$sha,kernel_version:"7.3.0",partition:"userdata",mode:"singleboot",filesystem:"ext4"}' > "$fixture/request.json"
+jq -n --arg sha "$sha" --arg payload "$payload" '{rpm_dist:".fc46",rpm_version_release:"7.3.0-16",kernel_profile:"normal",kernel_family:"senemos-uke-linux-kernel-mainline",kernel_source_commit:$sha,kernel_version:"7.3.0",kernel_release:"7.3.0-16",payload_sha256:$payload}' > "$artifacts/kernel/kernel-info.json"
 jq -s '.[0]+.[1]' "$fixture/request.json" "$artifacts/kernel/kernel-info.json" > "$artifacts/manifest.json"
 for component in '' -core -modules -dtbs -boot -singleboot; do
  printf 'senemos-uke-linux-kernel-mainline%s-%s.fc46.aarch64\tsenemos-uke-linux-kernel-mainline-%s.fc46.src.rpm\n' "$component" "$release" "$release"
@@ -36,6 +36,51 @@ check() { cohort_root_check "$fixture/request.json" "$artifacts" "$root" "$fixtu
 reject() { if check > "$fixture/rejected.log" 2>&1; then echo "Invalid cohort accepted: $1" >&2; exit 1; fi; }
 check > "$fixture/receipt.json"
 jq -e '.physical_boot_tested==false and .rollback_tested==false and .final_filesystem_hashes_verified==false and .runtime_firmware_compatibility=="unverified"' "$fixture/receipt.json" >/dev/null
+# Exercise current producer package naming without installing any RPMs. Stable
+# Fedora images remain gated by entry.sh; these are synthetic cohort fixtures.
+cp "$fixture/request.json" "$fixture/request.base"
+cp "$artifacts/kernel/kernel-info.json" "$fixture/info.base"
+cp "$artifacts/kernel/packages.tsv" "$fixture/packages.base"
+for target in 44 45 rawhide; do
+ for profile in normal el2-require; do
+  dist=.fc${target/rawhide/46}
+  family=senemos-uke-linux-kernel-mainline
+  abi=$release
+  if [[ $profile == el2-require ]]; then family+=-kvm; abi+=-kvm; fi
+  jq --arg target "$target" --arg profile "$profile" '.fedora_release=$target | .kernel_profile=$profile' "$fixture/request.base" > "$fixture/request.json"
+  jq --arg dist "$dist" --arg profile "$profile" --arg family "$family" --arg abi "$abi" '.rpm_dist=$dist | .kernel_profile=$profile | .kernel_family=$family | .kernel_release=$abi' "$fixture/info.base" > "$artifacts/kernel/kernel-info.json"
+  jq -s '.[0]+.[1]' "$fixture/request.json" "$artifacts/kernel/kernel-info.json" > "$artifacts/manifest.json"
+  for component in '' -core -modules -dtbs -boot -singleboot; do
+   printf '%s%s-%s%s.aarch64\t%s-%s%s.src.rpm\n' "$family" "$component" "$release" "$dist" "$family" "$release" "$dist"
+  done > "$artifacts/kernel/packages.tsv"
+  cp "$artifacts/kernel/packages.tsv" "$artifacts/installed-rpms.tsv"
+  if [[ $abi != "$release" ]]; then mv "$modules" "${modules}-kvm"; mv "$bundle" "${bundle}-kvm"; fi
+  check >/dev/null
+  cp "$artifacts/manifest.json" "$fixture/variant.manifest"
+  for expression in '.rpm_dist=".fc99"' '.kernel_profile="unknown"' '.kernel_family="other"' '.rpm_version_release="7.3.0-99"'; do
+   jq "$expression" "$fixture/variant.manifest" > "$artifacts/manifest.json"
+   reject "$target/$profile manifest $expression"
+  done
+  if [[ $abi != "$release" ]]; then mv "${modules}-kvm" "$modules"; mv "${bundle}-kvm" "$bundle"; fi
+ done
+done
+cp "$fixture/request.base" "$fixture/request.json"
+cp "$fixture/info.base" "$artifacts/kernel/kernel-info.json"
+cp "$fixture/packages.base" "$artifacts/kernel/packages.tsv"
+cp "$fixture/packages.base" "$artifacts/installed-rpms.tsv"
+jq -s '.[0]+.[1]' "$fixture/request.json" "$artifacts/kernel/kernel-info.json" > "$artifacts/manifest.json"
+for expression in '.rpm_dist=".el9"' '.kernel_profile="el2-require"' '.kernel_family="other"' '.rpm_version_release="7.3.0-99"' 'del(.rpm_dist)'; do
+ jq "$expression" "$fixture/info.base" > "$artifacts/kernel/kernel-info.json"
+ jq -s '.[0]+.[1]' "$fixture/request.json" "$artifacts/kernel/kernel-info.json" > "$artifacts/manifest.json"
+ reject "self-consistent invalid producer $expression"
+done
+cp "$fixture/info.base" "$artifacts/kernel/kernel-info.json"
+jq '.fedora_release="44"' "$fixture/request.base" > "$fixture/request.json"
+jq -s '.[0]+.[1]' "$fixture/request.json" "$artifacts/kernel/kernel-info.json" > "$artifacts/manifest.json"
+reject 'Fedora 44 request with Fedora 46 producer'
+cp "$fixture/request.base" "$fixture/request.json"
+jq -s '.[0]+.[1]' "$fixture/request.json" "$artifacts/kernel/kernel-info.json" > "$artifacts/manifest.json"
+echo 'Six Fedora/profile cohorts and mismatched producer/manifest fixtures passed'
 # Each enumeration must complete, even when its partial output looks admissible.
 mkdir "$fixture/bin"
 cat > "$fixture/bin/find" <<'SH'

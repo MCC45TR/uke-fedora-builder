@@ -10,8 +10,54 @@
     "x86_64": "registry.fedoraproject.org/fedora@sha256:f7d3478d02965da40131211c19fb827b4d6e3de0904e9d582a9354af47949c14",
     "aarch64": "registry.fedoraproject.org/fedora@sha256:9b0213742bcf87c07d8768278b03686e8655faaeb85027ecbdfe37b8d5017769"
   },
+  "fedora_targets": {
+    "44": {
+      "releasever": "44",
+      "copr_chroot": "fedora-44-aarch64",
+      "repos": [
+        "fedora",
+        "updates"
+      ],
+      "images": {
+        "x86_64": "registry.fedoraproject.org/fedora@sha256:351d714a39c16fda7f3d266c0e41b4f34b51e8dfc62f12ae83b8169d7a3c5c64",
+        "aarch64": "registry.fedoraproject.org/fedora@sha256:bdfd963b87a5d6b93a5a04d56f415058c29d8c4e0aec065ee74904bb7ddb4b99"
+      },
+      "image_tested": false,
+      "tablet_tested": false,
+      "image_admission": "blocked: signed Uke family builds and dependency resolution pending"
+    },
+    "45": {
+      "releasever": "45",
+      "copr_chroot": "fedora-45-aarch64",
+      "repos": [
+        "fedora",
+        "updates"
+      ],
+      "images": {
+        "x86_64": "registry.fedoraproject.org/fedora@sha256:5dab15dabf50442527c7564bcc07f7cefdd45d709d5b358c6ad349fafe43e3a3",
+        "aarch64": "registry.fedoraproject.org/fedora@sha256:f7d6def655367c24c12954adfdce12e5510175387428983264eec2c06c57428b"
+      },
+      "image_tested": false,
+      "tablet_tested": false,
+      "image_admission": "blocked: signed Uke family builds and dependency resolution pending"
+    },
+    "rawhide": {
+      "releasever": "rawhide",
+      "copr_chroot": "fedora-rawhide-aarch64",
+      "repos": [
+        "rawhide"
+      ],
+      "images": {
+        "x86_64": "registry.fedoraproject.org/fedora@sha256:3375b5f7d84cb52f52575148f13425899f40ee6a80112e3df8fef3bd208f58f5",
+        "aarch64": "registry.fedoraproject.org/fedora@sha256:cabe7588d7bbe5a8495a99d55db995e539d6aa44fe86c6e3f752c59925b331a4"
+      },
+      "image_tested": false,
+      "tablet_tested": false,
+      "image_admission": "existing KDE/GNOME experimental source route"
+    }
+  },
   "targets": {
-    "fedora": {"format": "rpm", "default_release": "rawhide", "releases": {"rawhide": "implemented", "45": "planned"}},
+    "fedora": {"format": "rpm", "default_release": "rawhide", "releases": {"rawhide": "implemented", "44": "experimental", "45": "experimental"}},
     "opensuse": {"format": "rpm", "default_release": "tumbleweed", "releases": {"tumbleweed": "planned"}},
     "debian": {"format": "deb", "default_release": "stable", "releases": {"stable": "planned"}},
     "ubuntu": {"format": "deb", "default_release": "lts", "releases": {"lts": "planned"}},
