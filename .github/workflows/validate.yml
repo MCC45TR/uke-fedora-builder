@@ -25,6 +25,7 @@ jobs:
           bash tests/cohort.sh
           bash tests/repository-kernel-plan.sh
           bash tests/public-login-shell.sh
+          bash tests/public-stage-routing.sh
           bash tests/image-contract.sh
           bash tests/boot-contract.sh
           bash tests/boot-pair-contract.sh
