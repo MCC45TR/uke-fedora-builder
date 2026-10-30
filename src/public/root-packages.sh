@@ -19,7 +19,12 @@ public_root_packages() {
     if [[ $channel == unstable ]]; then
         local individual=()
         for package in "${selection[@]}"; do
-            case $package in uke-core|uke-hw|uke-power|uke-sensors|uke-additional) ;; *) individual+=("$package");; esac
+            case $package in
+                uke-core|uke-hw|uke-power|uke-sensors|uke-additional) ;;
+                pipewire) individual+=(uke-pipewire);;
+                pipewire-pulseaudio) individual+=(uke-pipewire-pulseaudio);;
+                *) individual+=("$package");;
+            esac
         done
         selection=("${individual[@]}" uke-core-meta)
     fi

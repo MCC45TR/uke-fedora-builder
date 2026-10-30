@@ -56,5 +56,9 @@ the source worker. It resolves the complete KDE/GNOME selections, three login
 shells and both root profiles against the pinned kernel 60 RPMs. DNF stops at
 its confirmation boundary with `--assumeno`; only solver metadata is retained.
 Device-local touch and video-firmware RPMs are excluded from generic images.
-This candidate's COPR result is pending. Dependency resolution alone does not
-verify target RPM signatures, firmware rights, installation or full composition.
+COPR 11232209 stops before SRPM production: the original explicit Fedora
+PipeWire request conflicts with Core's Uke provider. The unstable selection now
+names `uke-pipewire` and `uke-pipewire-pulseaudio` directly, preserving normal
+solver policy. Fresh revision 14 remains pending. Dependency resolution alone
+does not verify target RPM signatures, firmware rights, installation or full
+composition.

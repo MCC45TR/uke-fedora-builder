@@ -17,8 +17,15 @@ for channel in stable testing unstable; do
             contains uke-offline-charge
             if [[ $channel == unstable ]]; then
                 contains uke-core-meta
+                contains uke-pipewire
+                contains uke-pipewire-pulseaudio
                 if contains uke-additional || contains uke-core || contains uke-hw || contains uke-power || contains uke-sensors; then exit 1; fi
-            else contains uke-additional; fi
+                if contains pipewire || contains pipewire-pulseaudio; then exit 1; fi
+            else
+                contains uke-additional
+                contains pipewire
+                contains pipewire-pulseaudio
+            fi
             if [[ $desktop == kde ]]; then
                 contains plasma-setup
                 if contains gdm; then exit 1; fi
