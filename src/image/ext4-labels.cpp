@@ -7,6 +7,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -38,8 +39,8 @@ int main(int argc, char **argv) {
             check(ext2fs_namei(image, EXT2_ROOT_INO, EXT2_ROOT_INO, path.c_str(), &number), "resolve inode");
             ext2_inode inode {};
             check(ext2fs_read_inode(image, number, &inode), "read inode");
+            struct stat original {};
             if (!generated) {
-                struct stat original {};
                 if (lstat(source.c_str(), &original)) throw std::runtime_error("Cannot stat source");
                 if (inode.i_mode != original.st_mode || inode_uid(inode) != original.st_uid ||
                     inode_gid(inode) != original.st_gid)
@@ -83,6 +84,32 @@ int main(int argc, char **argv) {
                 ext2fs_free_mem(&actual);
             }
             ext2fs_xattrs_close(&attrs);
+            if (!generated) {
+                // Population does not retain root time or subsecond precision.
+                // Copy the actual staging mtime after xattr writes, then verify it.
+                ext2_inode_large timed {};
+                check(ext2fs_read_inode_full(image, number, reinterpret_cast<ext2_inode *>(&timed),
+                                            sizeof(timed)), "read extended inode time");
+                if (!ext2fs_inode_includes(EXT2_GOOD_OLD_INODE_SIZE + timed.i_extra_isize, i_mtime_extra))
+                    throw std::runtime_error("Image inode cannot retain subsecond time: " + path);
+                const std::int64_t seconds = original.st_mtim.tv_sec;
+                const auto nanoseconds = original.st_mtim.tv_nsec;
+                if (seconds < -2147483648LL || seconds > ((3LL << 32) + 2147483647LL) ||
+                    nanoseconds < 0 || nanoseconds >= 1000000000L)
+                    throw std::runtime_error("Source mtime is outside EXT4 range: " + path);
+                const auto low = static_cast<std::uint32_t>(seconds);
+                const auto epoch = static_cast<std::uint32_t>(
+                    (seconds - static_cast<std::int32_t>(low)) / (1LL << 32));
+                const auto extra = (static_cast<std::uint32_t>(nanoseconds) << 2) | epoch;
+                if (write) {
+                    timed.i_mtime = low;
+                    timed.i_mtime_extra = extra;
+                    check(ext2fs_write_inode_full(image, number, reinterpret_cast<ext2_inode *>(&timed),
+                                                 sizeof(timed)), "write original inode mtime");
+                } else if (timed.i_mtime != low || timed.i_mtime_extra != extra) {
+                    throw std::runtime_error("Mtime differs at " + path);
+                }
+            }
             if (context) { freecon(context); ++count; }
             else ++excluded;
         };

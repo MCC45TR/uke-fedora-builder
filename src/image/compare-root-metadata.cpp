@@ -65,6 +65,8 @@ int main(int argc, char **argv) {
             const auto right = metadata(actual);
             if (left.st_mode != right.st_mode || left.st_uid != right.st_uid || left.st_gid != right.st_gid)
                 throw std::runtime_error("Mode or owner differs: " + relative);
+            if (left.st_mtim.tv_sec != right.st_mtim.tv_sec || left.st_mtim.tv_nsec != right.st_mtim.tv_nsec)
+                throw std::runtime_error("Mtime differs: " + relative);
             if (S_ISLNK(left.st_mode)) {
                 if (fs::read_symlink(original) != fs::read_symlink(actual))
                     throw std::runtime_error("Symlink differs: " + relative);

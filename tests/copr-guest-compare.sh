@@ -3,8 +3,17 @@
 set -Eeuo pipefail
 [[ $(id -u) == 0 && -f /job/root-readback.tar && -f /job/rootfs.tar ]]
 source /builder/src/public/root-metadata.sh
+exec 3>&2 4>&1
+exec > /job/metadata-compare.log 2>&1
 mount -t proc -o nosuid,nodev,noexec proc /proc
-trap 'umount /proc' EXIT
+cleanup() {
+    local status=$?
+    umount /proc || status=1
+    if [[ $status == 0 ]]; then cat /job/metadata-compare.log >&4
+    else tail -120 /job/metadata-compare.log >&3; fi
+    exit "$status"
+}
+trap cleanup EXIT
 auditor=/builder/build-tools/compare-root-metadata
 public_root_compare /job/root /job/rootfs.tar /job/root-readback.tar /job "$auditor"
 mkdir /job/control-readback
