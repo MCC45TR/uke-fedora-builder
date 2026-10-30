@@ -55,7 +55,7 @@ status=0
 timeout --kill-after=20 1800 guestfish --rw --format=raw -a "$work/guest.raw" \
     -f "$work/create.commands" 2>&1 | tee "$work/guestfish.log" || status=$?
 if [[ $status != 0 ]]; then cat "$work/guestfish.log" >&2; exit "$status"; fi
-jq -e '.native_dnf and .scriptlets and .dependency_check and .numeric_owner and
+jq -e '.native_dnf and .scriptlets and .dependency_check and .numeric_owner and .tmpfiles and
     (.full_os_composition == false) and (.hardware_tested == false)' "$work/report.json"
 sha256sum "$work/guest.raw" > "$work/guest.sha256"
 cat > "$work/read.commands" <<GUEST

@@ -45,6 +45,8 @@ metadata without extracting files as the host user. The source worker resolves
 all dependencies and supplies a local repository; native worker and guest
 networking remain disabled. Guest DNF uses ordinary signature checks and RPM
 scriptlets. A bounded selection includes chrony to check persistent system-user
-creation and directory ownership in a separate read-only appliance. This check
+creation and directory ownership in a separate read-only appliance. Fedora's
+shipped tmpfiles rule creates its ghost state directories using those identities.
+This check
 does not compose the complete desktop image. Its source is prepared; a successful
 COPR result is still required before this route is accepted.

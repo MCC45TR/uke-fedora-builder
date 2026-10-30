@@ -16,6 +16,9 @@ guest_cleanup() {
     for ((index=${#guest_mounts[@]}-1; index>=0; index--)); do
         umount "${guest_mounts[index]}" || status=1
     done
+    if [[ $status != 0 && -f /job/root-install.log ]]; then
+        tail -80 /job/root-install.log >&2
+    fi
     return "$status"
 }
 trap guest_cleanup EXIT
@@ -54,10 +57,14 @@ rpm --root /job/root -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C s
 uid=$(awk -F: '$1=="chrony" {print $3}' /job/root/etc/passwd)
 gid=$(awk -F: '$1=="chrony" {print $4}' /job/root/etc/passwd)
 [[ $uid =~ ^[0-9]+$ && $gid =~ ^[0-9]+$ && $uid != 0 && $gid != 0 ]]
+# Fedora declares these directories as ghost entries. Its shipped tmpfiles rule,
+# rather than RPM payload extraction, creates them using the installed identities.
+/usr/bin/systemd-tmpfiles --root=/job/root --create \
+    --prefix=/var/lib/chrony --prefix=/var/log/chrony
 [[ $(stat -c '%u:%g' /job/root/var/lib/chrony) == "$uid:$gid" ]]
 chroot /job/root /usr/bin/true
 jq -n --argjson uid "$uid" --argjson gid "$gid" --argjson count "$(wc -l < /job/installed-rpms.tsv)" \
-    '{native_dnf:true,scriptlets:true,dependency_check:true,numeric_owner:true,
+    '{native_dnf:true,scriptlets:true,dependency_check:true,numeric_owner:true,tmpfiles:true,
       chrony_uid:$uid,chrony_gid:$gid,installed_packages:$count,
       full_os_composition:false,hardware_tested:false}' > /job/report.json
 public_root_proc_unmount /job/root
