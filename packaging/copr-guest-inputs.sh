@@ -28,7 +28,7 @@ for closure in sdk fixture; do
         --repofrompath=copr-public-fedora,https://dl.fedoraproject.org/pub/fedora/linux/development/rawhide/Everything/aarch64/os/ \
         --enable-repo=copr-public-fedora --setopt=cachedir="$output/download-cache" \
         --setopt=copr-public-fedora.gpgkey="file://$key" --setopt=install_weak_deps=False \
-        --assumeyes --store="$stored" install "${packages[@]}"
+        --assumeyes install --store="$stored" "${packages[@]}"
     jq -e '.version=="1.0" and (.rpms|length)>0 and all(.rpms[];.action=="Install")' "$stored/transaction.json" > /dev/null
     cp "$stored/transaction.json" "$output/closures/$closure.json"
     : > "$output/closures/$closure-rpms.list"
