@@ -8,8 +8,9 @@ size=$(jq -er .size_mib /job/request.json)
 case $filesystem in ext4|f2fs|xfs|btrfs) :;; *) exit 2;; esac
 case $partition in linux|userdata) :;; *) exit 2;; esac
 [[ $size =~ ^[1-9][0-9]{3,6}$ && ! -e /job/root.raw && -f /job/rootfs.tar ]]
-truncate -s "${size}M" /job/root.raw
-[[ -f /job/root.raw && ! -L /job/root.raw ]]
+# shellcheck source=root-metadata.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-metadata.sh
 case $filesystem in
     btrfs) format='mkfs-btrfs /dev/sda label:UKE_LINUX sectorsize:4096';;
     f2fs) format='mkfs f2fs /dev/sda label:UKE_LINUX features:extra_attr,inode_checksum,sb_checksum';;
@@ -20,6 +21,20 @@ if [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then unset LIBGUESTFS_BACKEN
 cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 relabel='selinux-relabel /etc/selinux/targeted/contexts/files/file_contexts / force:true'
 [[ $filesystem != ext4 ]] || relabel=''
+if [[ $filesystem == ext4 ]]; then
+    if [[ $channel == unstable ]]; then
+        cp "$UKE_IMAGE_TOOLS/ext4-labels" /job/ext4-labels
+    else
+        c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
+            -o /job/ext4-labels -lext2fs -lcom_err -lselinux
+    fi
+    # shellcheck source=ext4-filesystem.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/ext4-filesystem.sh
+    public_ext4_populate /job/root.raw /job/root "$size" /job/ext4-labels
+else
+truncate -s "${size}M" /job/root.raw
+[[ -f /job/root.raw && ! -L /job/root.raw ]]
 guestfish --rw --format=raw -a /job/root.raw <<GUEST
 set-smp $cpus
 set-memsize 2048
@@ -31,18 +46,6 @@ $relabel
 sync
 umount-all
 GUEST
-if [[ $filesystem == ext4 ]]; then
-    # The appliance skips virtual directories; label image inodes offline.
-    if [[ $channel == unstable ]]; then
-        cp "$UKE_IMAGE_TOOLS/ext4-labels" /job/ext4-labels
-    else
-        c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
-            -o /job/ext4-labels -lext2fs -lcom_err -lselinux
-    fi
-    expected=/job/root
-    contexts=$expected/etc/selinux/targeted/contexts/files/file_contexts
-    /job/ext4-labels apply /job/root.raw "$expected" "$contexts"
-    /job/ext4-labels verify /job/root.raw "$expected" "$contexts"
 fi
 # A separate read-only appliance verifies the populated image, not the staging tree.
 guestfish --ro --format=raw -a /job/root.raw <<GUEST > /job/filesystem-readback.txt
@@ -60,11 +63,13 @@ grep -Fx "$filesystem" /job/filesystem-readback.txt
 grep -Fx UKE_LINUX /job/filesystem-readback.txt
 grep -aF passwd_file_t /job/filesystem-readback.txt
 # Ignore generated SELinux labels here; contents, owners, ACLs and capabilities must match.
-tar --compare --numeric-owner --acls --xattrs --xattrs-include=security.capability -f /job/root-readback.tar -C /job/root
-for name in rootfs root-readback; do
-    tar -tf "/job/$name.tar" | sed -e 's|^\./||' -e 's|/$||' | LC_ALL=C sort > "/job/$name.files"
-done
-cmp /job/rootfs.files /job/root-readback.files
+if [[ $channel == unstable ]]; then
+    metadata_auditor=$UKE_IMAGE_TOOLS/compare-root-metadata
+else
+    metadata_auditor=/job/compare-root-metadata
+    c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/compare-root-metadata.cpp -o "$metadata_auditor"
+fi
+public_root_compare /job/root /job/rootfs.tar /job/root-readback.tar /job "$metadata_auditor"
 if [[ $channel == unstable ]]; then cp "$UKE_IMAGE_TOOLS/android-sparse" /job/android-sparse
 else c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse; fi
 /job/android-sparse encode /job/root.raw "/job/artifacts/$partition.img"

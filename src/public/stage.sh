@@ -480,4 +480,7 @@ for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then die 'Mounted runtime tree during export'; fi
     find "$root/$tree" -xdev -mindepth 1 -depth -delete
 done
-tar --create --numeric-owner --one-file-system --sort=name --acls --xattrs --xattrs-include=security.capability -f /job/rootfs.tar -C "$root" .
+# shellcheck source=root-metadata.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-metadata.sh
+public_root_archive "$root" /job/rootfs.tar

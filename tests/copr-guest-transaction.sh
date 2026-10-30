@@ -5,6 +5,8 @@ set -Eeuo pipefail
 export HOME=/root LANG=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 source /builder/src/public/root-proc.sh
 source /builder/src/public/root-transaction.sh
+source /builder/src/public/ext4-filesystem.sh
+source /builder/src/public/root-metadata.sh
 mkdir -p /job/root/proc /etc/yum.repos.d /var/cache/dnf /var/lib/rpm /proc /sys /dev /run
 # guestfish command chroots into the SDK without preparing virtual filesystems.
 # These mounts exist only inside the appliance; no host mount is exposed.
@@ -49,7 +51,7 @@ dnf=(dnf5 --use-host-config --installroot=/job/root --releasever=rawhide
     --setopt=install_weak_deps=False --setopt=gpgcheck=True
     --setopt=keepcache=True --setopt=installonly_limit=0 --setopt=tsflags=nodocs)
 rpms=()
-packages=(bash coreutils systemd chrony)
+packages=(bash coreutils systemd chrony selinux-policy-targeted)
 public_root_proc_mount /job/root
 target_proc_mounted=1
 public_root_transaction /job/root /job/root-install.log dnf rpms packages
@@ -69,3 +71,26 @@ jq -n --argjson uid "$uid" --argjson gid "$gid" --argjson count "$(wc -l < /job/
       full_os_composition:false,hardware_tested:false}' > /job/report.json
 public_root_proc_unmount /job/root
 target_proc_mounted=0
+for tree in dev proc sys run; do
+    if findmnt --mountpoint "/job/root/$tree" --noheadings >/dev/null; then exit 1; fi
+    find "/job/root/$tree" -xdev -mindepth 1 -depth -delete
+done
+# Explicit software fixture metadata; these files are never a product payload.
+install -d -m755 /job/root/opt/uke-image-fixture
+printf 'UKE_METADATA_READBACK_PROOF\n' > /job/root/opt/uke-image-fixture/data
+cp /usr/bin/true /job/root/opt/uke-image-fixture/capability-probe
+setcap cap_net_bind_service=ep /job/root/opt/uke-image-fixture/capability-probe
+setfacl -m "u:$uid:r--" /job/root/opt/uke-image-fixture/data
+setfacl -d -m "u:$uid:r-x" /job/root/opt/uke-image-fixture
+public_root_archive /job/root /job/rootfs.tar
+public_ext4_populate /job/root.raw /job/root 1024 /builder/build-tools/ext4-labels
+printf 'KEEP_EXISTING_IMAGE\n' > /job/kept.raw
+if public_ext4_populate /job/kept.raw /job/root 1024 /builder/build-tools/ext4-labels; then exit 1; fi
+grep -Fxq KEEP_EXISTING_IMAGE /job/kept.raw
+ln -s /job/absent-target.raw /job/dangling.raw
+if public_ext4_populate /job/dangling.raw /job/root 1024 /builder/build-tools/ext4-labels; then exit 1; fi
+[[ ! -e /job/absent-target.raw ]]
+if public_ext4_populate /job/oversize.raw /job/root 65537 /builder/build-tools/ext4-labels; then exit 1; fi
+[[ ! -e /job/oversize.raw ]]
+jq '. + {ext4_populated:true,ext4_policy_labels_verified:true,metadata_fixture:true}' /job/report.json > /job/report.next
+mv /job/report.next /job/report.json

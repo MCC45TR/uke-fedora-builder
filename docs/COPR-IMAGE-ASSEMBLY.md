@@ -40,3 +40,13 @@ recovery and physical acceptance remain separate release gates.
 The isolation approach follows the
 [libguestfs architecture](https://libguestfs.org/guestfs-faq.1.html#How-does-libguestfs-compare-to-other-tools)
 and [guestfish command interface](https://libguestfs.org/guestfish.1.html).
+
+The next source candidate shares regular-file EXT4 population between the image
+stage and the COPR guest. It derives root inode ownership and permissions from
+the real staging tree, copies extended attributes with mke2fs and runs the
+existing label apply/verify checks. A separate appliance exports the actual
+image for content and metadata comparison. An additional native comparator
+checks owner/mode, symlink targets and exact ACL/capability attributes after
+readback extraction as guest root. Ownership, ACL and capability mismatch
+controls and both sparse decoders are included. Native COPR acceptance of this
+candidate is pending; it does not replace the full desktop or physical gates.

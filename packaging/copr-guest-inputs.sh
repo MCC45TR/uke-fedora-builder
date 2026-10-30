@@ -10,7 +10,8 @@ key=$recipe/configs/keys/fedora-46.asc
 # The SDK is build-only; no worker filesystem, database or identity is archived.
 packages=(bash coreutils dnf5 dnf5-plugins rpm rpm-build fedora-release-common
     filesystem setup systemd chrony util-linux shadow-utils jq tar cpio
-    grep sed gawk findutils diffutils gnupg2 curl kmod policycoreutils attr acl xz zstd)
+    grep sed gawk findutils diffutils gnupg2 curl kmod policycoreutils attr acl xz zstd
+    e2fsprogs libcap)
 dnf5 --forcearch=aarch64 --releasever=rawhide --disable-repo='*' \
     --repofrompath=copr-public-fedora,https://dl.fedoraproject.org/pub/fedora/linux/development/rawhide/Everything/aarch64/os/ \
     --enable-repo=copr-public-fedora \

@@ -29,7 +29,9 @@ for archive in "${archives[@]}"; do
     tar --concatenate -f "$work/sdk.tar" "$work/payload.tar"
 done
 tar -cf "$work/recipe.tar" -C "$recipe" src/public/root-proc.sh src/public/root-transaction.sh \
-    tests/copr-guest-transaction.sh configs/keys/fedora-46.asc
+    src/public/ext4-filesystem.sh src/public/root-metadata.sh \
+    tests/copr-guest-transaction.sh tests/copr-guest-compare.sh configs/keys/fedora-46.asc \
+    build-tools/ext4-labels build-tools/compare-root-metadata
 tar -cf "$work/inputs.tar" -C "$inputs" .
 truncate -s 8G "$work/guest.raw"
 cat > "$work/create.commands" <<GUEST
@@ -48,6 +50,7 @@ mkdir-p /job
 command-out "/usr/bin/bash /builder/tests/copr-guest-transaction.sh" -
 download /job/report.json $work/report.json
 download /job/installed-rpms.tsv $work/installed-rpms.tsv
+download /job/root.raw $work/root.raw
 sync
 umount-all
 GUEST
@@ -80,3 +83,45 @@ grep -Fxq "st_gid: $gid" "$work/readback.log"
 grep -Eq "^chrony:[^:]*:$uid:$gid:" "$work/readback.log"
 cat "$work/report.json"
 printf 'UKE_COPR_GUEST_ROOT signed_fedora_inputs=%d native_dnf=true scriptlets=true independent_readback=true readback_unchanged=true full_os_composition=false hardware_tested=false\n' "${#archives[@]}"
+# This independent appliance reads the actual populated image, not its SDK tree.
+sha256sum "$work/root.raw" > "$work/root.sha256"
+cat > "$work/image-read.commands" <<GUEST
+set-smp 2
+set-memsize 1024
+set-network false
+run
+vfs-type /dev/sda
+vfs-label /dev/sda
+mount-options ro,noload /dev/sda /
+getxattr /etc/passwd security.selinux
+statns /var/lib/chrony
+tar-out / $work/root-readback.tar numericowner:true xattrs:true acls:true excludes:lost+found
+umount-all
+GUEST
+timeout --kill-after=10 300 guestfish --ro --format=raw -a "$work/root.raw" \
+    -f "$work/image-read.commands" > "$work/image-readback.log" 2>&1
+sha256sum -c "$work/root.sha256"
+grep -Fxq ext4 "$work/image-readback.log"
+grep -Fxq UKE_LINUX "$work/image-readback.log"
+grep -aFq passwd_file_t "$work/image-readback.log"
+grep -Fxq "st_uid: $uid" "$work/image-readback.log"
+grep -Fxq "st_gid: $gid" "$work/image-readback.log"
+cat > "$work/compare.commands" <<GUEST
+set-smp 2
+set-memsize 2048
+set-network false
+run
+mount /dev/sda /
+upload $work/root-readback.tar /job/root-readback.tar
+command-out "/usr/bin/bash /builder/tests/copr-guest-compare.sh" -
+sync
+umount-all
+GUEST
+timeout --kill-after=20 600 guestfish --rw --format=raw -a "$work/guest.raw" -f "$work/compare.commands"
+"$recipe/build-tools/android-sparse" encode "$work/root.raw" "$work/root.img"
+"$recipe/build-tools/android-sparse" decode "$work/root.img" "$work/decoded.raw"
+cmp "$work/root.raw" "$work/decoded.raw"
+unlink "$work/decoded.raw"
+simg2img "$work/root.img" "$work/aosp.raw"
+cmp "$work/root.raw" "$work/aosp.raw"
+printf '%s\n' 'UKE_COPR_EXT4_IMAGE policy_labels=true independent_readback=true readback_unchanged=true sparse_roundtrip=true independent_aosp_decoder=true full_os_composition=false hardware_tested=false'
