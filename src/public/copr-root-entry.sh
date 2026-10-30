@@ -4,7 +4,11 @@ set -Eeuo pipefail
 [[ $(id -u) == 0 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 && ! -e /job/root ]]
 export LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 export UKE_OFFLINE=1 UKE_OUTPUT_OWNER=none UKE_COPR_ROOT_INPUTS=/inputs/target
+# shellcheck source=guest-runtime.sh
+# shellcheck disable=SC1091
 source /builder/src/public/guest-runtime.sh
+# shellcheck source=copr-root-inputs.sh
+# shellcheck disable=SC1091
 source /builder/src/public/copr-root-inputs.sh
 exec 3>&2 4>&1
 exec > /job/production-root.log 2>&1
