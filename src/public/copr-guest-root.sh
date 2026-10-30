@@ -45,7 +45,7 @@ tar-in $work/recipe.tar /builder
 mkdir-p /inputs
 tar-in $work/inputs.tar /inputs
 mkdir-p /job
-command-out "/usr/bin/bash /builder/tests/copr-guest-transaction.sh" $work/transaction.log
+command-out "/usr/bin/bash /builder/tests/copr-guest-transaction.sh" -
 download /job/report.json $work/report.json
 download /job/installed-rpms.tsv $work/installed-rpms.tsv
 sync
@@ -53,8 +53,7 @@ umount-all
 GUEST
 status=0
 timeout --kill-after=20 1800 guestfish --rw --format=raw -a "$work/guest.raw" \
-    -f "$work/create.commands" > "$work/guestfish.log" 2>&1 || status=$?
-[[ ! -f $work/transaction.log ]] || cat "$work/transaction.log"
+    -f "$work/create.commands" 2>&1 | tee "$work/guestfish.log" || status=$?
 if [[ $status != 0 ]]; then cat "$work/guestfish.log" >&2; exit "$status"; fi
 jq -e '.native_dnf and .scriptlets and .dependency_check and .numeric_owner and
     (.full_os_composition == false) and (.hardware_tested == false)' "$work/report.json"
