@@ -16,7 +16,7 @@ set-network false
 run
 mkfs ext4 /dev/sda
 mount /dev/sda /
-write /proof "UKE_COPR_APPLIANCE_PROOF"
+write /proof "UKE_COPR_APPLIANCE_PROOF\n"
 chown 65534 65534 /proof
 setxattr security.selinux $context ${#context} /proof
 sync
