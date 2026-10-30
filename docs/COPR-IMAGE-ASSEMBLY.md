@@ -33,3 +33,18 @@ release gates.
 The isolation approach follows the
 [libguestfs architecture](https://libguestfs.org/guestfs-faq.1.html#How-does-libguestfs-compare-to-other-tools)
 and [guestfish command interface](https://libguestfs.org/guestfish.1.html).
+
+The next source candidate factors the existing DNF install and dependency check
+into `root-transaction.sh`. The full image stage keeps its existing desktop,
+package and provenance policy. The shared helper rejects failed scriptlets even
+when DNF returns success, and verifies that target native commands execute.
+
+Its COPR integration check uses a build-only SDK made from individually signed
+Fedora Rawhide AArch64 RPM payloads. CPIO-to-TAR conversion preserves numeric
+metadata without extracting files as the host user. The source worker resolves
+all dependencies and supplies a local repository; native worker and guest
+networking remain disabled. Guest DNF uses ordinary signature checks and RPM
+scriptlets. A bounded selection includes chrony to check persistent system-user
+creation and directory ownership in a separate read-only appliance. This check
+does not compose the complete desktop image. Its source is prepared; a successful
+COPR result is still required before this route is accepted.

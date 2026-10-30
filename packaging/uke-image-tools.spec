@@ -1,17 +1,19 @@
 Name:           uke-image-tools
 Version:        1.0.0
-Release:        3%{?dist}
+Release:        4%{?dist}
 Summary:        Native tools for isolated Uke image assembly and verification
 License:        MIT
 URL:            https://github.com/MCC45TR/uke-fedora-builder
 Source0:        %{name}-%{version}.tar.xz
 Source1:        source-identity.json
+Source2:        guest-fedora-inputs.tar.xz
 ExclusiveArch:  aarch64
 BuildRequires:  gcc-c++ e2fsprogs-devel libselinux-devel openssl-devel libzstd-devel
 BuildRequires:  bash jq coreutils findutils diffutils grep sed gawk tar xz cpio
 BuildRequires:  rpm-build ripgrep dtc git-core make f2fs-tools e2fsprogs xfsprogs btrfs-progs zstd
 BuildRequires:  util-linux-core util-linux shadow-utils
 BuildRequires:  libguestfs-tools-c kernel-core kernel-modules qemu-kvm-core
+BuildRequires:  bsdtar gnupg2
 
 %description
 Image codecs, payload validation, language auditing and offline EXT4 labels.
@@ -36,10 +38,15 @@ install -pm755 build-tools/* %{buildroot}%{_libexecdir}/%{name}/
 install -Dm644 %{SOURCE1} %{buildroot}%{_datadir}/%{name}/source-identity.json
 
 %check
+mkdir guest-inputs
+tar -xJf %{SOURCE2} -C guest-inputs
+echo "$(jq -er .guest_inputs_sha256 %{SOURCE1})  %{SOURCE2}" | sha256sum -c -
+UKE_COPR_WORKER_AUDIT=1 bash src/public/copr-guest-root.sh "$PWD" "$PWD/guest-inputs"
 UKE_COPR_WORKER_AUDIT=1 bash tests/copr-image-worker.sh
 UKE_COPR_WORKER_AUDIT=1 bash tests/copr-image-appliance.sh
 bash tests/public-build-contract.sh
 bash tests/public-channel-contract.sh
+bash tests/public-root-transaction.sh
 bash tests/image-contract.sh
 bash tests/boot-contract.sh
 bash tests/boot-pair-contract.sh
@@ -62,6 +69,9 @@ bash tests/android-sparse-contract.sh build-tools/android-sparse "$PWD/build-too
 %{_datadir}/%{name}/source-identity.json
 
 %changelog
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-4
+- Check the shared root transaction with signed offline Fedora inputs in a TCG guest.
+
 * Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-3
 - Probe an unprivileged TCG appliance with numeric owners, labels and separate readback.
 

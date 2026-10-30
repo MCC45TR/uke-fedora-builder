@@ -14,3 +14,10 @@ jq -n --arg commit "$source_commit" --arg archive "$(sha256sum "$work/source.tar
       native_build_location:"COPR fedora-rawhide-aarch64",physical_acceptance:false}' > "$COPR_RESULTDIR/source-identity.json"
 tar -cJf "$COPR_RESULTDIR/uke-image-tools-1.0.0.tar.xz" -C "$work" uke-image-tools-1.0.0
 cp "$work/uke-image-tools-1.0.0/packaging/uke-image-tools.spec" "$COPR_RESULTDIR/"
+mkdir "$work/guest-inputs"
+bash "$work/uke-image-tools-1.0.0/packaging/copr-guest-inputs.sh" \
+    "$work/uke-image-tools-1.0.0" "$work/guest-inputs"
+jq --arg sha "$(sha256sum "$COPR_RESULTDIR/guest-fedora-inputs.tar.xz" | cut -d ' ' -f1)" \
+    '. + {guest_inputs_sha256:$sha,guest_inputs_origin:"signature-verified public Fedora RPMs"}' \
+    "$COPR_RESULTDIR/source-identity.json" > "$work/identity.json"
+mv "$work/identity.json" "$COPR_RESULTDIR/source-identity.json"
