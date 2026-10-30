@@ -79,3 +79,8 @@ an exact kernel release. The existing incomplete firmware review fails before
 RPM or guest work. Completed target payload preparation, production execution
 and full image acceptance remain unverified; the new transport's native result
 is pending.
+
+The next closure candidate targets `7.3.1-3.fc46`. The earlier 12 metadata goals
+above used kernel 60; they do not establish resolution for the new kernel.
+The new signed tuple and complete closure require fresh COPR evidence before
+this candidate can be used for image delivery.

@@ -20,12 +20,14 @@ mkdir "$work/target" "$work/audit"
 jq -n '{device:"uke",architecture:"aarch64",distribution:"fedora",fedora_release:"rawhide",
     channel:"unstable",target:"image",kernel_profile:"normal",desktop:"kde",default_shell:"bash",
     mode:"multiboot",partition:"linux",filesystem:"ext4",size_mib:16384,jobs:2,
-    kernel_rpm_request:"7.3.0-60.fc46",kernel_version:"7.3.0",kernel_commit:("a"*40),
+    kernel_rpm_request:"7.3.1-3.fc46",kernel_version:"7.3.1",kernel_commit:("a"*40),
     firmware_review_sha256:("b"*64)}' > "$work/request.json"
 public_copr_root_request "$work/request.json"
+jq '.kernel_rpm_request="7.3.0-60.fc46"|.kernel_version="7.3.0"' "$work/request.json" > "$work/previous-request.json"
+public_copr_root_request "$work/previous-request.json"
 for mutation in '.channel="testing"' '.fedora_release="45"' '.kernel_rpm_request="latest"' \
     '.partition="userdata"' '.size_mib=65537' '.size_mib=8192.5' '.jobs=0' '.kernel_commit="unknown"' \
-    '.touch_reference="private"' '.kernel_bundle="local"' '.kernel_version="7.3.1"'; do
+    '.touch_reference="private"' '.kernel_bundle="local"' '.kernel_version="7.3.2"'; do
     jq "$mutation" "$work/request.json" > "$work/invalid.json"
     if public_copr_root_request "$work/invalid.json" > "$work/refusal.log" 2>&1; then exit 1; fi
 done
