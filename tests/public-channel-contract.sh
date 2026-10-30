@@ -41,4 +41,5 @@ for release in 44 45; do
     (public_main --channel unstable --release "$release" --build kernel --yes) > "$work/refused" 2>&1 || status=$?
     ((status > 0 && status < 90))
 done
+bash "$root/tests/public-root-packages.sh"
 echo 'Three pinned channels, unstable repository defaults and alias/key/source/release refusals passed; no builds ran.'

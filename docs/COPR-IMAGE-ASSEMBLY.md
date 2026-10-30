@@ -50,3 +50,11 @@ recovery and physical acceptance remain separate release gates.
 The isolation approach follows the
 [libguestfs architecture](https://libguestfs.org/guestfs-faq.1.html#How-does-libguestfs-compare-to-other-tools)
 and [guestfish command interface](https://libguestfs.org/guestfish.1.html).
+
+The next input audit shares the production package and exclusion policy with
+the source worker. It resolves the complete KDE/GNOME selections, three login
+shells and both root profiles against the pinned kernel 60 RPMs. DNF stops at
+its confirmation boundary with `--assumeno`; only solver metadata is retained.
+Device-local touch and video-firmware RPMs are excluded from generic images.
+This candidate's COPR result is pending. Dependency resolution alone does not
+verify target RPM signatures, firmware rights, installation or full composition.

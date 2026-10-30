@@ -324,30 +324,11 @@ skip_if_unavailable=False
 priority=40
 includepkgs=uke-*,senemos-uke-linux-kernel-*
 REPO
-packages=(fedora-release fedora-repos bash "$(jq -er .default_shell "$request")" coreutils dnf5 dnf5-plugins glibc-all-langpacks
-    systemd systemd-udev systemd-pam NetworkManager NetworkManager-wifi bluez chrony
-    firewalld openssh-server sudo shadow-utils selinux-policy-targeted policycoreutils
-    e2fsprogs f2fs-tools btrfs-progs xfsprogs util-linux kbd less nano fastfetch
-    pipewire pipewire-pulseaudio wireplumber
-    uke-core uke-hw uke-power uke-sensors uke-additional uke-firmware
-    uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
-    uke-charge-control uke-offline-charge)
-[[ $fedora_release != rawhide ]] || packages+=(fedora-repos-rawhide)
-if [[ $channel == unstable ]]; then
-    individual=()
-    for package in "${packages[@]}"; do
-        case $package in uke-core|uke-hw|uke-power|uke-sensors|uke-additional) ;; *) individual+=("$package");; esac
-    done
-    packages=("${individual[@]}" uke-core-meta)
-fi
 desktop=$(jq -er .desktop "$request")
-[[ $desktop == kde || $desktop == gnome ]] || die "Unsupported desktop image: $desktop"
-if [[ $desktop == kde ]]; then
-    packages+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin)
-else
-    packages+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
-        gnome-control-center gnome-software gnome-console nautilus)
-fi
+# shellcheck source=root-packages.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-packages.sh
+public_root_packages packages "$fedora_release" "$channel" "$desktop" "$(jq -er .default_shell "$request")" || die 'Unsupported root package selection'
 release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
 base=$kernel_family
 rpm_release=$(jq -er '.rpm_version_release // .kernel_release' /job/artifacts/kernel/kernel-info.json)
@@ -366,14 +347,7 @@ if [[ $channel == unstable ]]; then
     done
 fi
 # Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
-excluded='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-unstable*'
-if [[ $KERNEL_PROFILE == normal ]]; then
-    excluded+=',senemos-uke-linux-kernel-mainline-kvm*'
-else
-    for component in '' -core -modules -dtbs -boot -singleboot; do
-        excluded+=",senemos-uke-linux-kernel-mainline$component"
-    done
-fi
+excluded=$(public_root_exclusions "$KERNEL_PROFILE")
 dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-config --installroot="$root" --releasever="$fedora_release"
     --disable-repo='*' --enable-repo=uke-selected
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
