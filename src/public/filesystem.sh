@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Only a new regular file is attached to an isolated libguestfs appliance.
 set -Eeuo pipefail
+channel=$(jq -er .channel /job/request.json)
 filesystem=$(jq -er .filesystem /job/request.json)
 partition=$(jq -er .partition /job/request.json)
 size=$(jq -er .size_mib /job/request.json)
@@ -32,8 +33,12 @@ umount-all
 GUEST
 if [[ $filesystem == ext4 ]]; then
     # The appliance skips virtual directories; label image inodes offline.
-    c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
-        -o /job/ext4-labels -lext2fs -lcom_err -lselinux
+    if [[ $channel == unstable ]]; then
+        cp "$UKE_IMAGE_TOOLS/ext4-labels" /job/ext4-labels
+    else
+        c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
+            -o /job/ext4-labels -lext2fs -lcom_err -lselinux
+    fi
     expected=/job/root
     contexts=$expected/etc/selinux/targeted/contexts/files/file_contexts
     /job/ext4-labels apply /job/root.raw "$expected" "$contexts"
@@ -60,7 +65,8 @@ for name in rootfs root-readback; do
     tar -tf "/job/$name.tar" | sed -e 's|^\./||' -e 's|/$||' | LC_ALL=C sort > "/job/$name.files"
 done
 cmp /job/rootfs.files /job/root-readback.files
-c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse
+if [[ $channel == unstable ]]; then cp "$UKE_IMAGE_TOOLS/android-sparse" /job/android-sparse
+else c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse; fi
 /job/android-sparse encode /job/root.raw "/job/artifacts/$partition.img"
 if jq -e '(.kernel_rpm_request // "") != ""' /job/request.json >/dev/null; then
     # Hosted runner: keep one decoder output at a time and discard verified tar copies.

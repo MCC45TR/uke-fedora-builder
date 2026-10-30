@@ -315,3 +315,23 @@ any release is published, artifacts must pass metadata/content readback,
 SELinux context verification, both sparse decoders, Zstandard readback and
 checksums. Releases are marked as experimental pre-releases; these host checks
 do not qualify tablet boot, first-account setup, charging or recovery.
+
+## Independent unstable image inputs
+
+30 October 2026: `unstable` selects `mcc45tr/uke-linux-unstable` and signing
+fingerprint `2204A661EA630A5303500085538797E72A3E4ECA`. It supports only the
+normal Fedora Rawhide AArch64 kernel profile. The default kernel input is the
+latest signed matching RPM set; `--kernel-rpm` can freeze its exact release.
+Local source, kernel-cache reuse and foreign-release substitutions are refused.
+The signed payload supplies the source commit before root composition.
+
+The unstable root selects individual runtime packages through `uke-core-meta`.
+Its image codecs and offline verification helpers come from the separate signed
+`uke-image-tools` COPR producer. The assembly worker has no project compiler or
+RPM build stage. Existing stable/testing source and KVM routes retain their
+separate policies; this change does not qualify those routes or alter their
+COPR definitions. Native helper fixtures run in COPR; GitHub checks source only.
+
+No new image, independent rebuild, installation, growth, boot, recovery or
+hardware acceptance is established by this source change. Existing physical
+release gates and firmware redistribution limits remain open.

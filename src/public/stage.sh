@@ -20,6 +20,12 @@ if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then
     trap 'chown -R "$UKE_OUTPUT_OWNER" /job/artifacts' EXIT
 fi
 channel=$(jq -er .channel "$request")
+if [[ $channel == unstable ]]; then
+    [[ $fedora_release == rawhide && ( $stage == repository-kernel || $stage == root || $stage == filesystem ) ]] || exit 1
+    # shellcheck source=repository-tools.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/repository-tools.sh
+fi
 filesystem=$(jq -er .filesystem "$request")
 partition=$(jq -er .partition "$request")
 jobs=$(jq -er .jobs "$request")
@@ -292,8 +298,12 @@ root_cleanup() {
 trap root_cleanup EXIT
 public_root_proc_mount "$root"
 
-project=$(jq -er --arg channel "$channel" '.channels[$channel].project' "$policy")
-fingerprint=$(jq -er --arg channel "$channel" '.channels[$channel].fingerprint' "$policy")
+# shellcheck source=channel.sh
+# shellcheck disable=SC1091
+source /builder/src/public/channel.sh
+public_channel "$channel" "$policy"
+project=$PUBLIC_PROJECT
+fingerprint=$PUBLIC_FINGERPRINT
 key=/cache/$project.asc
 if [[ ${UKE_OFFLINE:-0} != 1 ]]; then
     curl --proto '=https' --tlsv1.2 -fL --retry 3 "https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/pubkey.gpg" -o "$key.part"
@@ -323,6 +333,13 @@ packages=(fedora-release fedora-repos bash "$(jq -er .default_shell "$request")"
     uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
     uke-charge-control uke-offline-charge)
 [[ $fedora_release != rawhide ]] || packages+=(fedora-repos-rawhide)
+if [[ $channel == unstable ]]; then
+    individual=()
+    for package in "${packages[@]}"; do
+        case $package in uke-core|uke-hw|uke-power|uke-sensors|uke-additional) ;; *) individual+=("$package");; esac
+    done
+    packages=("${individual[@]}" uke-core-meta)
+fi
 desktop=$(jq -er .desktop "$request")
 [[ $desktop == kde || $desktop == gnome ]] || die "Unsupported desktop image: $desktop"
 if [[ $desktop == kde ]]; then
@@ -342,6 +359,11 @@ for component in '' -core -modules -dtbs -boot; do
 done
 if [[ $partition == userdata ]]; then
     local_rpms+=("/job/artifacts/kernel/$base-singleboot-$rpm_release$dist.aarch64.rpm")
+fi
+if [[ $channel == unstable ]]; then
+    for package in "${local_rpms[@]}"; do
+        rpmkeys --dbpath /job/kernel-keydb --checksig "$package" | grep -F 'signatures OK'
+    done
 fi
 # Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
 excluded='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-unstable*'
