@@ -386,20 +386,10 @@ if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
 fi
-# systemctl normally returns success for ignored chroot queries, so a package's
-# `if systemctl is-active dbus` can incorrectly run busctl without a bus.
-# Force real connectivity detection during RPM scriptlets: no host bus is mounted.
-# All unit presets and later --root operations keep their normal offline semantics.
-SYSTEMD_IN_CHROOT=0 "${dnf[@]}" -y install "${local_rpms[@]}" "${packages[@]}" 2>&1 | tee /job/root-install.log
-if ((${#arch_flags[@]})); then
-    # Emulated scriptlets must have run; a silent failure would leave an incomplete root.
-    chroot "$root" /usr/bin/true
-    if grep -F 'scriptlet failed' /job/root-install.log; then
-        echo 'Package scriptlets failed under AArch64 emulation; see root-install.log' >&2
-        exit 1
-    fi
-fi
-"${dnf[@]}" check
+# shellcheck source=root-transaction.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-transaction.sh
+public_root_transaction "$root" /job/root-install.log dnf local_rpms packages
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
 [[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$rpm_release$dist" ]]
 bundle=$root/usr/lib/senemos/kernel-updates/$release
