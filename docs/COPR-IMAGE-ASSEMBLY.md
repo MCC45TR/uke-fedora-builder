@@ -62,3 +62,20 @@ a conflicting newer Fedora provider without relaxing solver policy. Device-local
 touch and video-firmware RPMs are excluded from generic images. These metadata
 results do not verify target RPM signatures, firmware rights, installation or
 full composition.
+
+The next candidate exposes `src/public/copr-root-stage.sh` for a COPR producer.
+It accepts the checked SDK inputs and one complete frozen target set, rebuilds
+local repository metadata from declared signature-verified RPMs and invokes the
+existing repository-kernel and root stages inside the same isolated SDK. The
+guest has no network and the root never passes through host-user extraction.
+The resulting root archive, artifacts and SDK remain available for filesystem
+composition and independent readback.
+
+Target inputs contain `request.json`, `manifest.json`, `firmware-review.json`,
+the pinned unstable public key and Fedora/Uke RPM directories. The manifest
+binds the request hash and each RPM path, hash and NEVRA, plus the exact expected
+root NEVRAs. Public generic requests reject local/private references and require
+an exact kernel release. The existing incomplete firmware review fails before
+RPM or guest work. Completed target payload preparation, production execution
+and full image acceptance remain unverified; the new transport's native result
+is pending.

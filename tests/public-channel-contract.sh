@@ -42,4 +42,5 @@ for release in 44 45; do
     ((status > 0 && status < 90))
 done
 bash "$root/tests/public-root-packages.sh"
+bash "$root/tests/public-copr-root-contract.sh"
 echo 'Three pinned channels, unstable repository defaults and alias/key/source/release refusals passed; no builds ran.'

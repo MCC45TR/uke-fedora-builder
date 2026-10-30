@@ -19,17 +19,22 @@ expected=$PUBLIC_FINGERPRINT
 [[ $(gpg --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == "$expected" ]]
 mkdir -p /job/kernel-keydb /job/artifacts/kernel /job/kernel-payload
 rpmkeys --dbpath /job/kernel-keydb --import "$key"
+kernel_repository=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-aarch64/
+if [[ -n ${UKE_COPR_ROOT_INPUTS:-} ]]; then
+    [[ $UKE_COPR_ROOT_INPUTS == /inputs/target && ${UKE_OFFLINE:-0} == 1 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 ]]
+    kernel_repository=file:///inputs/target/rpms/uke
+fi
 cat > /etc/yum.repos.d/uke-kernel.repo <<REPO
 [uke-kernel]
 name=Uke $channel kernel inputs
-baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-aarch64/
+baseurl=$kernel_repository
 enabled=0
 gpgcheck=1
 skip_if_unavailable=False
 REPO
 dnf=(dnf5 --forcearch=aarch64 --disable-repo='*' --enable-repo=uke-kernel
     --setopt=cachedir=/cache/kernel-repository --setopt=keepcache=True)
-[[ ${UKE_OFFLINE:-0} != 1 ]] || dnf+=(--cacheonly)
+[[ ${UKE_OFFLINE:-0} != 1 || -n ${UKE_COPR_ROOT_INPUTS:-} ]] || dnf+=(--cacheonly)
 # Freeze this release branch; remote package updates must not change its kernel tuple.
 release=$(jq -er .kernel_rpm_request /job/request.json)
 if [[ $release == latest ]]; then
