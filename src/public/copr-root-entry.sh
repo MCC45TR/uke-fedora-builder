@@ -12,6 +12,8 @@ source /builder/src/public/guest-runtime.sh
 source /builder/src/public/copr-root-inputs.sh
 exec 3>&2 4>&1
 exec > /job/production-root.log 2>&1
+# Shared with guest-runtime.sh for cleanup after partial mount failure.
+# shellcheck disable=SC2034
 PUBLIC_GUEST_MOUNTS=()
 cleanup() {
     local status=$?
