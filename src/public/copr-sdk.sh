@@ -39,11 +39,17 @@ public_copr_sdk() {
 }
 
 public_copr_guest_run() {
-    local mode=$1 disk=$2 commands=$3 log=$4 seconds=$5 status=0
+    [[ $# == 5 || $# == 6 ]] || return 1
+    local mode=$1 disk=$2 commands=$3 log=$4 seconds=$5 status=0 extra=${6:-}
     [[ ${UKE_COPR_WORKER_AUDIT:-0} == 1 && -f $disk && ! -L $disk && -f $commands && ! -L $commands ]] || return 1
     [[ $mode == ro || $mode == rw ]] || return 1
     [[ $seconds =~ ^[1-9][0-9]{0,4}$ && ! -e $log && ! -L $log ]] || return 1
-    timeout --kill-after=20 "$seconds" guestfish "--$mode" --format=raw -a "$disk" \
+    local disks=(--format=raw -a "$disk")
+    if [[ -n $extra ]]; then
+        [[ $mode == ro && -f $extra && ! -L $extra ]] || return 1
+        disks+=(--format=raw -a "$extra")
+    fi
+    timeout --kill-after=20 "$seconds" guestfish "--$mode" "${disks[@]}" \
         -f "$commands" 2>&1 | tee "$log" || status=$?
     if [[ $status != 0 ]]; then cat "$log" >&2; fi
     return "$status"

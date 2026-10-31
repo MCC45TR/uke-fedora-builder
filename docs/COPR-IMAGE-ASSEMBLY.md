@@ -84,3 +84,13 @@ The next closure candidate targets `7.3.1-3.fc46`. The earlier 12 metadata goals
 above used kernel 60; they do not establish resolution for the new kernel.
 The new signed tuple and complete closure require fresh COPR evidence before
 this candidate can be used for image delivery.
+
+On 31 October 2026, a separate source candidate adds
+`src/public/copr-image-stage.sh` after the complete root entry. It retains the
+requested filesystem and capacity, shares the existing format commands, and
+keeps root ownership inside the SDK. A second read-only appliance checks every
+SELinux path against the target policy and exports metadata for comparison in
+the owned SDK. Both sparse decoders must reproduce the raw image. The candidate
+uses the same function for all four declared formats in COPR checks and retains
+the original bounded EXT4 controls. Its native and full-image results are
+pending; no complete image or physical acceptance is claimed.

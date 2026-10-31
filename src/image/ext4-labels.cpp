@@ -17,11 +17,46 @@ namespace fs = std::filesystem;
 static void check(errcode_t code, const char *operation) {
     if (code) throw std::runtime_error(std::string(operation) + ": " + error_message(code));
 }
+static int verify_tree(const fs::path &directory, const char *contexts) {
+    struct stat root_stat {};
+    if (lstat(directory.c_str(), &root_stat) || !S_ISDIR(root_stat.st_mode))
+        throw std::runtime_error("Tree must be a directory, never a symlink");
+    const fs::path root = fs::canonical(directory);
+    selinux_opt options[] = {{SELABEL_OPT_PATH, contexts}};
+    selabel_handle *labels = selabel_open(SELABEL_CTX_FILE, options, 1);
+    if (!labels) throw std::runtime_error("Cannot load the target file-context policy");
+    unsigned long count = 0, excluded = 0;
+    auto visit = [&](const fs::path &entry) {
+        const std::string path = entry == root ? "/" : "/" + entry.lexically_relative(root).generic_string();
+        struct stat metadata {};
+        if (lstat(entry.c_str(), &metadata)) throw std::runtime_error("Cannot stat " + path);
+        char *expected = nullptr;
+        if (selabel_lookup_raw(labels, &expected, path.c_str(), metadata.st_mode)) {
+            if (errno == ENOENT) { ++excluded; return; }
+            throw std::runtime_error("Policy has no context for " + path);
+        }
+        char *actual = nullptr;
+        const int length = lgetfilecon_raw(entry.c_str(), &actual);
+        const bool matches = length >= 0 && actual && !std::strcmp(expected, actual);
+        freecon(expected);
+        if (actual) freecon(actual);
+        if (!matches) throw std::runtime_error("Context differs at " + path);
+        ++count;
+    };
+    try {
+        visit(root);
+        for (const auto &entry : fs::recursive_directory_iterator(root)) visit(entry.path());
+    } catch (...) { selabel_close(labels); throw; }
+    selabel_close(labels);
+    std::cout << "Verified " << count << " SELinux tree contexts; " << excluded << " policy-excluded paths\n";
+    return 0;
+}
 int main(int argc, char **argv) {
     try {
+        if (argc == 4 && !std::strcmp(argv[1], "verify-tree")) return verify_tree(argv[2], argv[3]);
         initialize_ext2_error_table();
         if (argc != 5 || (std::strcmp(argv[1], "apply") && std::strcmp(argv[1], "verify")))
-            throw std::runtime_error("Usage: ext4-labels apply|verify IMAGE ROOT FILE_CONTEXTS");
+            throw std::runtime_error("Usage: ext4-labels apply|verify IMAGE ROOT FILE_CONTEXTS; verify-tree ROOT FILE_CONTEXTS");
         struct stat image_stat {};
         if (lstat(argv[2], &image_stat) || !S_ISREG(image_stat.st_mode))
             throw std::runtime_error("Image must be a regular file, never a symlink or block device");

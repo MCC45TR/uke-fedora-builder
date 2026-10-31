@@ -14,6 +14,12 @@ source "$root/src/public/copr-sdk.sh"
 # shellcheck source=../src/public/root-repository.sh
 # shellcheck disable=SC1091
 source "$root/src/public/root-repository.sh"
+# shellcheck source=../src/public/filesystem-commands.sh
+# shellcheck disable=SC1091
+source "$root/src/public/filesystem-commands.sh"
+# shellcheck source=../src/public/copr-filesystem.sh
+# shellcheck disable=SC1091
+source "$root/src/public/copr-filesystem.sh"
 work=$(mktemp -d)
 trap 'find "$work" -depth -delete' EXIT
 mkdir "$work/target" "$work/audit"
@@ -68,6 +74,20 @@ if UKE_COPR_WORKER_AUDIT=1 public_copr_guest_run rw "$work/mock-disk" "$work/moc
 grep -Fxq KEEP_LOG "$work/existing.log"
 if UKE_COPR_WORKER_AUDIT=1 public_copr_guest_run invalid "$work/mock-disk" "$work/mock-commands" "$work/new.log" 60; then exit 1; fi
 [[ ! -e $work/forbidden-operation && ! -e $work/new.log ]]
+if UKE_COPR_WORKER_AUDIT=1 public_copr_guest_run rw "$work/mock-disk" "$work/mock-commands" "$work/new.log" 60 "$work/mock-disk"; then exit 1; fi
+mkdir "$work/mock-tools"
+printf '#!/bin/sh\nexit 97\n' > "$work/mock-tools/android-sparse"
+chmod +x "$work/mock-tools/android-sparse"
+for invalid_request in invalid:1024 ext4:65537; do
+    IFS=: read -r filesystem size <<< "$invalid_request"
+    # All other inputs satisfy admission. Even a regressed guard cannot start a VM.
+    (
+        mkdir() { : > "$work/forbidden-operation"; return 97; }
+        if UKE_COPR_WORKER_AUDIT=1 public_copr_filesystem "$work/mock-disk" "$work/mock-disk" "$filesystem" "$size" \
+            "$work/refused-filesystem" /builder/build-tools "$work/mock-tools"; then exit 1; fi
+    )
+done
+[[ ! -e $work/forbidden-operation && ! -e $work/new.log && ! -e $work/refused-filesystem ]]
 for project in uke-linux uke-linux-test uke-linux-unstable; do
     public_root_repository "$work/runtime.repo" "$project" rawhide
     grep -Fxq "baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-\$basearch/" "$work/runtime.repo"
