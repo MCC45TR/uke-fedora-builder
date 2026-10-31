@@ -21,12 +21,15 @@ set-network false
 run
 GUEST
 for filesystem in f2fs xfs btrfs ext4; do
+    printf 'echo UKE_IMAGE_APPLIANCE_FORMAT_START filesystem=%s\n' "$filesystem"
     printf 'wipefs /dev/sda\n'
     public_filesystem_format "$filesystem"
-    printf 'vfs-type /dev/sda\nmount /dev/sda /\ntouch /format-proof\numount-all\n'
+    # The disk is reformatted repeatedly; mount the declared type explicitly.
+    printf 'vfs-type /dev/sda\nmount-vfs "" %s /dev/sda /\ntouch /format-proof\numount-all\n' "$filesystem"
+    printf 'echo UKE_IMAGE_APPLIANCE_FORMAT_PASS filesystem=%s\n' "$filesystem"
 done
 cat <<GUEST
-mount /dev/sda /
+mount-vfs "" ext4 /dev/sda /
 write /proof "UKE_COPR_APPLIANCE_PROOF\n"
 chown 65534 65534 /proof
 setxattr security.selinux $context ${#context} /proof
@@ -35,6 +38,7 @@ umount-all
 GUEST
 } > "$work/create.commands"
 status=0
+LIBGUESTFS_DEBUG=1 LIBGUESTFS_TRACE=1 \
 timeout --kill-after=20 600 guestfish --rw --format=raw -a "$work/disk.raw" -f "$work/create.commands" > "$work/create.log" 2>&1 || status=$?
 printf 'UKE_IMAGE_APPLIANCE_PROBE create_exit=%d\n' "$status"
 if [[ $status != 0 ]];then
@@ -49,7 +53,10 @@ if [[ $status != 0 ]];then
     printf 'UKE_IMAGE_APPLIANCE_PROBE image_built=false full_os_composition=false\n'
     exit "$status"
 fi
-for filesystem in ext4 f2fs xfs btrfs; do grep -Fxq "$filesystem" "$work/create.log"; done
+for filesystem in ext4 f2fs xfs btrfs; do
+    grep -Fxq "$filesystem" "$work/create.log"
+    grep -Fxq "UKE_IMAGE_APPLIANCE_FORMAT_PASS filesystem=$filesystem" "$work/create.log"
+done
 printf 'UKE_IMAGE_APPLIANCE_FORMATTERS ext4=true f2fs=true xfs=true btrfs=true basic_mounts=true\n'
 sha256sum "$work/disk.raw" > "$work/disk.sha256"
 cat > "$work/read.commands" <<GUEST
