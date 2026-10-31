@@ -24,6 +24,7 @@ guest_cleanup() {
 }
 trap guest_cleanup EXIT
 public_guest_mounts
+bash /builder/tests/copr-guest-runtime.sh
 bash /builder/tests/copr-label-tree.sh
 if grep -q '^chrony:' /etc/passwd; then echo 'SDK identity contaminated the target proof' >&2; exit 1; fi
 sha256sum -c /job/mke2fs.sha256 >&2
