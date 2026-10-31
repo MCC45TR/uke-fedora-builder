@@ -40,8 +40,7 @@ set-network false
 run
 $format
 mount /dev/sda /
-tar-in $archive / xattrs:true acls:true
-selinux-relabel /etc/selinux/targeted/contexts/files/file_contexts / force:true
+tar-in $archive / xattrs:true selinux:true acls:true
 sync
 umount-all
 GUEST

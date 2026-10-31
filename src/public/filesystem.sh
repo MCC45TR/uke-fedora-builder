@@ -23,8 +23,6 @@ read_options=$(public_filesystem_ro_options "$filesystem")
 # The appliance uses KVM when the container was given /dev/kvm; the image forces TCG otherwise.
 if [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then unset LIBGUESTFS_BACKEND_SETTINGS; fi
 cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
-relabel='selinux-relabel /etc/selinux/targeted/contexts/files/file_contexts / force:true'
-[[ $filesystem != ext4 ]] || relabel=''
 if [[ $filesystem == ext4 ]]; then
     if [[ $channel == unstable ]]; then
         cp "$UKE_IMAGE_TOOLS/ext4-labels" /job/ext4-labels
@@ -45,8 +43,7 @@ set-memsize 2048
 run
 $format
 mount /dev/sda /
-tar-in /job/rootfs.tar / xattrs:true acls:true
-$relabel
+tar-in /job/rootfs.tar / xattrs:true selinux:true acls:true
 sync
 umount-all
 GUEST

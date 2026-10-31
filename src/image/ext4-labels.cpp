@@ -38,9 +38,11 @@ static int verify_tree(const fs::path &directory, const char *contexts) {
         char *actual = nullptr;
         const int length = lgetfilecon_raw(entry.c_str(), &actual);
         const bool matches = length >= 0 && actual && !std::strcmp(expected, actual);
+        const std::string difference = matches ? "" : "Context differs at " + path +
+            ": expected " + expected + "; found " + (actual ? actual : "<missing>");
         freecon(expected);
         if (actual) freecon(actual);
-        if (!matches) throw std::runtime_error("Context differs at " + path);
+        if (!matches) throw std::runtime_error(difference);
         ++count;
     };
     try {

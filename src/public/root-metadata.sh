@@ -1,10 +1,19 @@
 #!/usr/bin/env bash
 # Shared archive/readback policy for the real image stage and COPR guest checks.
 public_root_archive() {
-    local root=$1 output=$2
-    [[ $(id -u) == 0 && -d $root && ! -L $root && ! -e $output && ! -L $output ]] || return 1
-    tar --create --format=posix --numeric-owner --one-file-system --sort=name --acls --xattrs \
-        --xattrs-include=security.capability -f "$output" -C "$root" .
+    local root=$1 output=$2 verifier=$3 tree
+    [[ $(id -u) == 0 && -d $root && ! -L $root && ! -e $output && ! -L $output &&
+       -x $verifier && ! -L $verifier && $(realpath "$root") != / ]] || return 1
+    [[ -s $root/etc/selinux/targeted/contexts/files/file_contexts ]] || return 1
+    for tree in dev proc sys run; do
+        if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then return 1; fi
+    done
+    # Label the owned staging tree, including empty virtual-filesystem roots.
+    # libguestfs's relabel wrapper unconditionally excludes four such paths.
+    setfiles -F -m -r "$root" "$root/etc/selinux/targeted/contexts/files/file_contexts" "$root" || return
+    "$verifier" verify-tree "$root" "$root/etc/selinux/targeted/contexts/files/file_contexts" || return
+    tar --create --format=posix --numeric-owner --one-file-system --sort=name --acls --xattrs --selinux \
+        --xattrs-include=security.capability --xattrs-include=security.selinux -f "$output" -C "$root" .
 }
 public_root_compare() {
     local root=$1 original=$2 readback=$3 scratch=$4 auditor=$5 comparison

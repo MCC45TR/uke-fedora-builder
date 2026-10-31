@@ -78,7 +78,18 @@ cp /usr/bin/true /job/root/opt/uke-image-fixture/capability-probe
 setcap cap_net_bind_service=ep /job/root/opt/uke-image-fixture/capability-probe
 setfacl -m "u:$uid:r--" /job/root/opt/uke-image-fixture/data
 setfacl -d -m "u:$uid:r-x" /job/root/opt/uke-image-fixture
-public_root_archive /job/root /job/rootfs.tar
+archive_metadata() {
+    stat -c '%n:%a:%u:%g:%y' /job/root /job/root/var/lib/chrony \
+        /job/root/opt/uke-image-fixture{,/data,/capability-probe}
+    getfacl -n -p /job/root/opt/uke-image-fixture{,/data}
+    getcap -n /job/root/opt/uke-image-fixture/capability-probe
+    sha256sum /job/root/opt/uke-image-fixture/{data,capability-probe}
+}
+archive_metadata > /job/archive-metadata-before.txt
+public_root_archive /job/root /job/rootfs.tar /builder/build-tools/ext4-labels
+archive_metadata > /job/archive-metadata-after.txt
+cmp /job/archive-metadata-before.txt /job/archive-metadata-after.txt
+printf '%s\n' 'UKE_COPR_ARCHIVE target_policy_labels=true virtual_roots_included=true metadata_unchanged=true hardware_tested=false'
 public_ext4_populate /job/root.raw /job/root 1024 /builder/build-tools/ext4-labels
 printf 'KEEP_EXISTING_IMAGE\n' > /job/kept.raw
 if public_ext4_populate /job/kept.raw /job/root 1024 /builder/build-tools/ext4-labels; then exit 1; fi
