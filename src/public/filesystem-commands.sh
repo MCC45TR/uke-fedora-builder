@@ -12,7 +12,7 @@ public_filesystem_ro_options() {
     case $1 in
         ext4) echo ro,noload;;
         f2fs|xfs) echo ro,norecovery;;
-        btrfs) echo ro,nologreplay;;
+        btrfs) echo ro,rescue=nologreplay;;
         *) return 1;;
     esac
 }

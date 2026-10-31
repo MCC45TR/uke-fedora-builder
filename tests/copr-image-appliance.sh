@@ -25,7 +25,11 @@ for filesystem in f2fs xfs btrfs ext4; do
     printf 'wipefs /dev/sda\n'
     public_filesystem_format "$filesystem"
     # The disk is reformatted repeatedly; mount the declared type explicitly.
-    printf 'vfs-type /dev/sda\nmount-vfs "" %s /dev/sda /\ntouch /format-proof\numount-all\n' "$filesystem"
+    printf 'vfs-type /dev/sda\nmount-vfs "" %s /dev/sda /\ntouch /format-proof\nsync\numount-all\n' "$filesystem"
+    # Exercise the production non-recovery read options before the long root job.
+    read_options=$(public_filesystem_ro_options "$filesystem")
+    printf 'mount-vfs "%s" %s /dev/sda /\ncat /format-proof\numount-all\n' "$read_options" "$filesystem"
+    printf 'echo UKE_IMAGE_APPLIANCE_READ_OPTION_PASS filesystem=%s\n' "$filesystem"
     printf 'echo UKE_IMAGE_APPLIANCE_FORMAT_PASS filesystem=%s\n' "$filesystem"
 done
 cat <<GUEST
@@ -56,8 +60,10 @@ fi
 for filesystem in ext4 f2fs xfs btrfs; do
     grep -Fxq "$filesystem" "$work/create.log"
     grep -Fxq "UKE_IMAGE_APPLIANCE_FORMAT_PASS filesystem=$filesystem" "$work/create.log"
+    grep -Fxq "UKE_IMAGE_APPLIANCE_READ_OPTION_PASS filesystem=$filesystem" "$work/create.log"
 done
 printf 'UKE_IMAGE_APPLIANCE_FORMATTERS ext4=true f2fs=true xfs=true btrfs=true basic_mounts=true\n'
+printf 'UKE_IMAGE_APPLIANCE_READ_OPTIONS ext4=true f2fs=true xfs=true btrfs=true non_recovery_options_accepted=true\n'
 sha256sum "$work/disk.raw" > "$work/disk.sha256"
 cat > "$work/read.commands" <<GUEST
 set-smp 1
