@@ -460,4 +460,11 @@ done
 # shellcheck source=root-metadata.sh
 # shellcheck disable=SC1091
 source /builder/src/public/root-metadata.sh
-public_root_archive "$root" /job/rootfs.tar
+if [[ $channel == unstable ]]; then
+    archive_verifier=$UKE_IMAGE_TOOLS/ext4-labels
+else
+    archive_verifier=/job/ext4-labels
+    c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
+        -o "$archive_verifier" -lext2fs -lcom_err -lselinux
+fi
+public_root_archive "$root" /job/rootfs.tar "$archive_verifier"

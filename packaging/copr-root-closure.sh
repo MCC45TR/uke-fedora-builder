@@ -34,6 +34,8 @@ for desktop in kde gnome; do
                 dnf5 --forcearch=aarch64 --releasever=rawhide --installroot="$solver" \
                     --disable-repo='*' \
                     --repofrompath=copr-public-fedora,https://dl.fedoraproject.org/pub/fedora/linux/development/rawhide/Everything/aarch64/os/ \
+                    --setopt=copr-public-fedora.baseurl= \
+                    --setopt='copr-public-fedora.metalink=https://mirrors.fedoraproject.org/metalink?repo=rawhide&arch=aarch64&protocol=https' \
                     --repofrompath=uke-selected,https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux-unstable/fedora-rawhide-aarch64/ \
                     --enable-repo=copr-public-fedora --enable-repo=uke-selected \
                     --setopt=cachedir="$cache" --setopt=install_weak_deps=False \

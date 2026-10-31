@@ -20,15 +20,25 @@ for closure in sdk fixture; do
     stored=$output/transaction-$closure
     mkdir -p "$solver/usr/lib/sysimage/rpm"
     rpm --dbpath "$solver/usr/lib/sysimage/rpm" --initdb
-    if [[ $closure == sdk ]]; then packages=("${sdk_packages[@]}"); else packages=("${fixture_packages[@]}"); fi
+    refresh_options=()
+    if [[ $closure == sdk ]]; then
+        packages=("${sdk_packages[@]}")
+        # The preceding full-goal audit can outlive a Rawhide compose change.
+        refresh_options=(--refresh)
+    else
+        packages=("${fixture_packages[@]}")
+    fi
     # Resolve the whole requested set together. `download --resolve` resolves
     # individual packages and can miss conditional requirements between them.
     # Store downloads only; it neither installs nor replays a transaction here.
-    dnf5 --forcearch=aarch64 --releasever=rawhide --installroot="$solver" \
+    dnf5 "${refresh_options[@]}" --forcearch=aarch64 --releasever=rawhide --installroot="$solver" \
         --disable-repo='*' \
         --repofrompath=copr-public-fedora,https://dl.fedoraproject.org/pub/fedora/linux/development/rawhide/Everything/aarch64/os/ \
+        --setopt=copr-public-fedora.baseurl= \
+        --setopt='copr-public-fedora.metalink=https://mirrors.fedoraproject.org/metalink?repo=rawhide&arch=aarch64&protocol=https' \
         --enable-repo=copr-public-fedora --setopt=cachedir="$output/download-cache" \
         --setopt=copr-public-fedora.gpgkey="file://$key" --setopt=install_weak_deps=False \
+        --setopt=copr-public-fedora.metadata_expire=-1 \
         --assumeyes install --store="$stored" "${packages[@]}"
     jq -e '.version=="1.0" and (.rpms|length)>0 and all(.rpms[];.action=="Install")' "$stored/transaction.json" > /dev/null
     cp "$stored/transaction.json" "$output/closures/$closure.json"

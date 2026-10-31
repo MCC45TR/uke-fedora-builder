@@ -11,16 +11,18 @@ case $partition in linux|userdata) :;; *) exit 2;; esac
 # shellcheck source=root-metadata.sh
 # shellcheck disable=SC1091
 source /builder/src/public/root-metadata.sh
-case $filesystem in
-    btrfs) format='mkfs-btrfs /dev/sda label:UKE_LINUX sectorsize:4096';;
-    f2fs) format='mkfs f2fs /dev/sda label:UKE_LINUX features:extra_attr,inode_checksum,sb_checksum';;
-    *) format="mkfs $filesystem /dev/sda label:UKE_LINUX blocksize:4096";;
-esac
+# shellcheck source=filesystem-commands.sh
+# shellcheck disable=SC1091
+source /builder/src/public/filesystem-commands.sh
+# shellcheck source=guest-appliance.sh
+# shellcheck disable=SC1091
+source /builder/src/public/guest-appliance.sh
+public_guest_appliance /job/filesystem-appliance
+format=$(public_filesystem_format "$filesystem")
+read_options=$(public_filesystem_ro_options "$filesystem")
 # The appliance uses KVM when the container was given /dev/kvm; the image forces TCG otherwise.
 if [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then unset LIBGUESTFS_BACKEND_SETTINGS; fi
 cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
-relabel='selinux-relabel /etc/selinux/targeted/contexts/files/file_contexts / force:true'
-[[ $filesystem != ext4 ]] || relabel=''
 if [[ $filesystem == ext4 ]]; then
     if [[ $channel == unstable ]]; then
         cp "$UKE_IMAGE_TOOLS/ext4-labels" /job/ext4-labels
@@ -41,8 +43,7 @@ set-memsize 2048
 run
 $format
 mount /dev/sda /
-tar-in /job/rootfs.tar / xattrs:true acls:true
-$relabel
+tar-in /job/rootfs.tar / xattrs:true selinux:true acls:true
 sync
 umount-all
 GUEST
@@ -54,7 +55,7 @@ set-memsize 2048
 run
 vfs-type /dev/sda
 vfs-label /dev/sda
-mount-ro /dev/sda /
+mount-options $read_options /dev/sda /
 getxattr /etc/passwd security.selinux
 tar-out / /job/root-readback.tar numericowner:true xattrs:true acls:true excludes:lost+found
 umount-all

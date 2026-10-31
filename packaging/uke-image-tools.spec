@@ -1,6 +1,6 @@
 Name:           uke-image-tools
 Version:        1.0.0
-Release:        17%{?dist}
+Release:        26%{?dist}
 Summary:        Native tools for isolated Uke image assembly and verification
 License:        MIT
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -47,9 +47,9 @@ echo "$(jq -er .guest_inputs_sha256 %{SOURCE1})  %{SOURCE2}" | sha256sum -c -
 mkdir guest-inputs
 tar -xJf %{SOURCE2} -C guest-inputs
 jq -es 'length==12 and all(.[];.goal_resolved and .metadata_only and (.installed==false) and (.rpm_downloaded==false) and (.full_os_composition==false) and (.hardware_tested==false))' guest-inputs/closures/full-root/*/report.json
+UKE_COPR_WORKER_AUDIT=1 bash tests/copr-image-appliance.sh
 UKE_COPR_WORKER_AUDIT=1 bash src/public/copr-guest-root.sh "$PWD" "$PWD/guest-inputs"
 UKE_COPR_WORKER_AUDIT=1 bash tests/copr-image-worker.sh
-UKE_COPR_WORKER_AUDIT=1 bash tests/copr-image-appliance.sh
 bash tests/public-build-contract.sh
 bash tests/public-channel-contract.sh
 bash tests/public-root-transaction.sh
@@ -75,6 +75,36 @@ bash tests/android-sparse-contract.sh build-tools/android-sparse "$PWD/build-too
 %{_datadir}/%{name}/source-identity.json
 
 %changelog
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-26
+- Use the Btrfs rescue=nologreplay readback option.
+- Probe every production read-only mount option before target installation.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-25
+- Verify target-policy labels on the staging tree and preserve them in archives.
+- Restore SELinux archive metadata for every declared filesystem.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-24
+- Mount the declared filesystem in the repeated-format appliance probe.
+- Retain appliance kernel and command diagnostics if a probe fails.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-23
+- Use official HTTPS Rawhide mirrors and refresh the SDK cohort before download.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-22
+- Include every declared formatter in a private appliance and probe it before root installation.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-21
+- Validate every reported layer of an existing SDK virtual mount.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-20
+- Preserve appliance virtual mounts below owned SDK mount layers.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-19
+- Retain early SDK admission and mount diagnostics for full filesystem failures.
+
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-18
+- Compose and independently verify every declared filesystem through the COPR SDK.
+
 * Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-17
 - Resolve the complete desktop against the requested Linux 7.3.1-3 tuple.
 

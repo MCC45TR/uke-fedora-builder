@@ -23,7 +23,7 @@ cleanup() {
     exit "$status"
 }
 trap cleanup EXIT
-mkdir -p /proc /dev /sys /run /cache /etc/yum.repos.d /etc/pki/rpm-gpg /job/artifacts /job/inputs /job/input-audit
+mkdir -p /proc /dev /sys /run /cache /etc/yum.repos.d /etc/pki/rpm-gpg /job/artifacts /job/inputs /job/input-audit /job/filesystem-mount
 public_guest_mounts
 sha256sum -c /job/mke2fs.sha256
 rpm --initdb

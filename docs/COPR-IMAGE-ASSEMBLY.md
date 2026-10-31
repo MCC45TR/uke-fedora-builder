@@ -86,3 +86,13 @@ six signed RPMs, 821 module hashes, both embedded kernels and the exact source
 composition independently match. The earlier kernel-60 records keep their
 original scope. Neither metadata resolution nor the bounded fixture proves a
 complete installed desktop image or physical acceptance.
+
+On 31 October 2026, a separate source candidate adds
+`src/public/copr-image-stage.sh` after the complete root entry. It retains the
+requested filesystem and capacity, shares the existing format commands, and
+keeps root ownership inside the SDK. A second read-only appliance checks every
+SELinux path against the target policy and exports metadata for comparison in
+the owned SDK. Both sparse decoders must reproduce the raw image. The candidate
+uses the same function for all four declared formats in COPR checks and retains
+the original bounded EXT4 controls. Its native and full-image results are
+pending; no complete image or physical acceptance is claimed.
