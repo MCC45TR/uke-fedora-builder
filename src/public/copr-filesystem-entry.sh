@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Root ownership is used only inside the disposable offline SDK.
 set -Eeuo pipefail
+failure_status=0
 trap 'failure_status=$?; printf "UKE_COPR_FS_ENTRY_ERROR line=%s status=%s command=%q\n" "$LINENO" "$failure_status" "$BASH_COMMAND" >&2' ERR
 [[ $# == 1 && $(id -u) == 0 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 ]]
 export LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
