@@ -54,7 +54,7 @@ and [guestfish command interface](https://libguestfs.org/guestfish.1.html).
 
 The source worker and production stage share the package and exclusion policy.
 All 12 KDE/GNOME, Bash/Fish/Zsh and linux/userdata goals resolve against the
-exact kernel 60 parts. The KDE closures contain 961–965 packages; GNOME has
+exact kernel 7.3.1-3 parts. The KDE closures contain 961–965 packages; GNOME has
 768–772. DNF stops at its confirmation boundary with `--assumeno`; only solver
 metadata is retained, with empty target databases and RPM caches. The unstable
 selection explicitly names `uke-pipewire` and `uke-pipewire-pulseaudio`, avoiding
