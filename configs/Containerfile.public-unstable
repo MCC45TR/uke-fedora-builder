@@ -1,0 +1,10 @@
+ARG BASE_IMAGE=scratch
+FROM ${BASE_IMAGE}
+# Assembly SDK: kernels and project executables are signed COPR inputs.
+RUN dnf5 -y update --refresh && dnf5 -y --setopt=install_weak_deps=False install \
+    libguestfs-tools-c kernel-core kernel-modules qemu-kvm-core f2fs-tools e2fsprogs xfsprogs btrfs-progs \
+    e2fsprogs-libs libselinux openssl-libs libzstd libstdc++ jq tar coreutils findutils util-linux attr acl policycoreutils android-tools \
+    curl gnupg2 cpio zstd dnf5-plugins ripgrep kmod git-core systemd systemd-udev shadow-utils \
+    && if [ "$(uname -m)" = x86_64 ]; then dnf5 -y install qemu-user-static-aarch64; fi \
+    && dnf5 clean all
+ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC LIBGUESTFS_BACKEND=direct LIBGUESTFS_BACKEND_SETTINGS=force_tcg

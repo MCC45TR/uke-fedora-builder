@@ -1,0 +1,4 @@
+{
+  "kernel_rpm": "7.3.1-3.fc46",
+  "policy": "Resolve the full original Rawhide unstable desktop selection against the current signed release-candidate kernel tuple; metadata evidence alone does not qualify its RPM bytes, full composition or hardware."
+}

@@ -1,0 +1,36 @@
+name: Image source contracts
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: image-source-contracts-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Install source inspection tools
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep make
+      - name: Validate source without compilation or RPM generation
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          guard=$(mktemp -d)
+          trap 'rm -rf -- "$guard"' EXIT
+          cat > "$guard/refuse-build" <<'GUARD'
+          #!/bin/sh
+          echo "Native compilation and RPM generation belong in COPR: ${0##*/}" >&2
+          exit 97
+          GUARD
+          chmod +x "$guard/refuse-build"
+          for tool in gcc g++ cc c++ clang clang++ as ld rpmbuild; do ln -s refuse-build "$guard/$tool"; done
+          export PATH="$guard:$PATH"
+          for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
+          shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
+          bash tests/public-build-contract.sh
+          bash tests/public-channel-contract.sh
+          echo 'Native helper builds and file fixtures run in the uke-image-tools COPR build.' >> "$GITHUB_STEP_SUMMARY"

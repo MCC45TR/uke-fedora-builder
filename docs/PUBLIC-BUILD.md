@@ -110,12 +110,13 @@ admitted by the selected SRPM producer.
 | `gnome` | Original Fedora GNOME Shell, GDM and GNOME Initial Setup. |
 | `stable` | Packages from `mcc45tr/uke-linux`, plus the pinned local platform-family builds described below. This is not a stable Fedora release or hardware qualification. |
 | `testing` | Signed packages from `mcc45tr/uke-linux-test`; the installed control channel is named `test`. |
-| `unstable` | The test repository with the installed control channel named `unstable`. |
+| `unstable` | Signed individual packages from `mcc45tr/uke-linux-unstable`; Fedora Rawhide AArch64 only. |
 
-All three channels build the same kernel source and version, selected by
-[`configs/public-build.json`](../configs/public-build.json) and `--kernel`. An unstable
-selection does not silently replace it with an unported kernel.org release candidate.
-Kernel-only output uses that same source/spec and produces both root profiles.
+The stable/testing source routes use the kernel policy in
+[`configs/public-build.json`](../configs/public-build.json) and `--kernel`.
+Unstable consumes matching signed kernel RPMs, defaults to `--kernel-rpm latest`
+and refuses local source substitution. Kernel-only output retains both root
+profiles for the selected source or signed RPM set.
 The stable repository predates the current source families. Stable image builds
 therefore also compile `uke-additional`, `uke-sensors`, `uke-hw`, `uke-power`,
 `uke-core` and `uke-metas` from the exact public hardware commit in that policy.
@@ -128,7 +129,8 @@ The pinned source producer's four historical SRPM inputs are cached from the
 checksum-locked GitHub archive before composition. This preserves the selected
 commit and input bytes after the retired COPR archive projects are removed.
 Online builds verify each download; offline builds require the exact cached
-bytes. Only `uke-linux` and `uke-linux-test` remain active Uke COPR projects.
+bytes. The three current Uke COPR channels are `uke-linux`, `uke-linux-test` and
+`uke-linux-unstable`; retired archive projects are not build inputs.
 
 ## Host preparation and input verification
 
@@ -315,3 +317,36 @@ any release is published, artifacts must pass metadata/content readback,
 SELinux context verification, both sparse decoders, Zstandard readback and
 checksums. Releases are marked as experimental pre-releases; these host checks
 do not qualify tablet boot, first-account setup, charging or recovery.
+
+## Independent unstable image inputs
+
+30 October 2026: `unstable` selects `mcc45tr/uke-linux-unstable` and signing
+fingerprint `2204A661EA630A5303500085538797E72A3E4ECA`. It supports only the
+normal Fedora Rawhide AArch64 kernel profile. The default kernel input is the
+latest signed matching RPM set; `--kernel-rpm` can freeze its exact release.
+Local source, kernel-cache reuse and foreign-release substitutions are refused.
+The signed payload supplies the source commit before root composition.
+
+The unstable root selects individual runtime packages through `uke-core-meta`.
+Its image codecs and offline verification helpers come from the separate signed
+`uke-image-tools` COPR producer. The assembly worker has no project compiler or
+RPM build stage. Existing stable/testing source and KVM routes retain their
+separate policies; this change does not qualify those routes or alter their
+COPR definitions. Native helper fixtures run in COPR; GitHub checks source only.
+
+The shared EXT4 path passed a 1 GiB COPR guest fixture in
+[build 11232234](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-unstable/build/11232234/).
+Normal Fedora RPM scriptlets, numeric owners, SELinux labels, content, exact
+mtimes, ACLs and capabilities survived independent image readback. Deliberate
+metadata corruptions were rejected; both sparse decoders reproduced the raw
+image. The assembly policy pins signed `uke-image-tools-1.0.0-14.fc46.aarch64`.
+
+The same build resolves all 12 complete KDE/GNOME, shell and root-profile goals
+from the production package policy. These metadata checks stop before target
+RPM downloads or installation. Unstable requests the owning Uke PipeWire
+providers directly; normal dependency policy stays enabled.
+
+This fixture does not compose the complete desktop root. Production guest
+transport, full image composition and an independent rebuild remain required,
+along with installation, growth, boot and recovery acceptance. Physical release
+gates and firmware redistribution limits remain open.

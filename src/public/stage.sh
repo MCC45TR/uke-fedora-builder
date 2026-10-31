@@ -5,6 +5,11 @@ set -Eeuo pipefail
 request=/job/request.json
 policy=/builder/configs/public-build.json
 stage=$1
+copr_inputs=${UKE_COPR_ROOT_INPUTS:-}
+if [[ -n $copr_inputs ]]; then
+    [[ $copr_inputs == /inputs/target && ${UKE_OFFLINE:-0} == 1 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 ]]
+    [[ $stage == root || $stage == repository-kernel ]]
+fi
 fedora_release=$(jq -er .fedora_release "$request")
 case $fedora_release in 44|45|rawhide) ;; *) echo "Unsupported Fedora target" >&2; exit 1;; esac
 # The worker is pinned to the requested distribution; derive its RPM macros there.
@@ -20,6 +25,12 @@ if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then
     trap 'chown -R "$UKE_OUTPUT_OWNER" /job/artifacts' EXIT
 fi
 channel=$(jq -er .channel "$request")
+if [[ $channel == unstable ]]; then
+    [[ $fedora_release == rawhide && ( $stage == repository-kernel || $stage == root || $stage == filesystem ) ]] || exit 1
+    # shellcheck source=repository-tools.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/repository-tools.sh
+fi
 filesystem=$(jq -er .filesystem "$request")
 partition=$(jq -er .partition "$request")
 jobs=$(jq -er .jobs "$request")
@@ -39,7 +50,7 @@ case $KERNEL_PROFILE in normal|el2-require) ;; *) die 'Unadmitted kernel profile
 kernel_family=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].family' "$policy")
 [[ $source_commit =~ ^[0-9a-f]{40}$ && $kernel_version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
 cache_flags=()
-[[ ${UKE_OFFLINE:-0} != 1 ]] || cache_flags+=(--cacheonly)
+[[ ${UKE_OFFLINE:-0} != 1 || -n $copr_inputs ]] || cache_flags+=(--cacheonly)
 rpm -qa --qf '%{NEVRA}\n' | LC_ALL=C sort > "/job/artifacts/worker-$stage-rpms.txt"
 local_repository() {
     createrepo_c --update --excludes='*.src.rpm' /job/artifacts
@@ -292,8 +303,12 @@ root_cleanup() {
 trap root_cleanup EXIT
 public_root_proc_mount "$root"
 
-project=$(jq -er --arg channel "$channel" '.channels[$channel].project' "$policy")
-fingerprint=$(jq -er --arg channel "$channel" '.channels[$channel].fingerprint' "$policy")
+# shellcheck source=channel.sh
+# shellcheck disable=SC1091
+source /builder/src/public/channel.sh
+public_channel "$channel" "$policy"
+project=$PUBLIC_PROJECT
+fingerprint=$PUBLIC_FINGERPRINT
 key=/cache/$project.asc
 if [[ ${UKE_OFFLINE:-0} != 1 ]]; then
     curl --proto '=https' --tlsv1.2 -fL --retry 3 "https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/pubkey.gpg" -o "$key.part"
@@ -302,35 +317,17 @@ fi
 [[ $(gpg --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == "$fingerprint" ]]
 install -m644 "$key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
 install -m644 "$fedora_key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora
-cat > /etc/yum.repos.d/uke-selected.repo <<REPO
-[uke-selected]
-name=Uke $channel
-baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-$fedora_release-\$basearch/
-enabled=1
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
-skip_if_unavailable=False
-priority=40
-includepkgs=uke-*,senemos-uke-linux-kernel-*
-REPO
-packages=(fedora-release fedora-repos bash "$(jq -er .default_shell "$request")" coreutils dnf5 dnf5-plugins glibc-all-langpacks
-    systemd systemd-udev systemd-pam NetworkManager NetworkManager-wifi bluez chrony
-    firewalld openssh-server sudo shadow-utils selinux-policy-targeted policycoreutils
-    e2fsprogs f2fs-tools btrfs-progs xfsprogs util-linux kbd less nano fastfetch
-    pipewire pipewire-pulseaudio wireplumber
-    uke-core uke-hw uke-power uke-sensors uke-additional uke-firmware
-    uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
-    uke-charge-control uke-offline-charge)
-[[ $fedora_release != rawhide ]] || packages+=(fedora-repos-rawhide)
+# shellcheck source=root-repository.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-repository.sh
+repository_mode=public
+[[ -z $copr_inputs ]] || repository_mode=copr-frozen
+public_root_repository /etc/yum.repos.d/uke-selected.repo "$project" "$fedora_release" "$repository_mode"
 desktop=$(jq -er .desktop "$request")
-[[ $desktop == kde || $desktop == gnome ]] || die "Unsupported desktop image: $desktop"
-if [[ $desktop == kde ]]; then
-    packages+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin)
-else
-    packages+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
-        gnome-control-center gnome-software gnome-console nautilus)
-fi
+# shellcheck source=root-packages.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-packages.sh
+public_root_packages packages "$fedora_release" "$channel" "$desktop" "$(jq -er .default_shell "$request")" || die 'Unsupported root package selection'
 release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
 base=$kernel_family
 rpm_release=$(jq -er '.rpm_version_release // .kernel_release' /job/artifacts/kernel/kernel-info.json)
@@ -343,15 +340,13 @@ done
 if [[ $partition == userdata ]]; then
     local_rpms+=("/job/artifacts/kernel/$base-singleboot-$rpm_release$dist.aarch64.rpm")
 fi
-# Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
-excluded='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,senemos-uke-linux-kernel-mainline-unstable*'
-if [[ $KERNEL_PROFILE == normal ]]; then
-    excluded+=',senemos-uke-linux-kernel-mainline-kvm*'
-else
-    for component in '' -core -modules -dtbs -boot -singleboot; do
-        excluded+=",senemos-uke-linux-kernel-mainline$component"
+if [[ $channel == unstable ]]; then
+    for package in "${local_rpms[@]}"; do
+        rpmkeys --dbpath /job/kernel-keydb --checksig "$package" | grep -F 'signatures OK'
     done
 fi
+# Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
+excluded=$(public_root_exclusions "$KERNEL_PROFILE")
 dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-config --installroot="$root" --releasever="$fedora_release"
     --disable-repo='*' --enable-repo=uke-selected
     --setopt=cachedir="/cache/dnf-$channel" --setopt=keepcache=True
@@ -359,25 +354,18 @@ dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-con
     # Uke packages require files such as /usr/lib/systemd/systemd-growfs, which only the filelists metadata resolves.
     --setopt=optional_metadata_types=filelists --setopt=max_parallel_downloads=10
     --setopt=tsflags=nodocs --setopt="excludepkgs=$excluded")
-while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
+if [[ -n $copr_inputs ]]; then dnf+=(--enable-repo=copr-frozen-fedora)
+else
+    while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
+fi
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
 fi
-# systemctl normally returns success for ignored chroot queries, so a package's
-# `if systemctl is-active dbus` can incorrectly run busctl without a bus.
-# Force real connectivity detection during RPM scriptlets: no host bus is mounted.
-# All unit presets and later --root operations keep their normal offline semantics.
-SYSTEMD_IN_CHROOT=0 "${dnf[@]}" -y install "${local_rpms[@]}" "${packages[@]}" 2>&1 | tee /job/root-install.log
-if ((${#arch_flags[@]})); then
-    # Emulated scriptlets must have run; a silent failure would leave an incomplete root.
-    chroot "$root" /usr/bin/true
-    if grep -F 'scriptlet failed' /job/root-install.log; then
-        echo 'Package scriptlets failed under AArch64 emulation; see root-install.log' >&2
-        exit 1
-    fi
-fi
-"${dnf[@]}" check
+# shellcheck source=root-transaction.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-transaction.sh
+public_root_transaction "$root" /job/root-install.log dnf local_rpms packages
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
 [[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$rpm_release$dist" ]]
 bundle=$root/usr/lib/senemos/kernel-updates/$release
@@ -396,7 +384,8 @@ while IFS= read -r -d '' archive; do
     rpmkeys --dbpath /job/keydb --checksig "$archive" | grep -F 'signatures OK'
     printf '%s\t%s\n' "$nevra" "$(sha256sum "$archive" | cut -d ' ' -f1)" >> /job/fedora-inputs.tsv
     rpm2cpio "$archive" | (cd /job/original-fedora; cpio -idmu --quiet --no-absolute-filenames)
-done < <(find "/cache/dnf-$channel" -type f -name '*.rpm' -print0)
+done < <(if [[ -n $copr_inputs ]]; then find "$copr_inputs/rpms/fedora" -type f -name '*.rpm' -print0
+         else find "/cache/dnf-$channel" -type f -name '*.rpm' -print0; fi)
 LC_ALL=C sort /job/fedora-inputs.tsv > /job/artifacts/fedora-inputs.tsv
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
 bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
@@ -430,7 +419,7 @@ mkdir -p "$root/mnt/vendor/persist"
 chmod 700 "$root/mnt/vendor/persist"
 printf 'SELINUX=enforcing\nSELINUXTYPE=targeted\n' > "$root/etc/selinux/config"
 install -m644 /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected "$root/etc/pki/rpm-gpg/"
-install -m644 /etc/yum.repos.d/uke-selected.repo "$root/etc/yum.repos.d/"
+public_root_repository "$root/etc/yum.repos.d/uke-selected.repo" "$project" "$fedora_release"
 cat > "$root/etc/dnf/dnf.conf" <<'DNF'
 [main]
 install_weak_deps=False
@@ -468,4 +457,14 @@ for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then die 'Mounted runtime tree during export'; fi
     find "$root/$tree" -xdev -mindepth 1 -depth -delete
 done
-tar --create --numeric-owner --one-file-system --sort=name --acls --xattrs --xattrs-include=security.capability -f /job/rootfs.tar -C "$root" .
+# shellcheck source=root-metadata.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-metadata.sh
+if [[ $channel == unstable ]]; then
+    archive_verifier=$UKE_IMAGE_TOOLS/ext4-labels
+else
+    archive_verifier=/job/ext4-labels
+    c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
+        -o "$archive_verifier" -lext2fs -lcom_err -lselinux
+fi
+public_root_archive "$root" /job/rootfs.tar "$archive_verifier"

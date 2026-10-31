@@ -110,6 +110,7 @@ jq -e '.kernel | (.ref|type=="string") and (.default_version|test("^[0-9]+\\.[0-
     "$root/configs/public-build.json" >/dev/null
 bash -n "$root"/src/public/*.sh
 bash "$root/tests/public-source-inputs.sh"
+bash "$root/tests/public-root-transaction.sh"
 printf '%s\n' '648 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
 quiet_fail() { if ("$@") > /dev/null 2>&1; then echo "Accepted: $*" >&2; exit 1; fi; }
 # Kernel selection: explicit versions, latest and its alias are accepted; anything else is refused before a build starts.
