@@ -6,7 +6,7 @@ public_guest_mounts() {
         return 1
     fi
     PUBLIC_GUEST_MOUNTS=()
-    local tree expected actual
+    local tree expected actual type
     for tree in proc dev sys run; do
         if [[ ! -d /$tree || -L /$tree ]]; then
             echo "SDK virtual filesystem directory is absent or a symlink: /$tree" >&2
@@ -14,11 +14,13 @@ public_guest_mounts() {
         fi
         case $tree in proc) expected=proc;; dev) expected=devtmpfs;; sys) expected=sysfs;; run) expected=tmpfs;; esac
         if findmnt --mountpoint "/$tree" --noheadings >/dev/null; then
-            actual=$(findmnt --mountpoint "/$tree" --noheadings --output FSTYPE) || return
-            if [[ $actual != "$expected" ]]; then
-                echo "Unexpected SDK virtual filesystem at /$tree: $actual (expected $expected)" >&2
-                return 1
-            fi
+            actual=$(findmnt --mountpoint "/$tree" --noheadings --raw --output FSTYPE) || return
+            while IFS= read -r type; do
+                if [[ $type != "$expected" ]]; then
+                    echo "Unexpected SDK virtual filesystem at /$tree: $type (expected $expected)" >&2
+                    return 1
+                fi
+            done <<< "$actual"
         fi
     done
     # libguestfs can supply bind mounts. Stack owned mounts with our policy;
