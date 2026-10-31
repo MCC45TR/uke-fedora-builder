@@ -12,6 +12,8 @@ public_copr_filesystem() {
     read_options=$(public_filesystem_ro_options "$filesystem") || return
     [[ -x $host_tools/android-sparse && ! -L $host_tools/android-sparse ]] || return 1
     mkdir -m700 "$output" || return
+    mkdir "$output/cache" "$output/tmp" || return
+    export LIBGUESTFS_CACHEDIR=$output/cache LIBGUESTFS_TMPDIR=$output/tmp
     jq -n --arg fs "$filesystem" --arg tools "$guest_tools" --argjson size "$size" \
         '{filesystem:$fs,tools:$tools,size_mib:$size}' > "$output/request.json" || return
     if [[ $filesystem == ext4 ]]; then

@@ -49,6 +49,7 @@ public_copr_guest_run() {
         [[ $mode == ro && -f $extra && ! -L $extra ]] || return 1
         disks+=(--format=raw -a "$extra")
     fi
+    LIBGUESTFS_BACKEND=direct LIBGUESTFS_BACKEND_SETTINGS=force_tcg \
     timeout --kill-after=20 "$seconds" guestfish "--$mode" "${disks[@]}" \
         -f "$commands" 2>&1 | tee "$log" || status=$?
     if [[ $status != 0 ]]; then cat "$log" >&2; fi

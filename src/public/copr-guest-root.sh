@@ -117,6 +117,8 @@ source "$recipe/src/public/filesystem-commands.sh"
 # shellcheck source=copr-filesystem.sh
 # shellcheck disable=SC1091
 source "$recipe/src/public/copr-filesystem.sh"
+# The real image caller starts after a child root producer; it inherits no SDK env.
+unset LIBGUESTFS_BACKEND LIBGUESTFS_BACKEND_SETTINGS LIBGUESTFS_CACHEDIR LIBGUESTFS_TMPDIR
 for filesystem in ext4 f2fs xfs btrfs; do
     public_copr_filesystem "$work/guest.raw" "$work/rootfs.tar" "$filesystem" 1024 \
         "$work/$filesystem" /builder/build-tools "$recipe/build-tools"
