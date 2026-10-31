@@ -1,6 +1,6 @@
 Name:           uke-image-tools
 Version:        1.0.0
-Release:        14%{?dist}
+Release:        17%{?dist}
 Summary:        Native tools for isolated Uke image assembly and verification
 License:        MIT
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -13,7 +13,7 @@ BuildRequires:  bash jq coreutils findutils diffutils grep sed gawk tar xz cpio
 BuildRequires:  rpm-build ripgrep dtc git-core make f2fs-tools e2fsprogs xfsprogs btrfs-progs zstd
 BuildRequires:  util-linux-core util-linux shadow-utils
 BuildRequires:  libguestfs-tools-c kernel-core kernel-modules qemu-kvm-core
-BuildRequires:  bsdtar gnupg2
+BuildRequires:  bsdtar gnupg2 createrepo_c
 BuildRequires:  android-tools
 BuildRequires:  libarchive-devel
 
@@ -75,6 +75,16 @@ bash tests/android-sparse-contract.sh build-tools/android-sparse "$PWD/build-too
 %{_datadir}/%{name}/source-identity.json
 
 %changelog
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-17
+- Resolve the complete desktop against the requested Linux 7.3.1-3 tuple.
+
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-16
+- Refuse ambiguous repeated NEVRAs in complete frozen root catalogs.
+- Keep frozen repository URLs out of the delivered root and match its requested kernel source.
+
+* Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-15
+- Share the SDK transport with the complete offline production root entry.
+
 * Fri Oct 30 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-14
 - Select the standalone Uke PipeWire providers required by unstable Core.
 

@@ -5,6 +5,11 @@ set -Eeuo pipefail
 request=/job/request.json
 policy=/builder/configs/public-build.json
 stage=$1
+copr_inputs=${UKE_COPR_ROOT_INPUTS:-}
+if [[ -n $copr_inputs ]]; then
+    [[ $copr_inputs == /inputs/target && ${UKE_OFFLINE:-0} == 1 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 ]]
+    [[ $stage == root || $stage == repository-kernel ]]
+fi
 fedora_release=$(jq -er .fedora_release "$request")
 case $fedora_release in 44|45|rawhide) ;; *) echo "Unsupported Fedora target" >&2; exit 1;; esac
 # The worker is pinned to the requested distribution; derive its RPM macros there.
@@ -45,7 +50,7 @@ case $KERNEL_PROFILE in normal|el2-require) ;; *) die 'Unadmitted kernel profile
 kernel_family=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].family' "$policy")
 [[ $source_commit =~ ^[0-9a-f]{40}$ && $kernel_version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
 cache_flags=()
-[[ ${UKE_OFFLINE:-0} != 1 ]] || cache_flags+=(--cacheonly)
+[[ ${UKE_OFFLINE:-0} != 1 || -n $copr_inputs ]] || cache_flags+=(--cacheonly)
 rpm -qa --qf '%{NEVRA}\n' | LC_ALL=C sort > "/job/artifacts/worker-$stage-rpms.txt"
 local_repository() {
     createrepo_c --update --excludes='*.src.rpm' /job/artifacts
@@ -312,18 +317,12 @@ fi
 [[ $(gpg --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == "$fingerprint" ]]
 install -m644 "$key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
 install -m644 "$fedora_key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora
-cat > /etc/yum.repos.d/uke-selected.repo <<REPO
-[uke-selected]
-name=Uke $channel
-baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-$fedora_release-\$basearch/
-enabled=1
-gpgcheck=1
-repo_gpgcheck=0
-gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
-skip_if_unavailable=False
-priority=40
-includepkgs=uke-*,senemos-uke-linux-kernel-*
-REPO
+# shellcheck source=root-repository.sh
+# shellcheck disable=SC1091
+source /builder/src/public/root-repository.sh
+repository_mode=public
+[[ -z $copr_inputs ]] || repository_mode=copr-frozen
+public_root_repository /etc/yum.repos.d/uke-selected.repo "$project" "$fedora_release" "$repository_mode"
 desktop=$(jq -er .desktop "$request")
 # shellcheck source=root-packages.sh
 # shellcheck disable=SC1091
@@ -355,7 +354,10 @@ dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-con
     # Uke packages require files such as /usr/lib/systemd/systemd-growfs, which only the filelists metadata resolves.
     --setopt=optional_metadata_types=filelists --setopt=max_parallel_downloads=10
     --setopt=tsflags=nodocs --setopt="excludepkgs=$excluded")
-while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
+if [[ -n $copr_inputs ]]; then dnf+=(--enable-repo=copr-frozen-fedora)
+else
+    while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
+fi
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
@@ -382,7 +384,8 @@ while IFS= read -r -d '' archive; do
     rpmkeys --dbpath /job/keydb --checksig "$archive" | grep -F 'signatures OK'
     printf '%s\t%s\n' "$nevra" "$(sha256sum "$archive" | cut -d ' ' -f1)" >> /job/fedora-inputs.tsv
     rpm2cpio "$archive" | (cd /job/original-fedora; cpio -idmu --quiet --no-absolute-filenames)
-done < <(find "/cache/dnf-$channel" -type f -name '*.rpm' -print0)
+done < <(if [[ -n $copr_inputs ]]; then find "$copr_inputs/rpms/fedora" -type f -name '*.rpm' -print0
+         else find "/cache/dnf-$channel" -type f -name '*.rpm' -print0; fi)
 LC_ALL=C sort /job/fedora-inputs.tsv > /job/artifacts/fedora-inputs.tsv
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
 bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
@@ -416,7 +419,7 @@ mkdir -p "$root/mnt/vendor/persist"
 chmod 700 "$root/mnt/vendor/persist"
 printf 'SELINUX=enforcing\nSELINUXTYPE=targeted\n' > "$root/etc/selinux/config"
 install -m644 /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected "$root/etc/pki/rpm-gpg/"
-install -m644 /etc/yum.repos.d/uke-selected.repo "$root/etc/yum.repos.d/"
+public_root_repository "$root/etc/yum.repos.d/uke-selected.repo" "$project" "$fedora_release"
 cat > "$root/etc/dnf/dnf.conf" <<'DNF'
 [main]
 install_weak_deps=False

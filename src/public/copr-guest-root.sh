@@ -6,42 +6,12 @@ set -Eeuo pipefail
 recipe=$(realpath "$1") inputs=$(realpath "$2")
 work=$(mktemp -d)
 trap 'find "$work" -depth -delete' EXIT
-[[ $recipe =~ ^/[A-Za-z0-9_./+-]+$ && $inputs =~ ^/[A-Za-z0-9_./+-]+$ && $work =~ ^/[A-Za-z0-9_./+-]+$ ]]
-export LIBGUESTFS_BACKEND=direct LIBGUESTFS_BACKEND_SETTINGS=force_tcg
-export LIBGUESTFS_CACHEDIR=$work/cache LIBGUESTFS_TMPDIR=$work/tmp
-mkdir "$work/cache" "$work/tmp" "$work/keydb" "$work/job"
-(cd "$inputs"; sha256sum -c SHA256SUMS > "$work/input-hashes.log")
-rpmkeys --dbpath "$work/keydb" --import "$recipe/configs/keys/fedora-46.asc"
-shopt -s nullglob
-archives=("$inputs/rpms/"*.rpm)
-(( ${#archives[@]} > 0 ))
-for archive in "${archives[@]}"; do
-    [[ $(rpm -qp --qf '%{VENDOR}' "$archive") == 'Fedora Project' ]]
-    case $(rpm -qp --qf '%{ARCH}' "$archive") in aarch64|noarch) ;; *) exit 1;; esac
-    rpmkeys --dbpath "$work/keydb" --checksig "$archive" | grep -F 'signatures OK'
-    if [[ $(rpm -qp --qf '%{NAME}' "$archive") == e2fsprogs ]]; then
-        rpm -qp --qf '[%{FILENAMES}\t%{FILEDIGESTS}\n]' "$archive" \
-            | awk -F '\t' '$1=="/usr/bin/mke2fs" {print $2 "  " $1}' > "$work/mke2fs.sha256"
-    fi
-done
-[[ -s $work/mke2fs.sha256 ]]
-tar -cf "$work/sdk.tar" --files-from /dev/null
-mapfile -t sdk_names < "$inputs/closures/sdk-rpms.list"
-(( ${#sdk_names[@]} > 0 ))
-for name in "${sdk_names[@]}"; do
-    [[ $name =~ ^[A-Za-z0-9+_.:-]+[.]rpm$ && -f $inputs/rpms/$name && ! -L $inputs/rpms/$name ]]
-    archive=$inputs/rpms/$name
-    rpm2cpio "$archive" > "$work/payload.cpio"
-    bsdtar -tf "$work/payload.cpio" > "$work/payload.paths"
-    awk '/^\// || /(^|\/)\.\.(\/|$)/ {bad=1} END {exit bad}' "$work/payload.paths"
-    # Resolve data-last CPIO link groups before writing TAR hard-link headers.
-    # No host extraction/chown, mutable configuration or installed DB is involved.
-    [[ ! -e $work/payload.tar ]] || unlink "$work/payload.tar"
-    "$recipe/build-fixtures/cpio-sdk-tar" "$work/payload.cpio" "$work/payload.tar"
-    tar --concatenate -f "$work/sdk.tar" "$work/payload.tar"
-done
+# shellcheck source=copr-sdk.sh
+# shellcheck disable=SC1091
+source "$recipe/src/public/copr-sdk.sh"
+public_copr_sdk "$recipe" "$inputs" "$work"
 tar -cf "$work/recipe.tar" -C "$recipe" src/public/root-proc.sh src/public/root-transaction.sh \
-    src/public/ext4-filesystem.sh src/public/root-metadata.sh \
+    src/public/ext4-filesystem.sh src/public/root-metadata.sh src/public/guest-runtime.sh \
     tests/copr-guest-transaction.sh tests/copr-guest-compare.sh configs/keys/fedora-46.asc \
     configs/copr-image-fixture-packages.json \
     build-tools/ext4-labels build-tools/compare-root-metadata
@@ -55,6 +25,7 @@ run
 mkfs ext4 /dev/sda
 mount /dev/sda /
 tar-in $work/sdk.tar /
+write /.uke-copr-sdk 1
 mkdir-p /builder
 tar-in $work/recipe.tar /builder
 mkdir-p /inputs
@@ -68,10 +39,7 @@ download /job/root.raw $work/root.raw
 sync
 umount-all
 GUEST
-status=0
-timeout --kill-after=20 1800 guestfish --rw --format=raw -a "$work/guest.raw" \
-    -f "$work/create.commands" 2>&1 | tee "$work/guestfish.log" || status=$?
-if [[ $status != 0 ]]; then cat "$work/guestfish.log" >&2; exit "$status"; fi
+public_copr_guest_run rw "$work/guest.raw" "$work/create.commands" "$work/guestfish.log" 1800
 jq -e '.native_dnf and .scriptlets and .dependency_check and .numeric_owner and .tmpfiles and
     (.full_os_composition == false) and (.hardware_tested == false)' "$work/report.json"
 sha256sum "$work/guest.raw" > "$work/guest.sha256"
@@ -96,7 +64,7 @@ grep -Fxq "st_uid: $uid" "$work/readback.log"
 grep -Fxq "st_gid: $gid" "$work/readback.log"
 grep -Eq "^chrony:[^:]*:$uid:$gid:" "$work/readback.log"
 cat "$work/report.json"
-printf 'UKE_COPR_GUEST_ROOT signed_fedora_inputs=%d native_dnf=true scriptlets=true independent_readback=true readback_unchanged=true full_os_composition=false hardware_tested=false\n' "${#archives[@]}"
+printf 'UKE_COPR_GUEST_ROOT signed_fedora_inputs=%d native_dnf=true scriptlets=true independent_readback=true readback_unchanged=true full_os_composition=false hardware_tested=false\n' "$PUBLIC_COPR_SDK_RPMS"
 # This independent appliance reads the actual populated image, not its SDK tree.
 sha256sum "$work/root.raw" > "$work/root.sha256"
 cat > "$work/image-read.commands" <<GUEST

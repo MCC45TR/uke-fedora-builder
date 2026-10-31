@@ -1,10 +1,10 @@
 # COPR image assembly prerequisites
 
-On 30 October 2026, Fedora Rawhide AArch64
-[COPR 11232234](https://copr.fedorainfracloud.org/coprs/build/11232234/) verified
+On 31 October 2026, Fedora Rawhide AArch64
+[COPR 11232861](https://copr.fedorainfracloud.org/coprs/build/11232861/) verified
 the native image helpers, an offline guest root transaction and a 1 GiB EXT4
-fixture. The signed helper is `uke-image-tools-1.0.0-14.fc46.aarch64`, source
-`15272418bb25a58b659ac50c057ad82ea02ca54e`. Its native program sources are
+fixture. The signed helper is `uke-image-tools-1.0.0-17.fc46.aarch64`, source
+`35280a534b729443b89dddcd806c7c2d20e484c8`. Its native program sources are
 unchanged from revision 12. The build also checks the complete declared desktop
 package policy before accepting its SDK inputs.
 
@@ -54,7 +54,7 @@ and [guestfish command interface](https://libguestfs.org/guestfish.1.html).
 
 The source worker and production stage share the package and exclusion policy.
 All 12 KDE/GNOME, Bash/Fish/Zsh and linux/userdata goals resolve against the
-exact kernel 60 parts. The KDE closures contain 961–965 packages; GNOME has
+exact kernel 7.3.1-3 parts. The KDE closures contain 961–965 packages; GNOME has
 768–772. DNF stops at its confirmation boundary with `--assumeno`; only solver
 metadata is retained, with empty target databases and RPM caches. The unstable
 selection explicitly names `uke-pipewire` and `uke-pipewire-pulseaudio`, avoiding
@@ -62,3 +62,27 @@ a conflicting newer Fedora provider without relaxing solver policy. Device-local
 touch and video-firmware RPMs are excluded from generic images. These metadata
 results do not verify target RPM signatures, firmware rights, installation or
 full composition.
+
+The source exposes `src/public/copr-root-stage.sh` for a COPR producer.
+It accepts the checked SDK inputs and one complete frozen target set, rebuilds
+local repository metadata from declared signature-verified RPMs and invokes the
+existing repository-kernel and root stages inside the same isolated SDK. The
+guest has no network and the root never passes through host-user extraction.
+The resulting root archive, artifacts and SDK remain available for filesystem
+composition and independent readback.
+
+Target inputs contain `request.json`, `manifest.json`, `firmware-review.json`,
+the pinned unstable public key and Fedora/Uke RPM directories. The manifest
+binds the request hash and each RPM path, hash and NEVRA, plus the exact expected
+root NEVRAs. Public generic requests reject local/private references and require
+an exact kernel release. The existing incomplete firmware review fails before
+RPM or guest work. Completed target payload preparation, production execution
+and full image acceptance remain unverified. The shared SDK/runtime passes the
+bounded native checks; the complete production root itself remains unexecuted.
+
+Revision 17 resolves all 12 metadata goals against `7.3.1-3.fc46`, with empty
+target databases and RPM caches. The separate kernel build 11232738 succeeds;
+six signed RPMs, 821 module hashes, both embedded kernels and the exact source
+composition independently match. The earlier kernel-60 records keep their
+original scope. Neither metadata resolution nor the bounded fixture proves a
+complete installed desktop image or physical acceptance.

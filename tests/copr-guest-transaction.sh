@@ -7,31 +7,23 @@ source /builder/src/public/root-proc.sh
 source /builder/src/public/root-transaction.sh
 source /builder/src/public/ext4-filesystem.sh
 source /builder/src/public/root-metadata.sh
+source /builder/src/public/guest-runtime.sh
 mkdir -p /job/root/proc /etc/yum.repos.d /var/cache/dnf /var/lib/rpm /proc /sys /dev /run
 # guestfish command chroots into the SDK without preparing virtual filesystems.
 # These mounts exist only inside the appliance; no host mount is exposed.
-guest_mounts=()
+PUBLIC_GUEST_MOUNTS=()
 target_proc_mounted=0
 guest_cleanup() {
-    local status=$? index
+    local status=$?
     if [[ $target_proc_mounted == 1 ]]; then public_root_proc_unmount /job/root || status=1; fi
-    for ((index=${#guest_mounts[@]}-1; index>=0; index--)); do
-        umount "${guest_mounts[index]}" || status=1
-    done
+    public_guest_unmounts || status=1
     if [[ $status != 0 && -f /job/root-install.log ]]; then
         tail -80 /job/root-install.log >&2
     fi
     return "$status"
 }
 trap guest_cleanup EXIT
-mount -t proc -o nosuid,nodev,noexec proc /proc
-guest_mounts+=(/proc)
-mount -t devtmpfs -o nosuid devtmpfs /dev
-guest_mounts+=(/dev)
-mount -t sysfs -o ro,nosuid,nodev,noexec sysfs /sys
-guest_mounts+=(/sys)
-mount -t tmpfs -o nosuid,nodev tmpfs /run
-guest_mounts+=(/run)
+public_guest_mounts
 if grep -q '^chrony:' /etc/passwd; then echo 'SDK identity contaminated the target proof' >&2; exit 1; fi
 sha256sum -c /job/mke2fs.sha256 >&2
 [[ $(stat -c '%i' /usr/bin/mke2fs) == "$(stat -c '%i' /usr/bin/mkfs.ext4)" ]]
