@@ -14,6 +14,10 @@ source /builder/src/public/root-metadata.sh
 # shellcheck source=filesystem-commands.sh
 # shellcheck disable=SC1091
 source /builder/src/public/filesystem-commands.sh
+# shellcheck source=guest-appliance.sh
+# shellcheck disable=SC1091
+source /builder/src/public/guest-appliance.sh
+public_guest_appliance /job/filesystem-appliance
 format=$(public_filesystem_format "$filesystem")
 read_options=$(public_filesystem_ro_options "$filesystem")
 # The appliance uses KVM when the container was given /dev/kvm; the image forces TCG otherwise.

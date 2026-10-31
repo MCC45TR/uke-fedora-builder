@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # The full producer and integration check use identical verified SDK bytes.
+# shellcheck source=guest-appliance.sh
+# shellcheck disable=SC1091
+source "$(dirname -- "${BASH_SOURCE[0]}")/guest-appliance.sh"
 # shellcheck disable=SC2034
 public_copr_sdk() {
     local recipe=$1 inputs=$2 work=$3 archive name
@@ -49,6 +52,7 @@ public_copr_guest_run() {
         [[ $mode == ro && -f $extra && ! -L $extra ]] || return 1
         disks+=(--format=raw -a "$extra")
     fi
+    public_guest_appliance "$log.appliance" || return
     LIBGUESTFS_BACKEND=direct LIBGUESTFS_BACKEND_SETTINGS=force_tcg \
     timeout --kill-after=20 "$seconds" guestfish "--$mode" "${disks[@]}" \
         -f "$commands" 2>&1 | tee "$log" || status=$?

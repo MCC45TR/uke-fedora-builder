@@ -89,6 +89,14 @@ for invalid_request in invalid:1024 ext4:65537; do
     )
 done
 [[ ! -e $work/forbidden-operation && ! -e $work/new.log && ! -e $work/refused-filesystem ]]
+mkdir "$work/kept-appliance"
+printf 'KEEP_APPLIANCE\n' > "$work/kept-appliance/proof"
+(
+    export LIBGUESTFS_PATH=KEEP_SEARCH_PATH
+    if public_guest_appliance "$work/kept-appliance"; then exit 1; fi
+    [[ $LIBGUESTFS_PATH == KEEP_SEARCH_PATH ]]
+)
+grep -Fxq KEEP_APPLIANCE "$work/kept-appliance/proof"
 for project in uke-linux uke-linux-test uke-linux-unstable; do
     public_root_repository "$work/runtime.repo" "$project" rawhide
     grep -Fxq "baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-\$basearch/" "$work/runtime.repo"
