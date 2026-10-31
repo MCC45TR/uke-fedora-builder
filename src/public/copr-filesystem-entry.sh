@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Root ownership is used only inside the disposable offline SDK.
 set -Eeuo pipefail
+trap 'failure_status=$?; printf "UKE_COPR_FS_ENTRY_ERROR line=%s status=%s command=%q\n" "$LINENO" "$failure_status" "$BASH_COMMAND" >&2' ERR
 [[ $# == 1 && $(id -u) == 0 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 ]]
 export LANG=C.UTF-8 LC_ALL=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
 case $1 in populate|compare) ;; *) exit 1;; esac
@@ -9,6 +10,7 @@ tools=$(jq -er .tools /job/filesystem-request.json)
 case $tools in /builder/build-tools|/job/tools-payload/usr/libexec/uke-image-tools) ;; *) exit 1;; esac
 size=$(jq -er .size_mib /job/filesystem-request.json)
 [[ $size =~ ^[1-9][0-9]{3,4}$ && $size -le 65536 ]]
+printf 'UKE_COPR_FS_ENTRY operation=%s tools=%s size_mib=%s\n' "$mode" "$tools" "$size" >&2
 # shellcheck source=guest-runtime.sh
 # shellcheck disable=SC1091
 source /builder/src/public/guest-runtime.sh

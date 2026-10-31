@@ -65,7 +65,8 @@ jq '.metadata_only=true' "$work/target/manifest.json" > "$work/metadata.json"
 mv "$work/metadata.json" "$work/target/manifest.json"
 if public_copr_root_inputs "$root" "$work/target" "$work/audit" > "$work/refusal.log" 2>&1; then exit 1; fi
 [[ ! -e $work/forbidden-operation ]]
-if public_guest_mounts; then echo 'Host accepted as a disposable SDK' >&2; exit 1; fi
+if public_guest_mounts > "$work/host-mount.log" 2>&1; then echo 'Host accepted as a disposable SDK' >&2; exit 1; fi
+grep -Fq 'Disposable SDK marker and root are required' "$work/host-mount.log"
 [[ ! -e $work/forbidden-operation ]]
 printf 'ordinary mock file, not a disk image\n' > "$work/mock-disk"
 printf 'unexecuted commands\n' > "$work/mock-commands"

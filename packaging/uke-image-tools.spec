@@ -1,6 +1,6 @@
 Name:           uke-image-tools
 Version:        1.0.0
-Release:        18%{?dist}
+Release:        19%{?dist}
 Summary:        Native tools for isolated Uke image assembly and verification
 License:        MIT
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -75,6 +75,9 @@ bash tests/android-sparse-contract.sh build-tools/android-sparse "$PWD/build-too
 %{_datadir}/%{name}/source-identity.json
 
 %changelog
+* Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-19
+- Retain early SDK admission and mount diagnostics for full filesystem failures.
+
 * Sat Oct 31 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0.0-18
 - Compose and independently verify every declared filesystem through the COPR SDK.
 

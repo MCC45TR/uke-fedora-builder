@@ -1,12 +1,21 @@
 #!/usr/bin/env bash
 # Virtual filesystems belong only to the disposable SDK, never the host.
 public_guest_mounts() {
-    [[ $(id -u) == 0 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 ]] || return 1
+    if [[ $(id -u) != 0 || ! -f /.uke-copr-sdk || $(< /.uke-copr-sdk) != 1 ]]; then
+        echo 'Disposable SDK marker and root are required for virtual filesystem setup' >&2
+        return 1
+    fi
     PUBLIC_GUEST_MOUNTS=()
     local tree
     for tree in proc dev sys run; do
-        [[ -d /$tree && ! -L /$tree ]] || return 1
-        if findmnt --mountpoint "/$tree" --noheadings >/dev/null; then return 1; fi
+        if [[ ! -d /$tree || -L /$tree ]]; then
+            echo "SDK virtual filesystem directory is absent or a symlink: /$tree" >&2
+            return 1
+        fi
+        if findmnt --mountpoint "/$tree" --noheadings >/dev/null; then
+            echo "SDK virtual filesystem is already mounted: /$tree" >&2
+            return 1
+        fi
     done
     mount -t proc -o nosuid,nodev,noexec proc /proc || return
     PUBLIC_GUEST_MOUNTS+=(/proc)
