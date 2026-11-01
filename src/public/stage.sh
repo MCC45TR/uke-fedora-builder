@@ -507,7 +507,16 @@ mv /job/manifest.tmp /job/artifacts/manifest.json
 public_root_proc_unmount "$root"
 # Audit the final installed files only after every chroot operation has finished
 # and procfs is detached. The auditor rejects any remaining mounted subtree.
-bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
+icon_proof=()
+if [[ $desktop == cutefish ]]; then
+    # shellcheck source=cutefish-icons-proof.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/cutefish-icons-proof.sh
+    public_cutefish_icons_proof "$root" "/cache/dnf-$channel" /job/original-cutefish /job/artifacts/desktop-inputs.tsv \
+        /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-cutefish
+    icon_proof=(--verified-cutefish-payload /job/original-cutefish)
+fi
+bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "${icon_proof[@]}" "$root"
 for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then die 'Mounted runtime tree during export'; fi
     find "$root/$tree" -xdev -mindepth 1 -depth -delete

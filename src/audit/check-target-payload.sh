@@ -3,16 +3,21 @@
 set -euo pipefail
 export LC_ALL=C
 original=''
-if [[ ${1:-} == --original-kde-payload ]]; then
-  [[ $# == 3 && -d $2 ]] || exit 2
-  original=$(realpath -- "$2"); shift 2
-fi
-[[ $# == 1 && -d $1 ]] || { echo 'Usage: check-target-payload.sh [--original-kde-payload VERIFIED_ORIGINAL_DIRECTORY] EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
-for tool in realpath find findmnt jq readlink readelf cmp mktemp rm; do
+cutefish_original=''
+while (($# > 1)); do
+  case $1 in
+    --original-kde-payload) [[ -d $2 ]] || exit 2; original=$(realpath -- "$2"); shift 2;;
+    --verified-cutefish-payload) [[ -d $2 ]] || exit 2; cutefish_original=$(realpath -- "$2"); shift 2;;
+    *) break;;
+  esac
+done
+[[ $# == 1 && -d $1 ]] || { echo 'Usage: check-target-payload.sh [--original-kde-payload VERIFIED_DIRECTORY] [--verified-cutefish-payload VERIFIED_RPM_DIRECTORY] EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
+for tool in realpath find findmnt jq readlink readelf cmp mktemp rm grep head tail stat; do
   command -v "$tool" >/dev/null || { printf 'Missing host audit tool: %s\n' "$tool" >&2; exit 2; }
 done
 root=$(realpath -- "$1")
 [[ $root != / && $original != "$root" ]] || exit 2
+[[ -z $cutefish_original || ( $cutefish_original != "$root" && $cutefish_original != "$root/"* ) ]] || exit 2
 # Finish discovery before issuing any acceptance result. Process substitution
 # would hide find's exit status and could silently omit an unreadable subtree.
 listing=$(mktemp)
@@ -35,8 +40,44 @@ if ! find "$root" -mindepth 1 \( -type f -o -type l \) -print0 > "$listing"; the
 fi
 python_needed=$'NEEDED[^\n]*libpython'
 failed=0
+verified_passive_cutefish_icon() {
+  local path=$1 relative expected theme proof_theme target proof_target header ending bytes status references reference value
+  relative=${path#"$root/"}
+  [[ -n $cutefish_original && $relative == usr/share/icons/Cutefish/*.svg ]] || return 1
+  theme=$root/usr/share/icons/Cutefish
+  proof_theme=$cutefish_original/usr/share/icons/Cutefish
+  expected=$cutefish_original/$relative
+  target=$(realpath -e -- "$path") || return 1
+  proof_target=$(realpath -e -- "$expected") || return 1
+  [[ $target == "$theme/"* && $proof_target == "$proof_theme/"* && -f $target && -f $proof_target && ! -x $target && ! -x $proof_target ]] || return 1
+  if [[ -L $path ]]; then
+    [[ -L $expected && $(readlink -- "$path") == "$(readlink -- "$expected")" ]] || return 1
+  else [[ ! -L $expected ]] || return 1; fi
+  cmp -s -- "$target" "$proof_target" || return 1
+  bytes=$(stat -c %s -- "$target") || return 1
+  [[ $bytes =~ ^[0-9]+$ && $bytes -le 1048576 ]] || return 1
+  header=$(head -c 256 -- "$target") || return 1
+  local svg_start='^[[:space:]]*(<svg([[:space:]>])|<\?xml[[:space:]])'
+  [[ $header =~ $svg_start ]] || return 1
+  ending=$(tail -c 512 -- "$target") || return 1
+  local svg_end='</svg>[[:space:]]*$'
+  [[ $ending =~ $svg_end ]] && grep -Iq . "$target" || return 1
+  # Passive, package-owned artwork only; no scripts, event handlers, entities,
+  # external resources or embedded foreign content are admitted by this rule.
+  if grep -Eiq '<[[:space:]]*(script|foreignObject)([[:space:]>])|<!DOCTYPE|<!ENTITY|[[:space:]]on[a-z]+[[:space:]]*=' "$target"; then return 1
+  else status=$?; [[ $status == 1 ]] || return 1; fi
+  references=$(grep -Eio "(xlink:)?href[[:space:]]*=[[:space:]]*['\"][^'\"]*['\"]" "$target") || { status=$?; [[ $status == 1 ]] || return 1; }
+  while IFS= read -r reference; do
+    [[ -n $reference ]] || continue
+    value=${reference#*=}; value=${value#"${value%%[![:space:]]*}"}; value=${value:1:-1}
+    # The signed theme embeds a PNG shadow. Admit only inert inline PNG data,
+    # never arbitrary data URLs, remote resources or embedded SVG/HTML.
+    [[ $value == \#* || $value =~ ^data:image/png\;base64,[A-Za-z0-9+/=[:space:]]+$ ]] || return 1
+  done <<< "$references"
+}
 python_payload() {
   local path=$1 expected
+  if verified_passive_cutefish_icon "$path"; then return; fi
   if [[ -n $original ]]; then
     expected=$original/${path#"$root/"}
     # Only bytes from the separately verified original KDE closure may pass.

@@ -37,6 +37,8 @@ jobs:
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
           bash tests/payload-traversal.sh
+          shellcheck src/public/cutefish-icons-proof.sh tests/cutefish-passive-icons.sh
+          bash tests/cutefish-passive-icons.sh
           bash tests/original-kde-payload.sh
           shellcheck src/public/release-layout.sh scripts/publish-image-release.sh scripts/merge-desktop-deliveries.sh scripts/reuse-validated-desktop.sh tests/release-layout.sh
           bash tests/release-layout.sh

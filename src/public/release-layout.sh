@@ -162,7 +162,7 @@ release_stage() {
     install -m644 "$artifacts/manifest.json" "$delivery/receipts/images/$system.json"
     local records=$delivery/receipts/builds/${system%.img.zst}
     mkdir -p "$records"
-    for file in FLASHING.txt installed-rpms.tsv fedora-inputs.tsv; do
+    for file in FLASHING.txt installed-rpms.tsv fedora-inputs.tsv desktop-inputs.tsv; do
         [[ ! -f $artifacts/$file ]] || install -m644 "$artifacts/$file" "$records/$file"
     done
     if [[ -d $artifacts/kernel ]]; then
