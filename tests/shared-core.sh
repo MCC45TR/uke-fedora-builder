@@ -26,9 +26,11 @@ reject public_core_packages_check "$work/baseline" "$work/removed"
 seal() {
     (cd "$work/export"; find . -type f ! -name core-SHA256SUMS -print0 | sort -z | xargs -0 sha256sum) > "$work/checksums"
     mv "$work/checksums" "$work/export/core-SHA256SUMS"
-    chmod 000 "$work/export/original-fedora/fixture"
-    tar --zstd -cf "$work/core.tar.zst" -C "$work/export" .
-    chmod 600 "$work/export/original-fedora/fixture"
+    # An unprivileged producer cannot read a mode-000 input. Write that mode
+    # into this one tar header while retaining readable source fixture bytes.
+    tar -cf "$work/core.tar" --mode=000 -C "$work/export" original-fedora/fixture
+    tar -rf "$work/core.tar" --exclude='./original-fedora/fixture' -C "$work/export" .
+    zstd -q -f "$work/core.tar" -o "$work/core.tar.zst"
 }
 candidate() {
     mkdir -p "$work/$1/artifacts"
