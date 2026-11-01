@@ -7,8 +7,9 @@ singleboot userdata and the same EXT4 capacity. No source compilation is used.
 
 The core is an internal seven-day Actions artifact, not a flashable image or
 Release asset. It contains the owned root archive, original Fedora byte evidence,
-exact signed kernel/tool inputs, RPM inventory and checksums. Desktop jobs must
-use the same builder commit and profile. Corruption, recipe/profile differences,
+exact signed kernel/tool inputs, RPM inventory and checksums. Each desktop gets
+a fresh copy of that artifact; a previous desktop image is never an input.
+Ordinary imports require the same builder commit and profile. Corruption and profile differences,
 or replacement/removal of any core RPM fail the job. Desktop dependency solving
 and signature verification still run; failures never fall back to source builds
 or another desktop.
@@ -20,6 +21,23 @@ Before reusing the published boot, the publisher downloads it, compares its
 bytes and checks the canonical cohort. A changed boot or root collision requires
 a new revision. Old Release assets and URLs remain intact. Receipts stay in
 seven-day delivery and 90-day metadata Actions artifacts.
+
+An explicit `core_run_id` can recover an already validated core after a desktop
+worker failure, without repeating core assembly. The recovery job checks the
+same repository's completed manual Fedora series, the successful core job,
+its immutable workspace gitlink, artifact ZIP SHA256 and the target profile.
+The inner archive's checksums are checked again in each fresh desktop job.
+The selected producer builder must match the artifact; the consumer builder
+and original producer source/run/hash are recorded separately in each root
+manifest. This is explicit reuse, never an automatic fallback. All current RPM
+signature, unchanged-core-package, module/DT/boot and filesystem checks still
+run. Each worker initializes its own pinned kernel signer database.
+
+Both producer and consumer reject full desktop sessions/display managers in
+the common RPM inventory. Shared libraries such as `libplasma` and
+`plasma-workspace-common` are allowed. Cutefish's GDM greeter legitimately pulls
+GNOME components; those are independent package dependencies, not input from the
+GNOME image. RPM inventories distinguish those dependencies from full sessions.
 
 KDE Plasma and NextKDE retain Fedora Plasma Setup. NextKDE uses the original
 Plasma Wayland session and starts its signed KOS user services only after setup

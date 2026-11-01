@@ -360,9 +360,12 @@ if [[ $partition == userdata ]]; then
     local_rpms+=("/job/artifacts/kernel/$base-singleboot-$rpm_release$dist.aarch64.rpm")
 fi
 if [[ $channel == unstable ]]; then
-    for package in "${local_rpms[@]}"; do
-        rpmkeys --dbpath /job/kernel-keydb --checksig "$package" | grep -F 'signatures OK'
-    done
+    # Do not depend on the producer's temporary key database crossing jobs.
+    # The key fingerprint was checked above against the selected channel policy.
+    # shellcheck source=root-kernel-signatures.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/root-kernel-signatures.sh
+    public_root_kernel_signatures "$key" /job/root-kernel-keydb "${local_rpms[@]}" || die 'Root kernel RPM signature verification failed'
 fi
 # Source-built local RPMs are unsigned. Remote RPM signature checks stay enabled.
 excluded=$(public_root_exclusions "$KERNEL_PROFILE")
@@ -387,6 +390,11 @@ fi
 source /builder/src/public/root-transaction.sh
 public_root_transaction "$root" /job/root-install.log dnf local_rpms packages
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
+# shellcheck source=desktop-isolation.sh
+# shellcheck disable=SC1091
+source /builder/src/public/desktop-isolation.sh
+public_desktop_isolation /job/artifacts/installed-rpms.tsv "$desktop" || die 'Installed desktop isolation audit failed'
+printf '{"desktop_isolation_audited":true,"previous_desktop_image_input":false}\n' > /job/artifacts/desktop-isolation.json
 if [[ -f /job/artifacts/core-installed-rpms.tsv ]]; then
     # shellcheck source=shared-core.sh
     # shellcheck disable=SC1091
@@ -482,6 +490,8 @@ jq --argjson private "$private" --slurpfile shell /job/artifacts/login-shell.jso
     credentials_included:false,ssh_enabled:false}' /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
 jq --slurpfile account /job/artifacts/account-provisioning.json '. + $account[0]' /job/artifacts/manifest.json > /job/manifest.tmp
+mv /job/manifest.tmp /job/artifacts/manifest.json
+jq --slurpfile isolation /job/artifacts/desktop-isolation.json '. + $isolation[0]' /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
 if [[ $channel == unstable ]]; then
     cohort_codec=$UKE_IMAGE_TOOLS/boot-image

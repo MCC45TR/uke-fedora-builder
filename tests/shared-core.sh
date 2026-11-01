@@ -15,6 +15,8 @@ jq '. + {credentials_included:false,image_built:false}' "$work/export/request.js
 printf 'owned-root-archive\n' > "$work/export/rootfs.tar"
 printf 'signed-original-fedora-bytes\n' > "$work/export/original-fedora/fixture"
 printf 'shared-kernel\n' > "$work/export/artifacts/kernel/fixture"
+printf 'bash-0:1-1.fc46.aarch64\nlibplasma-0:6-1.fc46.aarch64\nplasma-workspace-common-0:6-1.fc46.aarch64\n' > "$work/export/artifacts/core-installed-rpms.tsv"
+public_core_desktop_free "$work/export/artifacts/core-installed-rpms.tsv"
 printf 'bash-1\ncommon-1\n' > "$work/baseline"
 printf 'bash-1\ncommon-1\ndesktop-1\n' > "$work/installed"
 public_core_packages_check "$work/baseline" "$work/installed"
@@ -43,6 +45,25 @@ jq -e '.desktop=="nextkde" and .image_built==false and (.shared_core_sha256|test
 cmp "$work/export/artifacts/kernel/fixture" "$work/good/artifacts/kernel/fixture"
 cmp "$work/export/rootfs.tar" "$work/good/shared-core/rootfs.tar"
 cmp "$work/export/original-fedora/fixture" "$work/good/shared-core/original-fedora/fixture"
+for desktop in kde gnome cutefish nextkde; do
+    candidate "clean-$desktop"
+    jq --arg desktop "$desktop" '.desktop=$desktop' "$work/clean-$desktop/request.json" > "$work/next"
+    mv "$work/next" "$work/clean-$desktop/request.json"
+    public_core_restore "$work/core.tar.zst" "$work/clean-$desktop"
+    cmp "$work/export/rootfs.tar" "$work/clean-$desktop/shared-core/rootfs.tar"
+done
+# A previous desktop work directory cannot alter another clone or the producer.
+printf 'KDE-only-mutated-state' > "$work/clean-kde/shared-core/rootfs.tar"
+cmp "$work/export/rootfs.tar" "$work/clean-gnome/shared-core/rootfs.tar"
+candidate explicit-producer
+jq '.builder_commit=("d"*40)' "$work/explicit-producer/request.json" > "$work/next"
+mv "$work/next" "$work/explicit-producer/request.json"
+public_core_restore "$work/core.tar.zst" "$work/explicit-producer" "$(printf 'a%.0s' {1..40})"
+jq -e '.builder_commit==("d"*40) and .shared_core_producer_builder_commit==("a"*40)' "$work/explicit-producer/artifacts/manifest.json" >/dev/null
+for desktop in plasma-workspace gnome-shell gnome-initial-setup gdm sddm cutefish-desktop nextkde quickshell uke-kde-plasma-meta; do
+    printf '%s-0:1-1.fc46.aarch64\n' "$desktop" > "$work/contaminated"
+    reject public_core_desktop_free "$work/contaminated"
+done
 for key in builder_commit default_shell size_mib mode partition kernel_rpm_request; do
     candidate "$key"
     jq --arg key "$key" '.[$key]="different"' "$work/$key/request.json" > "$work/next"

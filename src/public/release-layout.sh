@@ -158,7 +158,7 @@ release_stage() {
 # Markdown backticks are literal; printf supplies the variable fields.
 # shellcheck disable=SC2016
 release_body() {
-    local delivery=$1 inventory=$2 file bytes sha boot version revision day source example runs run
+    local delivery=$1 inventory=$2 file bytes sha boot version revision day source example runs run manifest
     boot=$(jq -er .boot "$delivery/receipts/layout.json")
     version=$(jq -er .version "$delivery/receipts/layout.json")
     revision=$(jq -er .revision "$delivery/receipts/layout.json")
@@ -172,6 +172,14 @@ release_body() {
         printf '<!-- uke-image-build-runs: %s -->\n\n' "$runs"
     fi
     printf 'Boot is shared across desktops only after byte equality and the kernel/module/DT/root cohort agree. Host verification does not qualify tablet boot, first-account setup, firmware compatibility or rollback.\n\n'
+    for manifest in "$delivery/receipts/images/"*.json; do
+        if jq -e '.shared_core_producer_run_id and .shared_core_producer_workspace_commit' "$manifest" >/dev/null; then
+            printf 'Frozen common core: workspace `%s`, builder `%s`, successful core job in Actions run `%s`, archive SHA256 `%s`. Desktop composition records its consumer revision separately.\n\n' \
+                "$(jq -er .shared_core_producer_workspace_commit "$manifest")" "$(jq -er .shared_core_producer_builder_commit "$manifest")" \
+                "$(jq -er .shared_core_producer_run_id "$manifest")" "$(jq -er .shared_core_sha256 "$manifest")"
+            break
+        fi
+    done
     printf 'Kernel cohort: `%s`; source `%s`; signer `%s`. Required userdata capacity: **%s bytes**.\n\n' \
         "$(jq -r .kernel_release "$delivery/receipts/cohort.json")" "$(jq -r .kernel_source_commit "$delivery/receipts/cohort.json")" \
         "$(jq -r .kernel_key_fingerprint "$delivery/receipts/cohort.json")" "$(jq -r .root_raw_bytes "$delivery/receipts/cohort.json")"

@@ -266,7 +266,7 @@ public_main() {
         # shellcheck source=shared-core.sh
         # shellcheck disable=SC1091
         source "$BUILDER/src/public/shared-core.sh"
-        public_core_restore "$core_input" "$WORK" || die 'Shared core is corrupt or belongs to another recipe/profile'
+        public_core_restore "$core_input" "$WORK" "${UKE_SHARED_CORE_PRODUCER:-}" || die 'Shared core is corrupt or belongs to another recipe/profile'
     fi
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha arm_recipe=Containerfile.public native_recipe=Containerfile.public-native

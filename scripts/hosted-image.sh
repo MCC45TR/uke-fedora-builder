@@ -17,7 +17,8 @@ mkdir -p "$output" "$release"
 # Docker is provisioned on the hosted runner. Do not select an unrelated Podman store.
 export UKE_CONTAINER_ENGINE=docker
 if [[ -n ${IMAGE_CORE_INPUT:-} ]]; then
-    export UKE_SHARED_CORE_PHASE=import UKE_SHARED_CORE_INPUT=$IMAGE_CORE_INPUT
+    export UKE_SHARED_CORE_PHASE=import UKE_SHARED_CORE_INPUT=$IMAGE_CORE_INPUT UKE_SHARED_CORE_PRODUCER=${IMAGE_CORE_PRODUCER:-}
+    export UKE_SHARED_CORE_WORKSPACE=${IMAGE_CORE_WORKSPACE:-} UKE_SHARED_CORE_RUN_ID=${IMAGE_CORE_RUN_ID:-}
 fi
 "$root/ukelinux.sh" --build image --mode singleboot --filesystem ext4 \
     --release rawhide --desktop "${IMAGE_DESKTOP:-kde}" --shell "${IMAGE_SHELL:-bash}" \
