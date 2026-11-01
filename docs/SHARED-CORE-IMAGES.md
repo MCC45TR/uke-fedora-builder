@@ -16,11 +16,14 @@ or another desktop.
 
 Each desktop is independently checked through filesystem readback,
 SELinux metadata, both Android sparse decoders and the kernel/module/DT/root
-cohort checks. One publisher waits for all four successful jobs. It downloads
-each delivery into its own directory, checks the exact four-desktop set, equal
+cohort checks. One publisher waits for all desktop jobs to finish. It downloads
+each successful delivery into its own directory, checks the required set, equal
 core hashes, compatible cohorts and byte-identical boot files, then creates one
-experimental Release containing exactly one boot and four root images. Missing
-desktops or conflicting receipts fail before publication. A changed boot or root
+experimental Release containing one boot and the validated root images. KDE,
+GNOME and NextKDE are mandatory. An isolated Cutefish failure does not block
+those three; its absence is stated in the Release body. Cutefish is added only
+after independent success and identical boot/cohort verification. Missing
+mandatory desktops or conflicting receipts fail before publication. A changed boot or root
 collision requires a new revision. Old Release assets and URLs remain intact. Receipts stay in
 seven-day delivery and 90-day metadata Actions artifacts.
 

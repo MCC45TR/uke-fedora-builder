@@ -68,7 +68,8 @@ password change, and must pass the real GDM/PAM backend probe during assembly.
 No desktop silently substitutes another; tablet login and runtime remain
 unqualified. The [parallel shared-core workflow](docs/SHARED-CORE-IMAGES.md)
 builds the common core once, composes four independent desktop roots, and waits
-for all four before publishing one boot and four root images together.
+for the jobs to finish before publishing one shared boot and the validated roots.
+Cutefish failure is isolated; KDE, GNOME and NextKDE remain mandatory.
 
 Managed build environments may set `UKE_CA_BUNDLE` to a PEM trust bundle. It is
 mounted temporarily into workers and BuildKit build steps; it is not copied into

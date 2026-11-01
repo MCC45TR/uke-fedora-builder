@@ -102,13 +102,17 @@ release_inventory() {
     done | LC_ALL=C sort
 }
 release_desktop_set() {
-    local delivery=$1 core=$2 manifest actual
+    local delivery=$1 core=$2 policy=${3:-complete} manifest actual
     [[ $core =~ ^[0-9a-f]{64}$ ]] || release_fail 'Missing expected common core hash'
     release_verify "$delivery"
     local manifests=("$delivery/receipts/images/"*.json)
-    [[ ${#manifests[@]} == 4 ]] || release_fail 'Publication requires all four desktop images'
+    case $policy in complete|cutefish-optional) ;; *) release_fail 'Unknown desktop publication policy';; esac
     actual=$(jq -sr 'map(.desktop)|sort|join(",")' "${manifests[@]}")
-    [[ $actual == cutefish,gnome,kde,nextkde ]] || release_fail 'Publication requires exactly KDE, GNOME, Cutefish and NextKDE'
+    if [[ $policy == cutefish-optional && $actual == gnome,kde,nextkde ]]; then
+        [[ ${#manifests[@]} == 3 ]]
+    else
+        [[ ${#manifests[@]} == 4 && $actual == cutefish,gnome,kde,nextkde ]] || release_fail 'Publication requires KDE, GNOME and NextKDE; only Cutefish may be omitted explicitly'
+    fi
     for manifest in "${manifests[@]}"; do
         jq -e --arg core "$core" '.shared_core_sha256==$core and .desktop_isolation_audited==true and
             .previous_desktop_image_input==false and .fedora_release=="rawhide" and .channel=="unstable" and .default_shell=="bash"' \
@@ -211,6 +215,8 @@ release_body() {
     printf 'Automatic kernel activation and SSH remain disabled. No private touch reference is included; firmware redistribution review remains required. KDE Plasma and NextKDE use Plasma Setup; GNOME uses GNOME Initial Setup. NextKDE services start only in a normal account after setup.\n\n'
     if grep -q -- '-cutefish-uke-senemos-system-' "$inventory"; then
         printf '**Cutefish only:** public test login `senemos`, initial password `fedora`. GDM requires a password change at first login. The real GDM worker/PAM change-password conversation was tested during assembly; the tablet graphical login remains unqualified. Automatic login, remote password login and passwordless sudo are disabled. Change the published test password before use.\n\n'
+    elif [[ ${UKE_ALLOW_MISSING_CUTEFISH:-0} == 1 ]]; then
+        printf '**Cutefish is currently unavailable.** Its separate validation must succeed before a compatible image is added. KDE Plasma, GNOME and NextKDE passed their independent image checks.\n\n'
     fi
     printf 'Exact manifests, RPM inventories, checksums and diagnostics remain in Actions artifacts, separately from the image-only release assets.\n'
     if [[ -n ${GITHUB_REPOSITORY:-} && -n $runs ]]; then

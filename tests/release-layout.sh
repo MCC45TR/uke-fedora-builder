@@ -91,6 +91,9 @@ bash "$merge" "$work/complete-set" "$core_sha" "$work/set-delivery-"{kde,gnome,c
 reject bash "$merge" "$work/incomplete-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish}
 reject bash "$merge" "$work/duplicate-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish,kde}
 reject bash "$tool" desktop-set "$work/complete-set" "$(printf 'e%.0s' {1..64})"
+env UKE_ALLOW_MISSING_CUTEFISH=1 bash "$merge" "$work/without-cutefish" "$core_sha" "$work/set-delivery-"{kde,gnome,nextkde}
+[[ $(find "$work/without-cutefish/assets" -type f | wc -l) == 4 ]]
+UKE_ALLOW_MISSING_CUTEFISH=1 reject bash "$merge" "$work/without-nextkde" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish}
 cp -a "$work/set-gnome" "$work/set-conflicting-cohort"
 jq '.payload_sha256=("e"*64)' "$work/set-gnome/manifest.json" > "$work/set-conflicting-cohort/manifest.json"
 bash "$tool" stage "$work/set-conflicting-cohort" "$work/conflicting-cohort-delivery" 011126 1
@@ -200,4 +203,8 @@ reject bash "$publisher" "$work/gnome-only"
 [[ $(wc -l < "$work/remote/calls") == $((before + 1)) ]]
 env UKE_GH_STATE="$work/remote-complete-set" UKE_REQUIRE_DESKTOP_SET=1 UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/complete-set"
 jq -e '.draft==false and (.assets|length==5) and ([.assets[]|select(.name|contains("-boot-"))]|length==1)' "$work/remote-complete-set/release.json" >/dev/null
+env UKE_GH_STATE="$work/remote-optional-cutefish" UKE_REQUIRE_DESKTOP_SET=1 UKE_ALLOW_MISSING_CUTEFISH=1 UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/without-cutefish"
+jq -e '.draft==false and (.assets|length==4) and (.body|contains("Cutefish is currently unavailable"))' "$work/remote-optional-cutefish/release.json" >/dev/null
+env UKE_GH_STATE="$work/remote-optional-cutefish" UKE_REQUIRE_DESKTOP_SET=1 UKE_ALLOW_MISSING_CUTEFISH=1 UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/complete-set"
+jq -e '(.assets|length==5) and (.body|contains("Cutefish is currently unavailable")|not)' "$work/remote-optional-cutefish/release.json" >/dev/null
 echo 'Image names, shared boot byte/cohort gates, collisions, image-only publication and legacy-release preservation passed; no GitHub writes ran'

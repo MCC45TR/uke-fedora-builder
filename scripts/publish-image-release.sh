@@ -13,7 +13,9 @@ export UKE_RELEASE_BUILD_RUNS=$GITHUB_RUN_ID
 source "$layout_tool"
 bash "$layout_tool" verify "$delivery"
 if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
-    bash "$layout_tool" desktop-set "$delivery" "${UKE_EXPECTED_CORE_SHA:?Expected immutable core hash}"
+    policy=complete
+    [[ ${UKE_ALLOW_MISSING_CUTEFISH:-0} != 1 ]] || policy=cutefish-optional
+    bash "$layout_tool" desktop-set "$delivery" "${UKE_EXPECTED_CORE_SHA:?Expected immutable core hash}" "$policy"
 fi
 tag=$(jq -er .tag "$delivery/receipts/layout.json")
 boot=$(jq -er .boot "$delivery/receipts/layout.json")
@@ -90,7 +92,8 @@ if ((${#uploads[@]})); then gh release upload "$tag" "${uploads[@]}" --repo "$GI
 gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > "$work/published.json"
 jq -e '.assets|length>1 and all(.[]; .state=="uploaded" and (.digest|type=="string" and test("^sha256:[0-9a-f]{64}$")))' "$work/published.json" >/dev/null || release_fail 'Uploaded assets have no complete digest inventory'
 if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
-    jq -e '.assets|length==5' "$work/published.json" >/dev/null || release_fail 'The complete set must contain exactly one boot and four root images'
+    expected_count=$(wc -l < "$work/local.tsv")
+    jq -e --argjson count "$expected_count" '.assets|length==$count' "$work/published.json" >/dev/null || release_fail 'Published asset count differs from the verified desktop set'
 fi
 while IFS= read -r name; do
     release_asset_name "$delivery/receipts/layout.json" "$name" || release_fail 'Unexpected remote asset; release body was not finalized'
