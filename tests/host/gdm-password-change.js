@@ -47,10 +47,10 @@ server.connect('new-connection', (s,c) => {
     return true;
 });
 server.start();
-const launcher = new Gio.SubprocessLauncher({flags:Gio.SubprocessFlags.NONE});
+const launcher = new Gio.SubprocessLauncher({flags:Gio.SubprocessFlags.STDIN_INHERIT});
 launcher.setenv('GDM_SESSION_DBUS_ADDRESS',server.get_client_address(),true);
 launcher.setenv('LANG','C.UTF-8',true);
 child = launcher.spawnv(['/usr/libexec/gdm-session-worker']);
 GLib.timeout_add_seconds(GLib.PRIORITY_DEFAULT,60,()=>{fail('GDM worker timed out');return GLib.SOURCE_REMOVE;});
-loop.run(); child.force_exit(); server.stop();
+loop.run(); child.force_exit(); child.wait(null); server.stop();
 if (failed) imports.system.exit(1);

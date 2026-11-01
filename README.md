@@ -32,7 +32,7 @@ The interactive menu lets you choose a build target, installation layout, filesy
 | Build target | Fedora image or kernel |
 | Boot layout | `singleboot`, `multiboot` |
 | Filesystem | `ext4`, `f2fs`, `btrfs`, `xfs` |
-| Desktop | Original Fedora KDE Plasma, Plasma Mobile or GNOME; Cutefish and NextKde selections report availability gates |
+| Desktop | Original Fedora KDE Plasma, Plasma Mobile or GNOME; signed COPR Cutefish or NextKDE |
 | Login shell | `bash` (default), `zsh`, `fish` |
 | Package channel | `stable`, `testing`, `unstable` |
 
@@ -61,9 +61,13 @@ Package assembly never falls back to source compilation. `unstable` selects
 `--kernel-rpm` can freeze an exact published kernel release. Kernel source options
 require `--build-from-source` for image builds. Plasma Mobile adds Fedora's
 `plasma-mobile` and `plasma-settings` packages and retains Plasma account setup;
-its graphical session and first-account flow require device testing. Cutefish
-remains blocked on secure first-account integration; NextKde has no published
-builds. Neither selection silently substitutes another desktop.
+its graphical session and first-account flow require device testing. NextKDE
+uses Plasma Setup and starts its KOS services after normal account login.
+Cutefish uses GDM with the public test account `senemos` / `fedora`, requires a
+password change, and must pass the real GDM/PAM backend probe during assembly.
+No desktop silently substitutes another; tablet login and runtime remain
+unqualified. The [sequential shared-core workflow](docs/SHARED-CORE-IMAGES.md)
+builds the common core once and appends each completed desktop to one Release.
 
 Managed build environments may set `UKE_CA_BUNDLE` to a PEM trust bundle. It is
 mounted temporarily into workers and BuildKit build steps; it is not copied into
