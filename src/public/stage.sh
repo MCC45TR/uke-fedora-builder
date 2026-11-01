@@ -5,6 +5,10 @@ set -Eeuo pipefail
 request=/job/request.json
 policy=/builder/configs/public-build.json
 stage=$1
+if [[ -n ${UKE_WORKER_CA:-} ]]; then
+    [[ -r $UKE_WORKER_CA ]]
+    printf '\nsslcacert=%s\n' "$UKE_WORKER_CA" >> /etc/dnf/dnf.conf
+fi
 fedora_release=$(jq -er .fedora_release "$request")
 case $fedora_release in 44|45|rawhide) ;; *) echo "Unsupported Fedora target" >&2; exit 1;; esac
 # The worker is pinned to the requested distribution; derive its RPM macros there.
@@ -329,9 +333,10 @@ packages=(fedora-release fedora-repos bash "$(jq -er .default_shell "$request")"
     uke-charge-control uke-offline-charge)
 [[ $fedora_release != rawhide ]] || packages+=(fedora-repos-rawhide)
 desktop=$(jq -er .desktop "$request")
-[[ $desktop == kde || $desktop == gnome ]] || die "Unsupported desktop image: $desktop"
-if [[ $desktop == kde ]]; then
+[[ $desktop == kde || $desktop == plasma-mobile || $desktop == gnome ]] || die "Unsupported desktop image: $desktop"
+if [[ $desktop == kde || $desktop == plasma-mobile ]]; then
     packages+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin)
+    [[ $desktop != plasma-mobile ]] || packages+=(plasma-mobile plasma-settings)
 else
     packages+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
         gnome-control-center gnome-software gnome-console nautilus)
@@ -416,7 +421,7 @@ systemctl --root="$root" enable NetworkManager.service firewalld.service bluetoo
 systemctl --root="$root" disable sshd.service sshd.socket
 systemctl --root="$root" mask debug-shell.service uke-boot-guard.service
 systemctl --root="$root" set-default graphical.target
-if [[ $desktop == kde ]]; then
+if [[ $desktop == kde || $desktop == plasma-mobile ]]; then
     chroot "$root" /usr/bin/kwriteconfig6 --file /etc/xdg/plasmasetuprc --group Accounts --key UserGroups wheel
     chroot "$root" /usr/bin/systemd-sysusers /usr/lib/sysusers.d/plasma-setup-sysuser.conf
     systemctl --root="$root" enable plasma-setup.service plasmalogin.service

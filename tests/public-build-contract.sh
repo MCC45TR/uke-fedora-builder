@@ -16,7 +16,7 @@ public_worker() { exit 91; }
 public_stage() { exit 92; }
 reject() {
     local status=0
-    (public_main "$@") > /dev/null 2>&1 || status=$?
+    (public_main --build-from-source "$@") > /dev/null 2>&1 || status=$?
     ((status > 0 && status < 90)) || { echo 'Invalid request accepted or reached host preparation' >&2; exit 1; }
 }
 count=0
@@ -24,9 +24,9 @@ for fedora_release in 44 45 rawhide; do
 for login_shell in bash fish zsh; do
 for mode in multiboot singleboot; do
     for filesystem in ext4 f2fs btrfs xfs; do
-        for desktop in kde gnome cutefish; do
+        for desktop in kde gnome cutefish plasma-mobile nextkde; do
             for channel in stable testing unstable; do
-                (cd "$fixture"; public_main --build image --release "$fedora_release" --shell "$login_shell" --mode "$mode" --filesystem "$filesystem" --desktop "$desktop" --channel "$channel" --offline --dry-run) > "$fixture/plan"
+                (cd "$fixture"; public_main --build-from-source --build image --release "$fedora_release" --shell "$login_shell" --mode "$mode" --filesystem "$filesystem" --desktop "$desktop" --channel "$channel" --offline --dry-run) > "$fixture/plan"
                 grep -F "$mode; $filesystem; $desktop; $channel" "$fixture/plan" >/dev/null
                 grep -F "$fixture/out" "$fixture/plan" >/dev/null
                 ((count+=1))
@@ -36,9 +36,9 @@ for mode in multiboot singleboot; do
 done
 done
 done
-[[ $count == 648 && ! -e $fixture/out ]]
+[[ $count == 1080 && ! -e $fixture/out ]]
 for channel in stable testing unstable; do
-    public_main --build kernel --channel "$channel" --dry-run > "$fixture/plan"
+    public_main --build-from-source --build kernel --channel "$channel" --dry-run > "$fixture/plan"
     grep -F 'kernel: Fedora Rawhide AArch64' "$fixture/plan" >/dev/null
 done
 reject --release
@@ -63,7 +63,7 @@ truncate -s 5432 "$fixture/reference.bin"
 chmod 644 "$fixture/reference.bin"
 reject --touch-reference "$fixture/reference.bin" --dry-run
 chmod 600 "$fixture/reference.bin"
-public_main --touch-reference "$fixture/reference.bin" --dry-run >/dev/null
+public_main --build-from-source --touch-reference "$fixture/reference.bin" --dry-run >/dev/null
 ln -s reference.bin "$fixture/link.bin"
 reject --touch-reference "$fixture/link.bin" --dry-run
 truncate -s 5431 "$fixture/reference.bin"
@@ -104,16 +104,16 @@ grep -F 'apk add --no-cache fixture-package' "$fixture/install-commands" >/dev/n
 # A minimal PATH without jq must still print the new plan without bootstrapping.
 mkdir "$fixture/bin"
 ln -s "$(command -v dirname)" "$fixture/bin/dirname"
-PATH=$fixture/bin public_main --build image --dry-run > "$fixture/minimal-plan"
+PATH=$fixture/bin public_main --build-from-source --build image --dry-run > "$fixture/minimal-plan"
 [[ ! -e $fixture/out ]]
 jq -e '.kernel | (.ref|type=="string") and (.default_version|test("^[0-9]+\\.[0-9]+(\\.[0-9]+)?$")) and (has("commit")|not) and (has("release")|not)' \
     "$root/configs/public-build.json" >/dev/null
 bash -n "$root"/src/public/*.sh
 bash "$root/tests/public-source-inputs.sh"
-printf '%s\n' '648 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
+printf '%s\n' '1080 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
 quiet_fail() { if ("$@") > /dev/null 2>&1; then echo "Accepted: $*" >&2; exit 1; fi; }
 # Kernel selection: explicit versions, latest and its alias are accepted; anything else is refused before a build starts.
-for choice in 7.2.12 7.3 latest lastest; do public_main --kernel "$choice" --dry-run > /dev/null; done
+for choice in 7.2.12 7.3 latest lastest; do public_main --build-from-source --kernel "$choice" --dry-run > /dev/null; done
 for choice in 7.x latest\;rm v7.2.12 7.2.12.1 newest; do reject --kernel "$choice" --dry-run; done
 reject --kernel
 # Version resolution fetches kernel.org's list once for latest, never for an explicit version, and rejects bad lists.
@@ -167,9 +167,9 @@ MAKE
     git clone -q --no-checkout "$fixture/kernel.bundle" "$fixture/from-bundle"
     [[ $(git -C "$fixture/from-bundle" rev-parse HEAD) == "$(git -C "$fixture/kernel-worktree" rev-parse HEAD)" ]]
     # The entry honors a valid override, refuses an invalid one even for a plan, and keeps none as the policy source.
-    UKE_KERNEL_REPO=$fixture/kernel-worktree public_main --dry-run > /dev/null
-    UKE_KERNEL_REPO=none public_main --dry-run > /dev/null
-    status=0; (UKE_KERNEL_REPO=$fixture/plain public_main --dry-run) > /dev/null 2>&1 || status=$?
+    UKE_KERNEL_REPO=$fixture/kernel-worktree public_main --build-from-source --dry-run > /dev/null
+    UKE_KERNEL_REPO=none public_main --build-from-source --dry-run > /dev/null
+    status=0; (UKE_KERNEL_REPO=$fixture/plain public_main --build-from-source --dry-run) > /dev/null 2>&1 || status=$?
     ((status > 0 && status < 90)) || { echo 'Invalid UKE_KERNEL_REPO was ignored' >&2; exit 1; }
     # A reviewed commit is immutable; offline use requires that exact source.
     pin=$(printf 'd%.0s' {1..40})
@@ -266,7 +266,7 @@ reject --build kernel --reuse-kernel --dry-run
     public_worker() { printf '%s %s\n' "$1" "$3" >> "$fixture/worker-targets"; exit 91; }
     for release in 44 45; do
         status=0
-        (public_main --build kernel --release "$release" --yes --out "$fixture/worker-$release") > /dev/null 2>&1 || status=$?
+        (public_main --build-from-source --build kernel --release "$release" --yes --out "$fixture/worker-$release") > /dev/null 2>&1 || status=$?
         [[ $status == 91 ]]
     done
     [[ $(awk '{print $1}' "$fixture/worker-targets" | sort -u | wc -l) == 2 ]]

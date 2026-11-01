@@ -1,8 +1,8 @@
 ARG BASE_IMAGE=scratch
 FROM ${BASE_IMAGE}
-RUN dnf -y update --refresh && dnf -y --setopt=install_weak_deps=False install \
+RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then printf '\nsslcacert=/run/secrets/proxy_ca\n' >> /etc/dnf/dnf.conf; fi && dnf -y update --refresh && dnf -y --setopt=install_weak_deps=False install \
     libguestfs-tools-c kernel-core kernel-modules qemu-kvm-core f2fs-tools e2fsprogs xfsprogs btrfs-progs \
     gcc-c++ e2fsprogs-devel libselinux-devel jq tar coreutils findutils util-linux attr acl policycoreutils android-tools \
     && if [ "$(uname -m)" = x86_64 ]; then dnf -y install qemu-user-static-aarch64; fi \
-    && dnf clean all
+    && dnf clean all && sed -i '/^sslcacert=\/run\/secrets\/proxy_ca$/d' /etc/dnf/dnf.conf
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC LIBGUESTFS_BACKEND=direct LIBGUESTFS_BACKEND_SETTINGS=force_tcg

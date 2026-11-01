@@ -32,15 +32,19 @@ The interactive menu lets you choose a build target, installation layout, filesy
 | Build target | Fedora image or kernel |
 | Boot layout | `singleboot`, `multiboot` |
 | Filesystem | `ext4`, `f2fs`, `btrfs`, `xfs` |
-| Desktop | Original Fedora KDE Plasma or GNOME |
+| Desktop | Original Fedora KDE Plasma, Plasma Mobile or GNOME; Cutefish and NextKde selections report availability gates |
+| Login shell | `bash` (default), `zsh`, `fish` |
 | Package channel | `stable`, `testing`, `unstable` |
 
 For non-interactive builds:
 
 ```sh
-# Fedora KDE image using userdata
+# Signed Fedora/COPR package image using userdata (default assembly route)
 ./ukelinux.sh --build image --mode singleboot --filesystem ext4 \
-  --desktop kde --channel testing --out ./out
+  --release rawhide --shell bash --desktop kde --channel unstable --out ./out
+
+# Explicit source build instead of published kernel/platform RPMs
+./ukelinux.sh --build image --build-from-source --channel testing --out ./out
 
 # Kernel packages and boot profiles
 ./ukelinux.sh --build kernel --channel testing --out ./out
@@ -51,6 +55,19 @@ For non-interactive builds:
 ```
 
 The builder checks source and package inputs, keeps build records and generates checksums. It does **not** repartition the tablet, flash images or switch boot slots. Supported options and prerequisites are documented in the [public build guide](docs/PUBLIC-BUILD.md).
+
+Package assembly never falls back to source compilation. `unstable` selects
+`mcc45tr/uke-linux-unstable` directly with its pinned signing fingerprint.
+`--kernel-rpm` can freeze an exact published kernel release. Kernel source options
+require `--build-from-source` for image builds. Plasma Mobile adds Fedora's
+`plasma-mobile` and `plasma-settings` packages and retains Plasma account setup;
+its graphical session and first-account flow require device testing. Cutefish
+remains blocked on secure first-account integration; NextKde has no published
+builds. Neither selection silently substitutes another desktop.
+
+Managed build environments may set `UKE_CA_BUNDLE` to a PEM trust bundle. It is
+mounted temporarily into workers and BuildKit build steps; it is not copied into
+the target filesystem. TLS and RPM signature checks remain enabled.
 
 ## Boot layouts and installation
 

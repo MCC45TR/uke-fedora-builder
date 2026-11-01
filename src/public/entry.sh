@@ -11,7 +11,9 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --mode multiboot|singleboot        Root partition: linux or userdata
   --filesystem ext4|f2fs|btrfs|xfs   Single-device root filesystem
   --release 44|45|rawhide            Target Fedora version; default Rawhide
-  --desktop kde|gnome|cutefish      Graphical session; Cutefish image setup is gated
+  --desktop kde|gnome|plasma-mobile|cutefish|nextkde
+                                    Graphical session; unavailable sessions fail explicitly
+  --build-from-source               Compile kernel and missing platform RPMs (opt-in)
   --shell bash|fish|zsh              New user login shell; default Bash
   --channel stable|testing|unstable Uke RPM channel; independent of Fedora version
   --kernel-rpm EVR|latest           Image only: verified testing RPMs instead of compiling Linux
@@ -33,7 +35,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
 
 Supported Linux hosts: Ubuntu, Fedora, openSUSE, Arch Linux and Alpine;
 x86_64 and AArch64. Bash bootstraps after confirmation on minimal hosts.
-Image builds compile the pinned native kernel spec, then compose an empty root.
+Image builds install signed Fedora/COPR RPMs into a new filesystem by default.
 Kernel-only builds produce its source RPM, binary RPMs and both boot profiles.
 Existing core, boot, boot-pair and --check-device commands remain available.
 Run sudo dnf update --refresh after the first Fedora boot. This is required.
@@ -77,6 +79,7 @@ TEXT
 public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing fedora_release=rawhide login_shell=bash
     local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior='' kernel_request='' kernel_rpm=''
+    local build_from_source=0
     local -A selected=()
     KERNEL_PROFILE=normal RUN_TESTS=1 KERNEL_CONFIG_SHA=''
     JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1) OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 REUSE_KERNEL=0 ENGINE='' CID='' PAUSED=0
@@ -94,6 +97,7 @@ public_main() {
             --help|-h) public_help; return;;
             --self-test) bash "$BUILDER/tests/public-build-contract.sh"; return;;
             --skip-tests) RUN_TESTS=0;;
+            --build-from-source) build_from_source=1;;
             --yes) UKE_ASSUME_YES=1;; --reuse-kernel) REUSE_KERNEL=1;; --offline) OFFLINE=1;; --dry-run) DRY_RUN=1;;
             --j[0-9]*) key=--jobs; value=${1#--j};;
             --release=*|--fedora-version=*|--shell=*|--build=*|--mode=*|--filesystem=*|--desktop=*|--channel=*|--kernel=*|--kernel-rpm=*|--kernel-profile=*|--out=*|--jobs=*|--linux-size=*|--touch-reference=*) key=${1%%=*}; value=${1#*=};;
@@ -120,16 +124,17 @@ public_main() {
     if [[ $target == image ]]; then
         public_choice mode 'Boot mode: multiboot or singleboot'
         public_choice filesystem 'Root filesystem: ext4, f2fs, btrfs or xfs'
-        public_choice desktop 'Desktop: kde, gnome or cutefish'
+        public_choice desktop 'Desktop: kde, gnome, plasma-mobile, cutefish or nextkde'
         public_choice login_shell 'New user shell: bash, fish or zsh'
     fi
     public_choice channel 'Package channel: stable, testing or unstable'
     ((out_given)) || public_choice output 'Output directory'
+    case $desktop in kdenext) desktop=nextkde;; kde-mobile) desktop=plasma-mobile;; kde-plasma) desktop=kde;; esac
     case $target in image|kernel) :;; *) die 'Build target must be image or kernel';; esac
     case $mode in multiboot|singleboot) :;; *) die 'Mode must be multiboot or singleboot';; esac
     case $filesystem in ext4|f2fs|btrfs|xfs) :;; *) die 'Unsupported root filesystem';; esac
     case $fedora_release in 44|45|rawhide) :;; *) die 'Fedora target must be 44, 45 or rawhide';; esac
-    case $desktop in kde|gnome|cutefish) :;; *) die 'Desktop must be kde, gnome or cutefish';; esac
+    case $desktop in kde|gnome|plasma-mobile|cutefish|nextkde) :;; *) die 'Unsupported desktop';; esac
     case $login_shell in bash|fish|zsh) :;; *) die 'Login shell must be bash, fish or zsh';; esac
     if [[ $target == kernel && ( ${selected[desktop]:-0} == 1 || ${selected[login_shell]:-0} == 1 ) ]]; then
         die 'Desktop and login shell apply only to image builds'
@@ -143,9 +148,14 @@ public_main() {
     [[ $KERNEL_PROFILE == normal || $channel == testing ]] || die 'EL2 candidates require --channel testing'
     [[ -z $kernel_request || $kernel_request =~ ^(latest|lastest|[0-9]+\.[0-9]+(\.[0-9]+)?)$ ]] ||
         die 'Kernel must be an explicit version such as 7.2.12, latest or lastest'
+    if [[ $target == image && $build_from_source == 0 ]]; then
+        [[ -z $kernel_request && $REUSE_KERNEL == 0 ]] || die 'Source kernel options require --build-from-source'
+        kernel_rpm=${kernel_rpm:-latest}
+    fi
+    [[ $build_from_source == 0 || -z $kernel_rpm ]] || die '--build-from-source conflicts with --kernel-rpm'
     if [[ -n $kernel_rpm ]]; then
         [[ $kernel_rpm == latest || $kernel_rpm =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ ]] || die 'Kernel RPM must be latest or an exact 7.3.x-N.fc46 release'
-        [[ $target == image && $channel == testing && $KERNEL_PROFILE == normal && $REUSE_KERNEL == 0 && -z $kernel_request ]] || die 'Repository kernel requires an ordinary testing image without --kernel or --reuse-kernel'
+        [[ $target == image && $KERNEL_PROFILE == normal && $REUSE_KERNEL == 0 && -z $kernel_request ]] || die 'Repository kernel requires an ordinary image without --kernel or --reuse-kernel'
         [[ -z ${UKE_KERNEL_REPO:-} || $UKE_KERNEL_REPO == none ]] || die 'Repository kernel cannot use a local kernel source'
     fi
     [[ $REUSE_KERNEL == 0 || $target == image ]] || die '--reuse-kernel applies to image builds only'
@@ -169,7 +179,7 @@ public_main() {
     [[ $desktop != cutefish || $target != image ]] || say 'Image support: blocked until Cutefish graphical login and first-account setup are validated'
     say "Output parent: $output (a new run directory is created; existing output is preserved)"
     say "Kernel profile: $KERNEL_PROFILE; kernel tests enabled: $RUN_TESTS"
-    [[ -z $kernel_rpm ]] || say "Kernel input: signed testing RPMs ($kernel_rpm), with signature and matching boot/module checks"
+    [[ -z $kernel_rpm ]] || say "Kernel input: signed $channel RPMs ($kernel_rpm), with signature and matching boot/module checks; no source fallback"
     say 'REQUIRED after first Fedora boot: sudo dnf update --refresh'
     # An explicit local checkout must be valid; it is never silently ignored.
     local kernel_repo=''
@@ -177,11 +187,13 @@ public_main() {
     local cache_root=$output/cache/fedora-$fedora_release-$channel
     if [[ -n ${UKE_KERNEL_REPO:-} && $UKE_KERNEL_REPO != none ]]; then kernel_repo=$(kernel_repo_validate "$UKE_KERNEL_REPO") || exit 1; fi
     if [[ -n $kernel_repo ]]; then say "Kernel: ${kernel_request:-the policy default version}; source: local checkout $kernel_repo"
+    elif [[ -n $kernel_rpm ]]; then say 'Kernel: exact source revision will be read from the signed RPM cohort'
     else say "Kernel: ${kernel_request:-the policy default version}; source: the policy repository, resolved once when the build starts"; fi
     ((REUSE_KERNEL == 0)) || say 'Kernel: reusing the cached build of this source; a missing cache stops the build'
     ((DRY_RUN == 0)) || return 0
     [[ $target != image || $fedora_release == rawhide ]] || die "Unsupported Fedora $fedora_release image: signed native Uke family builds and complete dependency resolution are pending; no Rawhide RPM fallback is allowed"
     [[ $target != image || $desktop != cutefish ]] || die 'Unsupported image: Cutefish packages are built separately in mcc45tr/cutefish; graphical login and secure first-account setup are not validated'
+    [[ $target != image || $desktop != nextkde ]] || die 'NextKde unavailable: its COPR project has no published desktop packages'
     bootstrap
     architecture=$(uname -m)
     case $architecture in x86_64) host_platform=linux/amd64;; aarch64) host_platform=linux/arm64;; *) die 'Supported architectures: x86_64 and AArch64';; esac
@@ -194,7 +206,7 @@ public_main() {
     available=$(df -Pk "$output" | awk 'NR==2 {print $4}')
     required=65536
     [[ $target != image ]] || required=$((65536 + root_mib * 3))
-    [[ -z $kernel_rpm ]] || required=$((16384 + root_mib * 2))
+    [[ -z $kernel_rpm ]] || required=$((8192 + root_mib * 2))
     ((available >= required * 1024)) || die "At least $required MiB of free space is required"
     WORK=$(mktemp -d "$output/$target-fedora-$fedora_release-$channel-XXXXXXXX")
     chmod 700 "$WORK"
@@ -217,15 +229,22 @@ public_main() {
         fi
         kernel_repo_bundle "$kernel_repo" "$WORK/inputs/kernel.bundle"
         bundle=inputs/kernel.bundle
+    elif [[ -n $kernel_rpm ]]; then
+        # Placeholder policy identity only; repository-kernel replaces it with signed payload provenance.
+        KERNEL_COMMIT=$kernel_ref
     else
         KERNEL_COMMIT=$(kernel_commit_resolve "$kernel_url" "$kernel_ref" "$OFFLINE" "$cache_root") || exit 1
     fi
-    say "Kernel source ${KERNEL_COMMIT:0:12}, Linux $KERNEL_VERSION (requested: $kernel_request)"
+    if [[ -z $kernel_rpm ]]; then
+        say "Kernel source ${KERNEL_COMMIT:0:12}, Linux $KERNEL_VERSION (requested: $kernel_request)"
+    else
+        say "Resolving signed kernel cohort ($kernel_rpm) from the selected $channel repository"
+    fi
     jq -n --arg target "$target" --arg mode "$mode" --arg fs "$filesystem" --arg desktop "$desktop" \
         --arg release "$fedora_release" --arg shell "$login_shell" --arg channel "$channel" --arg partition "$partition" --argjson size "$root_mib" \
         --argjson jobs "$JOBS" --arg builder "$(git -C "$BUILDER" rev-parse HEAD)" --arg commit "$KERNEL_COMMIT" \
         --arg profile "$KERNEL_PROFILE" --arg config "$KERNEL_CONFIG_SHA" --argjson tests "$RUN_TESTS" \
-        --arg kernel_rpm "$kernel_rpm" --arg version "$KERNEL_VERSION" --arg requested "$kernel_request" --arg url "$kernel_url" --arg bundle "$bundle" \
+        --arg kernel_rpm "$kernel_rpm" --arg version "$KERNEL_VERSION" --arg requested "${kernel_rpm:-$kernel_request}" --arg url "$kernel_url" --arg bundle "$bundle" \
         '{device:"uke",architecture:"aarch64",distribution:"fedora",fedora_release:$release,release:$release,default_shell:$shell,copr_chroot:("fedora-"+$release+"-aarch64"),source_checked:false,rpm_transaction_validated:false,image_built:false,vm_tested:false,tablet_tested:false,target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder,
           kernel_commit:$commit,kernel_version:$version,kernel_requested:$requested,kernel_url:$url,kernel_rpm_request:$kernel_rpm,kernel_profile:$profile,kernel_native_config_sha256:$config,run_kernel_tests:($tests==1)}
          + (if $bundle == "" then {} else {kernel_bundle:$bundle} end)' > "$WORK/request.json"
@@ -237,6 +256,9 @@ public_main() {
     recipe_sha=$({ printf '%s\n' "$fedora_release" "$native_base" "$arm_base" "$arm_recipe"; cat "$WORK/recipe/configs/Containerfile.public" "$WORK/recipe/configs/Containerfile.public-native" "$WORK/recipe/configs/Containerfile.public-repository" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json"; } | sha256sum | cut -d ' ' -f1)
     native_image=localhost/uke-public-native:${recipe_sha:0:16}-$architecture
     arm_image=localhost/uke-public-arm64:${recipe_sha:0:16}
+    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 ]]; then
+        arm_image=localhost/uke-public-repository:${recipe_sha:0:16}-$architecture
+    fi
     public_worker "$native_image" "$host_platform" "$native_base" Containerfile.public-native
     TEST_IMAGE=$arm_base
     "$ENGINE" image inspect "$arm_base" >/dev/null 2>&1 || { ((OFFLINE == 0)) && "$ENGINE" pull --platform linux/arm64 "$arm_base"; }
@@ -244,19 +266,25 @@ public_main() {
         "$ENGINE" run --rm --network=none --security-opt label=disable -v "$WORK:/job" "$native_image" \
             cp /usr/bin/qemu-aarch64-static /job/inputs/qemu-aarch64-static
         UKE_AARCH64_INTERPRETER=$WORK/inputs/qemu-aarch64-static
-        prepare_aarch64
+        [[ -n $kernel_rpm ]] || prepare_aarch64
     fi
-    public_worker "$arm_image" linux/arm64 "$arm_base" "$arm_recipe"
+    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 ]]; then
+        # Package retrieval and native dnf do not execute target code. Only RPM
+        # scriptlets use the verified AArch64 interpreter during root assembly.
+        public_worker "$arm_image" "$host_platform" "$native_base" "$arm_recipe"
+    else
+        public_worker "$arm_image" linux/arm64 "$arm_base" "$arm_recipe"
+    fi
     # x86_64 hosts run every step that executes no AArch64 code in a native worker; the
     # host's binfmt handler still runs RPM scriptlets and chroot commands. UKE_CROSS=0 emulates all steps.
     local cross=0 cross_image=localhost/uke-public-cross:${recipe_sha:0:16} root_image=$arm_image root_platform=linux/arm64
     # shortcut: KVM helpers build on AArch64; enable cross after porting their prebuilt paths.
     if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $KERNEL_PROFILE == normal ]]; then
         cross=1 root_image=$cross_image root_platform=$host_platform
-        public_worker "$cross_image" "$host_platform" "$native_base" Containerfile.public
+        public_worker "$cross_image" "$host_platform" "$native_base" "$arm_recipe"
     fi
     if [[ -n $kernel_rpm ]]; then
-        public_stage "$arm_image" linux/arm64 repository-kernel
+        public_stage "$root_image" "$root_platform" repository-kernel
     else
     # The cache identifies the producer: route, recipe and the worker images that compile the kernel and link its initramfs.
     local producer_file=$WORK/producer.json arm_id kernel_recipe
@@ -291,11 +319,12 @@ public_main() {
         "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
     mv "$WORK/manifest.tmp" "$WORK/artifacts/manifest.json"
     if [[ $target == image ]]; then
-        if [[ $channel == stable ]]; then
+        if [[ $channel == stable && $build_from_source == 1 ]]; then
             say 'Building the pinned platform source families missing from the stable repository'
             public_stage "$arm_image" linux/arm64 hardware
         fi
         ((cross == 0)) || say 'Installing the AArch64 root with native dnf; only package scriptlets are emulated'
+        if [[ -n $kernel_rpm && $architecture == x86_64 ]]; then prepare_aarch64; fi
         public_stage "$root_image" "$root_platform" root
         public_stage "$native_image" "$host_platform" filesystem
     fi
@@ -339,7 +368,12 @@ public_worker() {
     local image=$1 platform=$2 base=$3 file=$4
     if "$ENGINE" image inspect "$image" >/dev/null 2>&1; then return; fi
     ((OFFLINE == 0)) || die "Offline worker missing: $image; prepare it online first"
-    "$ENGINE" build --platform "$platform" --build-arg "BASE_IMAGE=$base" \
+    local trust=()
+    if [[ -n ${UKE_CA_BUNDLE:-} ]]; then
+        [[ -r $UKE_CA_BUNDLE ]] || die 'UKE_CA_BUNDLE must be a readable PEM bundle'
+        trust=(--secret "id=proxy_ca,src=$UKE_CA_BUNDLE")
+    fi
+    "$ENGINE" build ${trust[@]+"${trust[@]}"} --platform "$platform" --build-arg "BASE_IMAGE=$base" \
         -t "$image" -f "$WORK/recipe/configs/$file" "$WORK/recipe/configs"
 }
 public_stage() {
@@ -350,12 +384,16 @@ public_stage() {
         owner=$(id -u):$(id -g)
     fi
     local devices=()
+    local trust=()
+    if [[ -n ${UKE_CA_BUNDLE:-} && $network != none ]]; then
+        trust=(-v "$UKE_CA_BUNDLE:/run/uke-ca.pem:ro" -e CURL_CA_BUNDLE=/run/uke-ca.pem -e UKE_WORKER_CA=/run/uke-ca.pem)
+    fi
     [[ $stage != root ]] || devices+=(--privileged)
     # Only the filesystem appliance benefits from hardware virtualization; it falls back to TCG without it.
     if [[ $stage == filesystem && $platform == "$host_platform" && -r /dev/kvm && -w /dev/kvm ]]; then devices=(--device /dev/kvm); fi
     mkdir -p "$output/cache/fedora-$fedora_release-$channel"
     wait_idle
-    CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable ${devices[@]+"${devices[@]}"} \
+    CID=$("$ENGINE" create --platform "$platform" --network="$network" --security-opt label=disable ${devices[@]+"${devices[@]}"} ${trust[@]+"${trust[@]}"} \
         --cpus="$JOBS" -v "$WORK:/job" -v "$WORK/recipe:/builder:ro" -v "$output/cache/fedora-$fedora_release-$channel:/cache" \
         -e "UKE_OFFLINE=$OFFLINE" -e "UKE_OUTPUT_OWNER=$owner" "$image" bash /builder/src/public/stage.sh "$stage")
     "$ENGINE" start -a "$CID" 2>&1 | tee "$WORK/$stage.log"

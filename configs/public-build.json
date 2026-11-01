@@ -37,8 +37,8 @@
       "fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E"
     },
     "unstable": {
-      "project": "uke-linux-test",
-      "fingerprint": "DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E"
+      "project": "uke-linux-unstable",
+      "fingerprint": "2204A661EA630A5303500085538797E72A3E4ECA"
     }
   },
   "boot": {
@@ -56,6 +56,6 @@
   "hardware": {
     "url": "https://github.com/MCC45TR/uke-linux-hardware-support.git",
     "commit": "7ab4ca40aea4da56d2424e96a935d50226568958",
-    "policy": "Stable image builds compile the six required public platform families locally; testing and unstable use signed test-repository packages."
+    "policy": "Package images use the selected signed COPR repository directly. Source builds are opt-in."
   }
 }

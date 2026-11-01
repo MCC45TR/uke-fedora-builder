@@ -1,6 +1,12 @@
 # Public source and image builds
 
-29 October 2026: the public builder accepts Fedora 44, Fedora 45 and Rawhide as
+1 November 2026: image builds use signed Fedora/COPR packages by default.
+`--build-from-source` explicitly enables kernel compilation and missing stable
+platform source builds. `scripts/build-image.sh` invokes the same image entry as
+the root `ukelinux.sh`. Missing packages stop assembly; no automatic source
+fallback is used. `--kernel-rpm` freezes an exact signed kernel cohort.
+
+The public builder accepts Fedora 44, Fedora 45 and Rawhide as
 separate targets, and Bash, Fish or Zsh as the new normal user's login shell.
 The default remains Rawhide, KDE and Bash. Fedora 44/45 image composition stops
 before host preparation until signed Uke family builds and dependency resolution
@@ -10,8 +16,9 @@ secure first-account flow are unvalidated. Dry-run selection is not image suppor
 The three targets use reviewed per-architecture Fedora image digests in
 `configs/build-rules.json`. Public RPM stages derive the dist tag from that
 worker, use release-specific Fedora/COPR repositories and segregate package and
-kernel caches by release and channel. The default kernel is pinned to the
-reviewed Uke Linux 7.3.0-33 source commit; no generic Fedora kernel is substituted.
+kernel caches by release and channel. Package mode reads source provenance from
+the signed kernel cohort. Source mode retains the reviewed pinned kernel profile;
+no generic Fedora kernel is substituted.
 The legacy Core command retains its original Rawhide-only contract.
 
 `--shell` installs the original Fedora shell, validates the executable from the
@@ -22,7 +29,11 @@ remain separate from native x86_64 container user-creation tests.
 
 `--release` (alias `--fedora-version`) selects Fedora, independently of
 `--channel`. Explicit desktop/shell flags are rejected for kernel-only builds.
-Testing and unstable share `uke-linux-test`; they are not separate repositories.
+Testing selects `uke-linux-test`; unstable selects `uke-linux-unstable` directly.
+Its signing fingerprint is `2204A661EA630A5303500085538797E72A3E4ECA`.
+`--desktop plasma-mobile` adds Fedora Plasma Mobile and Plasma Settings to the
+Plasma account-setup flow; graphical validation is pending. `--desktop nextkde`
+reports that the `mcc45tr/kdenext` project has no published builds.
 Builds never flash a device. Singleboot flashing destroys Android userdata;
 multiboot requires an existing physical `linux` partition.
 
@@ -34,7 +45,7 @@ multiboot requires an existing physical `linux` partition.
 ./ukelinux.sh --self-test
 ```
 
-All 648 release/desktop/shell/layout/filesystem/channel plans are checked without
+All 1080 release/desktop/shell/layout/filesystem/channel plans are checked without
 network or host preparation. The Cutefish meta package selects the real,
 separately packaged upstream desktop; it enables no display manager and cannot
 establish image or tablet support. Fedora 44/45 chroots were enabled in
@@ -77,11 +88,12 @@ Unix permissions is unsuitable even if it has enough free space.
   --desktop kde --channel unstable --dry-run
 ```
 
-Every kernel build is cached under `out/cache/kernel-builds/` by source commit, exact Linux version and producer. The producer includes the build route, worker configuration, executable kernel build scripts and exact worker image IDs. A changed helper compilation rule or worker therefore selects a different cache entry. After `--build kernel`, an image build with `--reuse-kernel` checks the entry's checksums, source and producer before restoring it. The manifest retains the original producer and the current requested kernel selection. A damaged entry is replaced by the next kernel build.
+Every source kernel build is cached under `out/cache/kernel-builds/` by source commit, exact Linux version and producer. The producer includes the build route, worker configuration, executable kernel build scripts and exact worker image IDs. A changed helper compilation rule or worker therefore selects a different cache entry. After `--build kernel`, an image build with `--build-from-source --reuse-kernel` checks the entry's checksums, source and producer before restoring it. The manifest retains the original producer and the current requested kernel selection. A damaged entry is replaced by the next kernel build.
 
 `--jobs` accepts 1 through the number of online CPUs and defaults to all of them. `--linux-size` accepts 8192 through 65536 MiB and
 defaults to 16384. The sparse codec has a 64 GiB raw-image bound. Allow at least
-64 GiB for kernel/tool work plus three times the selected root size. No
+8 GiB for package/tool work plus twice the selected root size in package mode;
+source mode requires 64 GiB plus three times the root size. No
 generic ARM64 kernel is substituted.
 
 x86_64 hosts run every step that executes no AArch64 code in a native worker:

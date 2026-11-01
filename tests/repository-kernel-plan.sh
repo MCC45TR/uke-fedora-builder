@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# No network or containers: repository kernel selection must remain explicitly admitted.
+# No network or containers: default package routing and explicit source opt-in.
 set -Eeuo pipefail
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck source=../src/image/core.sh
@@ -11,18 +11,27 @@ source "$root/src/public/entry.sh"
 bootstrap() { exit 90; }
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
-for rpm in latest 7.3.0-48.fc46; do
-    (public_main --kernel-rpm "$rpm" --build image --mode singleboot --filesystem ext4 --dry-run) > "$work/plan"
-    grep -F 'Kernel input: signed testing RPMs' "$work/plan" >/dev/null
+for channel in stable testing unstable; do
+    for rpm in latest 7.3.0-48.fc46; do
+        public_main --kernel-rpm "$rpm" --channel "$channel" --mode singleboot --filesystem ext4 --dry-run > "$work/plan"
+        grep -F "Kernel input: signed $channel RPMs" "$work/plan" >/dev/null
+    done
+    public_main --channel "$channel" --dry-run > "$work/default"
+    grep -F "Kernel input: signed $channel RPMs (latest)" "$work/default" >/dev/null
+    public_main --build-from-source --channel "$channel" --dry-run > "$work/source"
+    if grep -F 'Kernel input: signed' "$work/source"; then exit 1; fi
 done
-for options in '--kernel-rpm invalid' '--kernel-rpm 7.4-rc1' '--kernel-rpm 7.3.0-1.fc45' '--kernel-rpm latest --build kernel' '--kernel-rpm latest --channel stable' '--kernel-rpm latest --reuse-kernel' '--kernel-rpm latest --kernel 7.3' '--kernel-rpm latest --kernel-profile el2-require'; do
+for options in '--kernel-rpm invalid' '--kernel-rpm 7.4-rc1' '--kernel-rpm 7.3.0-1.fc45' '--kernel-rpm latest --build kernel' '--kernel-rpm latest --build-from-source' '--reuse-kernel' '--kernel 7.3' '--kernel-profile el2-require'; do
     status=0
     # Intentional splitting of fixed fixture option strings.
     # shellcheck disable=SC2086
     (public_main $options --dry-run) > "$work/refused" 2>&1 || status=$?
     ((status > 0 && status < 90))
 done
-status=0
-(UKE_KERNEL_REPO="$root" public_main --kernel-rpm latest --dry-run) > "$work/refused" 2>&1 || status=$?
-((status > 0 && status < 90))
-printf 'Signed repository kernel plans and incompatible source/channel/profile refusals passed\n'
+jq -e '.channels.unstable.project == "uke-linux-unstable" and .channels.unstable.project != .channels.testing.project' "$root/configs/public-build.json" >/dev/null
+for desktop in cutefish nextkde; do
+    status=0
+    (public_main --desktop "$desktop" --yes) > "$work/refused" 2>&1 || status=$?
+    ((status > 0 && status < 90))
+done
+printf 'Default signed package routes, distinct unstable repository, source opt-in and unavailable desktop refusals passed\n'

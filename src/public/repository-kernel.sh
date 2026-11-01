@@ -4,23 +4,27 @@ set -Eeuo pipefail
 # shellcheck source=cohort.sh
 # shellcheck disable=SC1091
 source /builder/src/public/cohort.sh
-[[ $(jq -er .channel /job/request.json) == testing ]]
+channel=$(jq -er .channel /job/request.json)
+fedora_release=$(jq -er .fedora_release /job/request.json)
+[[ $fedora_release == rawhide ]]
+dist=$(rpm --eval '%{?dist}')
+[[ $dist =~ ^[.]fc[0-9]+$ ]]
 base=senemos-uke-linux-kernel-mainline
-project=uke-linux-test
+project=$(jq -er --arg channel "$channel" '.channels[$channel].project' /builder/configs/public-build.json)
 key=/cache/$project.asc
 if [[ ${UKE_OFFLINE:-0} != 1 ]]; then
     curl --proto '=https' --tlsv1.2 -fL --retry 3 \
         "https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/pubkey.gpg" -o "$key.part"
     mv "$key.part" "$key"
 fi
-expected=$(jq -er .channels.testing.fingerprint /builder/configs/public-build.json)
+expected=$(jq -er --arg channel "$channel" '.channels[$channel].fingerprint' /builder/configs/public-build.json)
 [[ $(gpg --show-keys --with-colons "$key" | awk -F: '$1=="fpr" {print $10;exit}') == "$expected" ]]
 mkdir -p /job/kernel-keydb /job/artifacts/kernel /job/kernel-payload
 rpmkeys --dbpath /job/kernel-keydb --import "$key"
-cat > /etc/yum.repos.d/uke-kernel.repo <<'REPO'
+cat > /etc/yum.repos.d/uke-kernel.repo <<REPO
 [uke-kernel]
-name=Uke testing kernel inputs
-baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux-test/fedora-rawhide-aarch64/
+name=Uke $channel kernel inputs
+baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-$fedora_release-aarch64/
 enabled=0
 gpgcheck=1
 skip_if_unavailable=False
@@ -48,7 +52,7 @@ for archive in "${archives[@]}"; do
     (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /job/payload.cpio)
 done
 rpm_evr=$release
-release=${release%.fc46}
+release=${release%"$dist"}
 version=${release%-*}
 rpm_release=$release
 source_commit=$(cat "/job/kernel-payload/usr/share/senemos/uke/$release/source-commit")
@@ -62,6 +66,7 @@ payload_sha256=${payload_sha256%% *}
 (cd "$modules"; sha256sum -c "$bundle/modules.sha256")
 c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot/boot-image.cpp -o /job/boot-image
 for profile in linux userdata; do
+    /job/boot-image check-root "$bundle/$profile.img" "$profile"
     /job/boot-image inspect "$bundle/$profile.img" > "/job/artifacts/kernel/boot-$profile.json"
     /job/boot-image extract "$bundle/$profile.img" "/job/$profile.Image"
     cmp "$modules/vmlinuz" "/job/$profile.Image"
@@ -69,13 +74,13 @@ for profile in linux userdata; do
 done
 rpm -qp --qf '%{NEVRA}\t%{SOURCERPM}\n' "${archives[@]}" | LC_ALL=C sort > /job/artifacts/kernel/packages.tsv
 (cd /job/artifacts/kernel; sha256sum -- *.rpm) > /job/artifacts/kernel/RPM-SHA256SUMS
-jq -n --arg release "$release" --arg version "$version" --arg dist .fc46 --arg family "$base" --arg source "$source_commit" --arg fingerprint "$expected" --arg rpm "$rpm_release" --arg payload "$payload_sha256" \
-    '{payload_sha256:$payload,rpm_dist:$dist,kernel_profile:"normal",kernel_family:$family,rpm_version_release:$rpm,kernel_commit:$source,kernel_source_commit:$source,kernel_version:$version,kernel_release:$release,kernel_rpms_locally_built:false,kernel_repository:"mcc45tr/uke-linux-test",
+jq -n --arg release "$release" --arg version "$version" --arg project "$project" --arg dist "$dist" --arg family "$base" --arg source "$source_commit" --arg fingerprint "$expected" --arg rpm "$rpm_release" --arg payload "$payload_sha256" \
+    '{payload_sha256:$payload,rpm_dist:$dist,kernel_profile:"normal",kernel_family:$family,rpm_version_release:$rpm,kernel_commit:$source,kernel_source_commit:$source,kernel_version:$version,kernel_release:$release,kernel_rpms_locally_built:false,kernel_repository:("mcc45tr/"+$project),
       kernel_rpm_signature:"verified COPR signature",kernel_key_fingerprint:$fingerprint,
       physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' > /job/artifacts/kernel/kernel-info.json
 jq --slurpfile info /job/artifacts/kernel/kernel-info.json '. + $info[0]' /job/request.json > /job/request.tmp
 mv /job/request.tmp /job/request.json
 cp /job/request.json /job/artifacts/manifest.json
-jq -n --arg route repository --arg evr "$rpm_evr" --arg fingerprint "$expected" '{route:$route,rpm_evr:$evr,repository:"mcc45tr/uke-linux-test",signer_fingerprint:$fingerprint}' > /job/artifacts/kernel/producer.json
+jq -n --arg project "$project" --arg route repository --arg evr "$rpm_evr" --arg fingerprint "$expected" '{route:$route,rpm_evr:$evr,repository:("mcc45tr/"+$project),signer_fingerprint:$fingerprint}' > /job/artifacts/kernel/producer.json
 # Consumers only need the retained RPMs and receipts; discard the temporary extraction.
 rm -rf /job/kernel-payload /job/payload.cpio /job/linux.Image /job/userdata.Image
