@@ -37,6 +37,7 @@ for channel in stable testing unstable; do
             elif [[ $desktop == cutefish ]]; then
                 contains cutefish-desktop
                 contains gdm
+                contains dbus-daemon
                 if contains gnome-initial-setup || contains plasma-setup; then exit 1; fi
             else
                 if contains gdm || contains plasma-setup || contains nextkde || contains cutefish-desktop; then exit 1; fi

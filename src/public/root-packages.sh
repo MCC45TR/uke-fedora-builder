@@ -36,7 +36,8 @@ public_root_packages() {
         selection+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
             gnome-control-center gnome-software gnome-console nautilus)
     elif [[ $desktop == cutefish ]]; then
-        selection+=(cutefish-desktop gdm)
+        # The standalone bus is used by the isolated real GDM/PAM probe.
+        selection+=(cutefish-desktop gdm dbus-daemon)
     fi
 }
 
