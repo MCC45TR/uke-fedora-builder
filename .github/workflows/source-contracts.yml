@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install source inspection tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep make
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep make zstd
       - name: Validate source without compilation or RPM generation
         shell: bash
         run: |
@@ -38,4 +38,6 @@ jobs:
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
           bash tests/payload-traversal.sh
           bash tests/original-kde-payload.sh
+          shellcheck scripts/publish-image-release.sh tests/release-layout.sh
+          bash tests/release-layout.sh
           echo 'Native helper builds and file fixtures run in the uke-image-tools COPR build.' >> "$GITHUB_STEP_SUMMARY"
