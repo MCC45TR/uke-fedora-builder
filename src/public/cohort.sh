@@ -56,6 +56,32 @@ cohort_payload_inventory() (
         LC_ALL=C sort -z | xargs -0 sha256sum
 )
 
+cohort_boot_root_check() (
+    set -Eeuo pipefail
+    local image=$1 expected=$2 codec=$3 commandline token selected=linux selectors=0
+    local -a tokens=()
+    [[ $expected == linux || $expected == userdata ]]
+    [[ -f $image && ! -L $image ]]
+    # The signed codec validates the bounded Android v4 header, including the
+    # 1536-byte NUL-terminated command line. Older signed codecs expose inspect
+    # and extract but not the newer check-root subcommand.
+    "$codec" inspect "$image" >/dev/null
+    IFS= read -r -d '' commandline < <(dd if="$image" bs=1 skip=44 count=1536 iflag=nofollow status=none)
+    commandline=${commandline//$'\t'/ }
+    commandline=${commandline//$'\n'/ }
+    commandline=${commandline//$'\r'/ }
+    commandline=${commandline//$'\v'/ }
+    commandline=${commandline//$'\f'/ }
+    read -r -a tokens <<< "$commandline"
+    for token in "${tokens[@]}"; do
+        if [[ $token == senemos.root=* ]]; then
+            selectors=$((selectors + 1))
+            selected=${token#senemos.root=}
+        fi
+    done
+    [[ $selectors -le 1 && $selected == "$expected" ]]
+)
+
 cohort_root_check() {
     # A fresh shell preserves fail-fast behavior even when a caller tests status
     # with if/!; Bash otherwise disables errexit throughout a called function.
@@ -113,7 +139,7 @@ cohort_root_check_main() (
     done
     cmp "$artifacts/boot.img" "$artifacts/boot-$partition.img"
     cmp "$artifacts/boot.img" "$bundle/$partition.img"
-    "$codec" check-root "$artifacts/boot.img" "$partition"
+    cohort_boot_root_check "$artifacts/boot.img" "$partition" "$codec"
     "$codec" extract "$artifacts/boot.img" "$scratch/Image"
     cmp "$modules/vmlinuz" "$scratch/Image"
     jq -n '{source:"matched-request-and-producer",packages:"matched-producer-rpm-identities",

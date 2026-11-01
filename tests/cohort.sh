@@ -21,6 +21,29 @@ printf 'fixture DT bytes, not a physical board\n' > "$modules/dtb/qcom/sm7675-xi
 cohort_payload_inventory "$modules" > "$artifacts/kernel/payload.sha256"
 payload=$(sha256sum "$artifacts/kernel/payload.sha256" | cut -d ' ' -f1)
 "$fixture/codec" create "$modules/vmlinuz" "$bundle/userdata.img" userdata
+cat > "$fixture/legacy-codec" <<'SH'
+#!/usr/bin/env bash
+[[ $1 != check-root ]] || exit 98
+exec "$(dirname "$0")/codec" "$@"
+SH
+chmod +x "$fixture/legacy-codec"
+cohort_boot_root_check "$bundle/userdata.img" userdata "$fixture/legacy-codec"
+cp "$bundle/userdata.img" "$fixture/selector.img"
+for commandline in 'senemos.root=linux' 'senemos.root=userdata senemos.root=userdata' \
+    $'senemos.root=userdata\nsenemos.root=linux' 'senemos.root='; do
+    dd if=/dev/zero of="$fixture/selector.img" bs=1 seek=44 count=1536 conv=notrunc status=none
+    printf '%s\0' "$commandline" | dd of="$fixture/selector.img" bs=1 seek=44 conv=notrunc status=none
+    if cohort_boot_root_check "$fixture/selector.img" userdata "$fixture/legacy-codec"; then
+        echo 'Invalid or repeated boot root selector accepted' >&2; exit 1
+    fi
+done
+dd if=/dev/zero of="$fixture/selector.img" bs=1 seek=44 count=1536 conv=notrunc status=none
+printf 'extra=1\nsenemos.root=userdata\tother=2\0' | dd of="$fixture/selector.img" bs=1 seek=44 conv=notrunc status=none
+cohort_boot_root_check "$fixture/selector.img" userdata "$fixture/legacy-codec"
+dd if=/dev/zero of="$fixture/selector.img" bs=1 seek=44 count=1536 conv=notrunc status=none
+cohort_boot_root_check "$fixture/selector.img" linux "$fixture/legacy-codec"
+if cohort_boot_root_check "$fixture/selector.img" userdata "$fixture/legacy-codec"; then exit 1; fi
+echo 'Legacy signed-codec interface, wrong/duplicate roots, whitespace and default root checks passed'
 cp "$bundle/userdata.img" "$artifacts/boot.img"
 cp "$bundle/userdata.img" "$artifacts/boot-userdata.img"
 printf 'PARTLABEL=userdata / ext4 defaults 0 0\n' > "$root/etc/fstab"

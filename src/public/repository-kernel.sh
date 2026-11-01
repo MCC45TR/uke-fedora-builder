@@ -87,7 +87,7 @@ else
     c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot/boot-image.cpp -o /job/boot-image
 fi
 for profile in linux userdata; do
-    /job/boot-image check-root "$bundle/$profile.img" "$profile"
+    cohort_boot_root_check "$bundle/$profile.img" "$profile" /job/boot-image
     /job/boot-image inspect "$bundle/$profile.img" > "/job/artifacts/kernel/boot-$profile.json"
     /job/boot-image extract "$bundle/$profile.img" "/job/$profile.Image"
     cmp "$modules/vmlinuz" "/job/$profile.Image"
