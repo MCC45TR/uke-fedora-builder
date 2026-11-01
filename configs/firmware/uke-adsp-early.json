@@ -1,13 +1,13 @@
 {
   "schema_version": 1,
   "device": "uke",
-  "purpose": "early ADSP charger firmware",
-  "source_class": "own-device Linux readback; independent OEM identity not established",
-  "archive_sha256": "eee1fb0b278cf04338245c68a623d01c5060cd8e389e1c412c53177d29bf94f8",
+  "purpose": "matched ADSP firmware candidate for local charging and sensor tests",
+  "source_class": "own-device Android A modem partition; read-only capture; OEM release version unverified",
+  "archive_sha256": "49ae10705ee50ac65acec95b6e4a185c570c2970e83644b459606b7e6c112793",
   "files": [
     {
       "path": "usr/lib/firmware/adsp.b00",
-      "sha256": "bb6f75c983a4cd99688fc44ed07af4ab0161d97eee87fbe010023f9828aab37d"
+      "sha256": "3209a1d262544a0defc87427da0a15e2abdcf9aebc4053f387135de1f64f565a"
     },
     {
       "path": "usr/lib/firmware/adsp.b01",
@@ -31,7 +31,7 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b06",
-      "sha256": "a6a6fbf3c70b359bb16215a39ac5cf5435142d687731638c664ad83f80dd979d"
+      "sha256": "9616663da06b683de21204dba19b33901d5fee1c50f7cb410cb1bfe3172b613f"
     },
     {
       "path": "usr/lib/firmware/adsp.b07",
@@ -43,11 +43,11 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b09",
-      "sha256": "509c94bd706929ebefcd52839afa15cca22116cbd86a65f536418f8a24bec384"
+      "sha256": "2a0e2d89c0dc68c5978c2c4ee1f8fb1c501d5cb810c88e632fec012ebc143008"
     },
     {
       "path": "usr/lib/firmware/adsp.b10",
-      "sha256": "c31ce9dd8470ad1d884999516a5c659a983eb4b05c24398b12428229a920a49b"
+      "sha256": "b3015a04261370237d77dd01e12fd73049ae5e01603723cd73ef410e5f3a7d48"
     },
     {
       "path": "usr/lib/firmware/adsp.b11",
@@ -63,43 +63,43 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b14",
-      "sha256": "9372de1e87f38c2354b9cc37f52db0046cf7ff900d396dcc7130b725b6fd5f18"
+      "sha256": "555f219d17d4cc760963ec561b6cfd9d03a5ac03b9bf4f7d0b203d71d9c15fac"
     },
     {
       "path": "usr/lib/firmware/adsp.b15",
-      "sha256": "fbd42729f649efc9264dd27ad9bdf333ccb710eddf4b175dd3b8c6ed66e68fbd"
+      "sha256": "1a5a4199d99e6647d7f1e1af11be6ec024c1dc0bfe8f43f11536c920dbf0e219"
     },
     {
       "path": "usr/lib/firmware/adsp.b16",
-      "sha256": "c7078ffba775b5e77649e8eaf456572c0b5c51613ca465aa18f6178f356610ea"
+      "sha256": "04253d9427503f379bc8789f07005c0531ac43c42d248da200a73d14b69f9fa9"
     },
     {
       "path": "usr/lib/firmware/adsp.b17",
-      "sha256": "40c935b528e1d4a5df11ee3f889b6395f96004bc69e7dbc6bb66589dd61c9563"
+      "sha256": "d23ffe7612899dded1dc29850d4128ec40b59ae7f26f6dc3ac3ca4acbce62716"
     },
     {
       "path": "usr/lib/firmware/adsp.b18",
-      "sha256": "9677b0d66c6778112aeb40567accf6d2acf6b645970bd60ffa460f89387a895a"
+      "sha256": "b8d85d6f1ea9533e2fdbf822817e1e1b8b737c9557fc1ec9c39371c1d923b644"
     },
     {
       "path": "usr/lib/firmware/adsp.b19",
-      "sha256": "883f8eac2b0798264e3ad20c2800a402fe5b33e9545eec8b4795cff24a839d9e"
+      "sha256": "03f9de091c630347b305409965c0efd5e802a6d72bb276bbe5d8d2e8a1b49d55"
     },
     {
       "path": "usr/lib/firmware/adsp.b20",
-      "sha256": "be276063b2552ab62aff08a250b08b469558944fc89e5d847df6fb88a8591b3b"
+      "sha256": "527e4710701c6e9fb4ec830fa128760b8b48b4736369238869c99d99cd915741"
     },
     {
       "path": "usr/lib/firmware/adsp.b21",
-      "sha256": "130da95043f6f6d6fd157cc4a5345720e5bb038ebda4c81c68e76313f948e821"
+      "sha256": "f8fd25d29a289fe6f5f332bfb9ade574f049316be059fc72100f014bf04973f4"
     },
     {
       "path": "usr/lib/firmware/adsp.b22",
-      "sha256": "cb717a32c51bf4a7dbc5ce1693930a76c8dd6dc52a1e078be08d7c128108182a"
+      "sha256": "f3ded6a33278c9aa721372c67260379e8d38c19c99a5aa2b9415c5a5ddf2ec2b"
     },
     {
       "path": "usr/lib/firmware/adsp.b23",
-      "sha256": "6c7f368081b0e16b6566db2f60f55e4d6a2feeaa1b23df363c38b4df238e9196"
+      "sha256": "1adfcf738b1c020a4f59818447a791f074ca53bafbb8c4b2fb8569a2edffac4e"
     },
     {
       "path": "usr/lib/firmware/adsp.b25",
@@ -115,15 +115,15 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b28",
-      "sha256": "db440f0420b4a0715db512ce16ecf41145a7cb4e26ef0e4e2a2e2285441a83b2"
+      "sha256": "61b222542fac2a528bbd1e170f67011c66d113a3f6274b3de618ec9f0b3123b6"
     },
     {
       "path": "usr/lib/firmware/adsp.b29",
-      "sha256": "170172681d28d2b13304c3df9b16fb0fb26d34a0c75fb023c30b0fbf930c8e53"
+      "sha256": "8a218888e2043ff55e008f6333853454e508053c13fca753eb7b047a98e8dbff"
     },
     {
       "path": "usr/lib/firmware/adsp.b30",
-      "sha256": "d7d73e967bd243d1301ca045e076c75475b60cb7225c788fa522e074f4300e85"
+      "sha256": "431ef0273efac1221b3598340a358568ed936a46e9913f8fd1bb7f45da563f28"
     },
     {
       "path": "usr/lib/firmware/adsp.b31",
@@ -135,7 +135,7 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b33",
-      "sha256": "85c1f605f09e190ca26bf612c3339d41963920c2b5350a47ac40a4cb0ac195c9"
+      "sha256": "b63e9d9bcd2da477f865c38a3267f714416f5541cee320d2afe9646311434345"
     },
     {
       "path": "usr/lib/firmware/adsp.b34",
@@ -143,15 +143,15 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b35",
-      "sha256": "28af6af2161ed282713883b7d7f247833c69be062b54472f72ee3c07ee472db6"
+      "sha256": "66953115e2e44bab13891d70e0650aba42f253014a9cdc1fa23c6bb95292a378"
     },
     {
       "path": "usr/lib/firmware/adsp.b36",
-      "sha256": "a3b22b7f7da2b5c3f67b9d109ff8e61e7746bda150e32e7cad710f93a8cbf546"
+      "sha256": "bb3bab7b3f24a8b72551564572945defa9802e84cd14f62fe841db08bca69d1f"
     },
     {
       "path": "usr/lib/firmware/adsp.b37",
-      "sha256": "58eeb00155b149ee408700d80ce613bc79690e22663d55a1144ca8cc0ee05c86"
+      "sha256": "b7657833cc46853f063747be9cebab478ad1d1a99562f904bb2ff05e87badd89"
     },
     {
       "path": "usr/lib/firmware/adsp.b38",
@@ -159,7 +159,7 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b39",
-      "sha256": "7b33227b672e7bdb6e05c4344c2e3b17ee44764e77436c521487c3dbf40f81da"
+      "sha256": "22c9d32bc055860ef6d8916c1a77e151e3abf79c9c50fc8082d534034da90e28"
     },
     {
       "path": "usr/lib/firmware/adsp.b40",
@@ -167,11 +167,11 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b41",
-      "sha256": "f6cd091acaf5221a9ea67b694436be261e82f927102062fe98d605daf4bad1bc"
+      "sha256": "b395ad7e355ca97afb0b5c1d6fde88dcd2c21f96c397ae1bfb08ed4ad2eeb7c5"
     },
     {
       "path": "usr/lib/firmware/adsp.b42",
-      "sha256": "7313379eb02cf1df71e8a4ea64884c7feb5acf77d26588e76a5713b1ee0bbefc"
+      "sha256": "9c2799fe98647e3b0f88068f3a02af85cbd99f61caba514d75411b618e2a7b71"
     },
     {
       "path": "usr/lib/firmware/adsp.b43",
@@ -179,7 +179,7 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b44",
-      "sha256": "465fd2faddbdfed63a531b29ea387adf964b29892cc0673cb7a92f97deb5422d"
+      "sha256": "f8565d82ee8a1074bc7edb6465a3c5c30356b3bacf7c8a1b6de664017d89df34"
     },
     {
       "path": "usr/lib/firmware/adsp.b45",
@@ -187,15 +187,15 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b46",
-      "sha256": "8d181fc60c59eaa490ab778b27c18de70f4f0e61f429a724182ead18937ae9e4"
+      "sha256": "a5fa48b8577b872d1b412860a123b93d15261d2fe82a3f50e75521ce92c4c5af"
     },
     {
       "path": "usr/lib/firmware/adsp.b47",
-      "sha256": "7ef1fbaee52fe939377fc448061b8a1aa9e17985dcf03ca80214de3e4b9632f6"
+      "sha256": "0e9af7cba3044d140828583f33def093378c147fbc8489a4f283f7c2f2352533"
     },
     {
       "path": "usr/lib/firmware/adsp.b48",
-      "sha256": "d7f42ad45e5209cd91edd85bdeb2d62360d9dffecd48b0a0f241c603d372cb98"
+      "sha256": "fe77a122b0887e46559fc97da67d8540b58e1adbfa81a930a9867a6b13d4869e"
     },
     {
       "path": "usr/lib/firmware/adsp.b49",
@@ -203,15 +203,15 @@
     },
     {
       "path": "usr/lib/firmware/adsp.b50",
-      "sha256": "29782c2c8008044518a4bb9f610d803e17c11604259ce80a4cac2b63a1bd610e"
+      "sha256": "1ee0d7bccf783dac4c78f54ef0776349032caff3f9bb630a0f9dc0d9e0530c2b"
     },
     {
       "path": "usr/lib/firmware/adsp.b52",
-      "sha256": "5bd1567572a4b5d81424874c05f6516ff907af0e1eca1ff30ed1d14244505694"
+      "sha256": "cc90984486065e96e4924c3781e1671294e533913e13b1f751aa7aed3b0b0aed"
     },
     {
       "path": "usr/lib/firmware/adsp.mdt",
-      "sha256": "d8bf5e1f1c7795f766f22046c2d77f81f334d0035a9a494ae9d9c281bd2a6a59"
+      "sha256": "4ccce10d5dceee5af62f2acc61f3c19294aef0ec5fa73071e03d2d6a03cec444"
     },
     {
       "path": "usr/lib/firmware/adsp_dtb.b00",
@@ -223,11 +223,11 @@
     },
     {
       "path": "usr/lib/firmware/adsp_dtb.b02",
-      "sha256": "5ae252027607478dd9e9e86088c6fd1b01f941ac8a460cbf44de6d05cb4ec849"
+      "sha256": "db14b691503051c1b52fc2cd3786cd90fd5b33ec3d70f0e652a3242b32cec84a"
     },
     {
       "path": "usr/lib/firmware/adsp_dtb.mdt",
-      "sha256": "893ae87ac9b208ecd9aa4e3f7c6ee0c660487fe89e3a3d383cc2caa2e2812e04"
+      "sha256": "390a017ad8295a164501a28c226d7092948bf55e50ae463b87e8e079b4a89a68"
     }
   ]
 }

@@ -200,7 +200,7 @@ pair_main() {
     cp "$kernel_cache/inputs/kernel.spec" "$WORK/inputs/kernel.spec"
     cp -a "$kernel_cache/inputs/SOURCES" "$WORK/inputs/"
     if jq -e '.early_adsp_firmware==true' "$WORK/inputs/profile.json" >/dev/null; then
-        local firmware=$kernel/referances/firmware/uke-os3.0.304.0-adsp-20261012.tar
+        local firmware=$kernel/referances/firmware/uke-modem-a-adsp-20261013.tar
         verify_cache "$firmware" "$(jq -er .archive_sha256 "$BUILDER/configs/firmware/uke-adsp-early.json")"
         cp --reflink=auto "$firmware" "$WORK/inputs/early-firmware.tar"
     fi
