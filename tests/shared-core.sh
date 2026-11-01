@@ -26,7 +26,9 @@ reject public_core_packages_check "$work/baseline" "$work/removed"
 seal() {
     (cd "$work/export"; find . -type f ! -name core-SHA256SUMS -print0 | sort -z | xargs -0 sha256sum) > "$work/checksums"
     mv "$work/checksums" "$work/export/core-SHA256SUMS"
+    chmod 000 "$work/export/original-fedora/fixture"
     tar --zstd -cf "$work/core.tar.zst" -C "$work/export" .
+    chmod 600 "$work/export/original-fedora/fixture"
 }
 candidate() {
     mkdir -p "$work/$1/artifacts"
@@ -37,6 +39,8 @@ public_core_restore "$work/core.tar.zst" "$work/good"
 jq -e '.desktop=="nextkde" and .shared_core_phase=="import" and .kernel_commit==("b"*40) and .jobs==4' "$work/good/request.json" >/dev/null
 jq -e '.desktop=="nextkde" and .image_built==false and (.shared_core_sha256|test("^[0-9a-f]{64}$"))' "$work/good/artifacts/manifest.json" >/dev/null
 cmp "$work/export/artifacts/kernel/fixture" "$work/good/artifacts/kernel/fixture"
+cmp "$work/export/rootfs.tar" "$work/good/shared-core/rootfs.tar"
+cmp "$work/export/original-fedora/fixture" "$work/good/shared-core/original-fedora/fixture"
 for key in builder_commit default_shell size_mib mode partition kernel_rpm_request; do
     candidate "$key"
     jq --arg key "$key" '.[$key]="different"' "$work/$key/request.json" > "$work/next"

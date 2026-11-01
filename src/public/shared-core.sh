@@ -12,7 +12,12 @@ public_core_restore() {
     [[ -f $archive && ! -L $archive && -d $work && ! -e $work/shared-core ]] || return 1
     mkdir "$work/shared-core"
     tar --zstd --extract --no-same-owner -f "$archive" -C "$work/shared-core" || return
-    (cd "$work/shared-core" && sha256sum --check --strict core-SHA256SUMS) || return
+    # RPM proof files can legitimately be 0000 (shadow) or execute-only (sudo).
+    # The unprivileged receiver owns this byte-evidence copy; make it readable
+    # without changing the separately archived root's original modes or owners.
+    [[ -d $work/shared-core/original-fedora && ! -L $work/shared-core/original-fedora ]] || return 1
+    chmod -R u+rX "$work/shared-core/original-fedora" || return
+    (cd "$work/shared-core" && sha256sum --check --strict --quiet core-SHA256SUMS) || return
     jq -e '.desktop=="core" and .shared_core_phase=="export" and .target=="image" and
         .fedora_release=="rawhide" and .channel=="unstable" and .filesystem=="ext4" and
         .architecture=="aarch64" and .mode=="singleboot" and .partition=="userdata"' "$work/shared-core/request.json" >/dev/null || return
