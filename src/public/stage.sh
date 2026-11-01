@@ -461,8 +461,13 @@ jq --argjson private "$private" --slurpfile shell /job/artifacts/login-shell.jso
     python_policy:"only byte-identical signature-verified original Fedora packages",
     credentials_included:false,ssh_enabled:false}' /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
-c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot/boot-image.cpp -o /job/cohort-boot-image
-cohort_root_check "$request" /job/artifacts "$root" /job/cohort-boot-image \
+if [[ $channel == unstable ]]; then
+    cohort_codec=$UKE_IMAGE_TOOLS/boot-image
+else
+    cohort_codec=/job/cohort-boot-image
+    c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot/boot-image.cpp -o "$cohort_codec"
+fi
+cohort_root_check "$request" /job/artifacts "$root" "$cohort_codec" \
     /job/artifacts/kernel/packages.tsv /job/artifacts/installed-rpms.tsv > /job/cohort-validation.json
 jq --slurpfile cohort /job/cohort-validation.json '. + {cohort_validation:$cohort[0]}' \
     /job/artifacts/manifest.json > /job/manifest.tmp
