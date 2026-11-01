@@ -22,6 +22,50 @@ if grep -q '^Extracted target payload:' "$fixture/output"; then
     echo 'Incomplete traversal printed a success receipt' >&2; exit 1
 fi
 rm "$fixture/bin/find" "$fixture/payload/omitted"
+# A live subtree must be refused before even file discovery. Paths with the
+# same prefix outside the target must not hide ordinary payload files.
+cat > "$fixture/bin/findmnt" <<'SH'
+#!/usr/bin/env bash
+case $UKE_FIXTURE_MOUNTS in
+ failure) exit 1;;
+ malformed) printf '{"filesystems":null}\n';;
+ empty) printf '{"filesystems":[]}\n';;
+ nested) jq -n --arg path "$UKE_FIXTURE_ROOT/proc" '{filesystems:[{target:"/"},{target:$path}]}' ;;
+ adjacent) jq -n --arg path "$UKE_FIXTURE_ROOT-other/proc" '{filesystems:[{target:"/"},{target:$path}]}' ;;
+esac
+SH
+cat > "$fixture/bin/find" <<'SH'
+#!/usr/bin/env bash
+touch "$UKE_FIXTURE_DISCOVERY"
+exit 97
+SH
+chmod +x "$fixture/bin/findmnt" "$fixture/bin/find"
+for mode in failure malformed empty nested; do
+ if PATH="$fixture/bin:$PATH" UKE_FIXTURE_ROOT="$fixture/payload" UKE_FIXTURE_MOUNTS=$mode \
+    UKE_FIXTURE_DISCOVERY="$fixture/discovered" bash "$audit" "$fixture/payload" > "$fixture/output" 2>&1; then exit 1; fi
+ [[ ! -e $fixture/discovered ]]
+ if grep -q '^Extracted target payload:' "$fixture/output"; then exit 1; fi
+done
+rm "$fixture/bin/find"
+PATH="$fixture/bin:$PATH" UKE_FIXTURE_ROOT="$fixture/payload" UKE_FIXTURE_MOUNTS=adjacent bash "$audit" "$fixture/payload" >/dev/null
+rm "$fixture/bin/findmnt"
+# Ordinary files under proc are still real payload when no mount hides them.
+mkdir "$fixture/payload/proc"
+printf '#!/usr/bin/python3\n' > "$fixture/payload/proc/unapproved"
+if bash "$audit" "$fixture/payload" >/dev/null 2>&1; then exit 1; fi
+rm "$fixture/payload/proc/unapproved"
+# Permission-bit checks alone do not detect I/O errors from readable files.
+cat > "$fixture/read-fault" <<'SH'
+read() {
+ for argument in "$@"; do
+  if [[ $argument == -n ]]; then printf 'injected read I/O error\n' >&2; return 1; fi
+ done
+ builtin read "$@"
+}
+SH
+if BASH_ENV="$fixture/read-fault" bash "$audit" "$fixture/payload" > "$fixture/output" 2>&1; then exit 1; fi
+grep -F 'Unreadable target header rejected:' "$fixture/output" >/dev/null
+if grep -q '^Extracted target payload:' "$fixture/output"; then exit 1; fi
 # Keep NUL-safe enumeration and the real ELF decoder on ordinary data.
 cp /bin/true "$fixture/payload/ELF with space"
 printf '#!/bin/sh\n' > "$fixture/payload/line"$'\n'"break"
@@ -45,4 +89,4 @@ done
 for mode in cross-line ordinary; do
  PATH="$fixture/bin:$PATH" UKE_FIXTURE_DYNAMIC=$mode bash "$audit" "$fixture/payload" >/dev/null
 done
-echo 'Traversal failure, NUL-safe names, real malformed ELF, decoder failure and line-bounded Python dependency checks passed'
+echo 'Mount/read/traversal failures, ordinary proc payload, NUL-safe names, malformed ELF and Python dependency checks passed'

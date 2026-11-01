@@ -7,12 +7,19 @@ repo=$(cd "$(dirname "$0")/.." && pwd)
 source "$repo/src/public/root-proc.sh"
 fixture=$(mktemp -d)
 mkdir "$fixture/proc"
+printf '#!/bin/sh\n' > "$fixture/safe"
 trap 'public_root_proc_unmount "$fixture"; find "$fixture" -depth -delete' EXIT
 public_root_proc_mount "$fixture"
 findmnt --mountpoint "$fixture/proc" --noheadings -o OPTIONS | grep -Eq '(^|,)ro(,|$)'
 test -L "$fixture/proc/self/fd/1"
+if bash "$repo/src/audit/check-target-payload.sh" "$fixture" > "$fixture/audit-mounted.log" 2>&1; then
+    echo 'Payload audit accepted a live proc mount' >&2; exit 1
+fi
+grep -F 'Mounted target subtree or incomplete mount inventory' "$fixture/audit-mounted.log" >/dev/null
+rm "$fixture/audit-mounted.log"
 public_root_proc_unmount "$fixture"
 public_root_proc_unmount "$fixture"
+bash "$repo/src/audit/check-target-payload.sh" "$fixture"
 rmdir "$fixture/proc"
 ln -s /proc "$fixture/proc"
 if public_root_proc_mount "$fixture"; then exit 1; fi

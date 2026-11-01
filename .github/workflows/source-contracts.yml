@@ -35,4 +35,7 @@ jobs:
           bash tests/public-channel-contract.sh
           bash tests/repository-kernel-plan.sh
           bash tests/public-worker-snapshot.sh docker
+          shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
+          bash tests/payload-traversal.sh
+          bash tests/original-kde-payload.sh
           echo 'Native helper builds and file fixtures run in the uke-image-tools COPR build.' >> "$GITHUB_STEP_SUMMARY"

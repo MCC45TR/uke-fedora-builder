@@ -397,7 +397,6 @@ done < <(if [[ -n $copr_inputs ]]; then find "$copr_inputs/rpms/fedora" -type f 
          else find "/cache/dnf-$channel" -type f -name '*.rpm' -print0; fi)
 LC_ALL=C sort /job/fedora-inputs.tsv > /job/artifacts/fedora-inputs.tsv
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
-bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
 bash /builder/src/public/login-shell.sh "$root" "$(jq -er .default_shell "$request")" > /job/artifacts/login-shell.json
 [[ $(rpm --root "$root" -q fedora-release-common --qf '%{VERSION}') == "$fedora_number" ]]
 # Official Fedora carry-over builds are admitted only through verified Fedora RPM bytes.
@@ -473,6 +472,9 @@ jq --slurpfile cohort /job/cohort-validation.json '. + {cohort_validation:$cohor
     /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
 public_root_proc_unmount "$root"
+# Audit the final installed files only after every chroot operation has finished
+# and procfs is detached. The auditor rejects any remaining mounted subtree.
+bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "$root"
 for tree in dev proc sys run; do
     if findmnt --mountpoint "$root/$tree" --noheadings >/dev/null; then die 'Mounted runtime tree during export'; fi
     find "$root/$tree" -xdev -mindepth 1 -depth -delete

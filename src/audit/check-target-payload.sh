@@ -8,15 +8,27 @@ if [[ ${1:-} == --original-kde-payload ]]; then
   original=$(realpath -- "$2"); shift 2
 fi
 [[ $# == 1 && -d $1 ]] || { echo 'Usage: check-target-payload.sh [--original-kde-payload VERIFIED_ORIGINAL_DIRECTORY] EXTRACTED_TARGET_DIRECTORY' >&2; exit 2; }
-for tool in realpath find readlink readelf cmp mktemp rm; do
+for tool in realpath find findmnt jq readlink readelf cmp mktemp rm; do
   command -v "$tool" >/dev/null || { printf 'Missing host audit tool: %s\n' "$tool" >&2; exit 2; }
 done
 root=$(realpath -- "$1")
-[[ $original != "$root" ]] || exit 2
+[[ $root != / && $original != "$root" ]] || exit 2
 # Finish discovery before issuing any acceptance result. Process substitution
 # would hide find's exit status and could silently omit an unreadable subtree.
 listing=$(mktemp)
-trap 'rm -f -- "$listing"' EXIT
+mounts=$(mktemp)
+read_errors=$(mktemp)
+trap 'rm -f -- "$listing" "$mounts" "$read_errors"' EXIT
+# Never inspect a live procfs/sysfs/device mount as extracted RPM bytes. Fail
+# before discovery rather than pruning paths that could contain real payload.
+if ! findmnt --all --list --json --output TARGET > "$mounts" ||
+   ! jq -e --arg prefix "$root/" '
+     (.filesystems | type == "array" and length > 0) and
+     all(.filesystems[]; (.target | type == "string") and
+                        (.target | startswith($prefix) | not))' "$mounts" >/dev/null; then
+  echo 'Mounted target subtree or incomplete mount inventory; payload audit refused' >&2
+  exit 1
+fi
 if ! find "$root" -mindepth 1 \( -type f -o -type l \) -print0 > "$listing"; then
   echo 'Target traversal failed; payload audit is incomplete' >&2
   exit 1
@@ -47,7 +59,11 @@ while IFS= read -r -d '' path; do
     [[ -r $path ]] || { printf 'Unreadable target file: %s\n' "${path#"$root/"}" >&2; failed=1; continue; }
     # Bound the header read without spawning several processes for every file.
     header=''
-    IFS= read -r -n 256 -d '' header < "$path" || :
+    if IFS= read -r -n 256 -d '' header 2> "$read_errors" < "$path"; then :
+    elif [[ -s $read_errors ]]; then
+      printf 'Unreadable target header rejected: %s\n' "${path#"$root/"}" >&2
+      failed=1; continue
+    fi
     if [[ $header =~ ^\#\![^[:cntrl:]]*(python|pypy) ]]; then
       python_payload "$path"
     elif [[ ${header:0:4} == $'\177ELF' ]]; then
