@@ -6,8 +6,10 @@
 source "$BUILDER/src/public/kernel-source.sh"
 public_help() {
     cat <<'HELP'
-Uke Fedora AArch64 source and image builder
+Uke Linux AArch64 source and image builder
 Usage: ./ukelinux.sh [--build image|kernel] [options]
+  --distro fedora|ubuntu|arch        Target distribution; default Fedora
+                                    Ubuntu and Arch backends are not implemented yet
   --mode multiboot|singleboot        Root partition: linux or userdata
   --filesystem ext4|f2fs|btrfs|xfs   Single-device root filesystem
   --release 44|45|rawhide            Target Fedora version; default Rawhide
@@ -78,6 +80,33 @@ TEXT
         '     F2FS userdata grows offline during first boot; other formats retain the image size.'
 }
 public_main() {
+    # Resolve distribution before legacy routing or any Fedora-specific preparation.
+    local distro=fedora distro_given=0 distro_prompt=1 distro_arg
+    local -a distro_args=()
+    while (($#)); do
+        case $1 in
+            --distro=*) distro=${1#*=}; distro_given=1;;
+            --distro)
+                shift; (($#)) || die 'Missing value for --distro'
+                distro=$1; distro_given=1;;
+            *)
+                distro_arg=$1
+                case $distro_arg in --yes|--dry-run|--help|-h|--self-test|--check-device) distro_prompt=0;; esac
+                distro_args+=("$distro_arg");;
+        esac
+        shift
+    done
+    if [[ $distro_given == 0 && $distro_prompt == 1 && -t 0 ]]; then
+        read -r -p 'Distribution: fedora, ubuntu (unavailable), arch (unavailable) [fedora]: ' distro_arg
+        distro=${distro_arg:-fedora}
+    fi
+    case $distro in
+        fedora) ;;
+        ubuntu|arch) die "Distribution $distro: unsupported; native image backend is not implemented. No build was started.";;
+        '') die 'Missing value for --distro';;
+        *) die 'Distribution must be fedora, ubuntu or arch';;
+    esac
+    set -- "${distro_args[@]}"
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing fedora_release=rawhide login_shell=bash
     local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior='' kernel_request='' kernel_rpm=''
     local build_from_source=0

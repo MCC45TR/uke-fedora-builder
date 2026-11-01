@@ -32,6 +32,8 @@ jobs:
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
           bash tests/public-build-contract.sh
+          shellcheck tests/distribution-routing.sh
+          bash tests/distribution-routing.sh
           bash tests/public-channel-contract.sh
           bash tests/repository-kernel-plan.sh
           bash tests/public-worker-snapshot.sh docker

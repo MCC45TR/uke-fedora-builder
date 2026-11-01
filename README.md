@@ -1,4 +1,4 @@
-# Uke Fedora Builder
+# Uke Linux Builder
 
 Fedora Rawhide AArch64 image and build tools for the **Xiaomi Pad 7** and **POCO Pad X1** (`uke`, Qualcomm SM7675).
 
@@ -25,7 +25,9 @@ cd uke-linux
 ./ukelinux.sh
 ```
 
-The interactive menu lets you choose a build target, installation layout, filesystem, desktop, package channel and output directory.
+The interactive menu lets you choose a distribution, build target, installation layout, filesystem, desktop, package channel and output directory. The repository keeps its existing `uke-fedora-builder` name and uses only `main` for active development.
+
+As of **1 November 2026**, `--distro fedora` selects the existing Fedora backend and remains the default. `--distro ubuntu` and `--distro arch` are reserved choices that stop explicitly before host preparation, including with `--dry-run`; they do not produce Fedora images under another distribution's name. See [distribution backend status](docs/DISTRIBUTIONS.md) for remaining work.
 
 | Option | Available selections |
 | --- | --- |
