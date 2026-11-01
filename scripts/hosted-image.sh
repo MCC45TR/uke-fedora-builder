@@ -5,6 +5,7 @@ root=$(git rev-parse --show-toplevel)
 [[ -x $root/ukelinux.sh && $(uname -m) == aarch64 ]]
 case ${IMAGE_DESKTOP:-kde} in kde|gnome) ;; *) exit 2;; esac
 case ${IMAGE_SHELL:-bash} in bash|fish|zsh) ;; *) exit 2;; esac
+case ${IMAGE_CHANNEL:-unstable} in stable|testing|unstable) ;; *) exit 2;; esac
 case ${IMAGE_SIZE_MIB:-16384} in 8192|16384) ;; *) exit 2;; esac
 [[ -n ${RUNNER_TEMP:-} && -n ${GITHUB_OUTPUT:-} && -n ${GITHUB_RUN_ID:-} ]]
 output=$RUNNER_TEMP/uke-build
@@ -14,7 +15,7 @@ mkdir -p "$output" "$release"
 export UKE_CONTAINER_ENGINE=docker
 "$root/ukelinux.sh" --build image --mode singleboot --filesystem ext4 \
     --release rawhide --desktop "${IMAGE_DESKTOP:-kde}" --shell "${IMAGE_SHELL:-bash}" \
-    --channel testing --kernel-rpm "${IMAGE_KERNEL_RPM:-latest}" \
+    --channel "${IMAGE_CHANNEL:-unstable}" --kernel-rpm "${IMAGE_KERNEL_RPM:-latest}" \
     --linux-size "${IMAGE_SIZE_MIB:-16384}" --out "$output" --yes
 mapfile -t manifests < <(find "$output" -path '*/artifacts/manifest.json' -type f)
 [[ ${#manifests[@]} == 1 ]]
@@ -44,9 +45,9 @@ install -m644 "$artifacts/kernel/RPM-SHA256SUMS" "$release/kernel-RPM-SHA256SUMS
 # Hash only the final downloadable files. The sparse image hash is retained in manifest.json.
 (cd "$release"; sha256sum boot.img system.img.zst manifest.json FLASHING.txt installed-rpms.tsv kernel-packages.tsv kernel-RPM-SHA256SUMS SOURCE.txt > SHA256SUMS; sha256sum --check --strict SHA256SUMS)
 cat > "$release/RELEASE.md" <<TEXT
-Fedora Rawhide AArch64 ${IMAGE_DESKTOP:-kde} EXT4 singleboot testing image for Xiaomi Pad 7 / POCO Pad X1.
+Fedora Rawhide AArch64 ${IMAGE_DESKTOP:-kde} EXT4 singleboot ${IMAGE_CHANNEL:-unstable} image for Xiaomi Pad 7 / POCO Pad X1.
 
-Built natively on GitHub's ubuntu-24.04-arm runner. Linux $(jq -r .kernel_release "$release/manifest.json") comes from the signature-verified Uke testing repository. Exact sources, RPM identities and host readback results are included in the receipts. No private touch reference or login credentials are included. SSH and automatic kernel activation are disabled.
+Built natively on GitHub's ubuntu-24.04-arm runner. Linux $(jq -r .kernel_release "$release/manifest.json") comes from the signature-verified Uke ${IMAGE_CHANNEL:-unstable} repository. Exact sources, RPM identities and host readback results are included in the receipts. No private touch reference or login credentials are included. SSH and automatic kernel activation are disabled.
 
 This is an experimental pre-release. Host checks do not establish tablet boot, charging, first-account setup or recovery acceptance. Provide your own qualified touch reference before touch-based account setup. Firmware redistribution notices and component licenses remain separate from kernel source licensing.
 

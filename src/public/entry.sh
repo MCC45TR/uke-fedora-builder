@@ -16,7 +16,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --build-from-source               Compile kernel and missing platform RPMs (opt-in)
   --shell bash|fish|zsh              New user login shell; default Bash
   --channel stable|testing|unstable Uke RPM channel; independent of Fedora version
-  --kernel-rpm EVR|latest           Image only: verified testing RPMs instead of compiling Linux
+  --kernel-rpm EVR|latest           Verified testing/unstable RPMs; unstable defaults to latest
   --kernel VERSION|latest|lastest   Linux version to build; latest is kernel.org's newest stable
                                     release and needs a reviewed Uke profile (default: policy version)
   --kernel-profile normal|el2-require|el2-exit-experimental
@@ -37,6 +37,7 @@ Supported Linux hosts: Ubuntu, Fedora, openSUSE, Arch Linux and Alpine;
 x86_64 and AArch64. Bash bootstraps after confirmation on minimal hosts.
 Image builds install signed Fedora/COPR RPMs into a new filesystem by default.
 Kernel-only builds produce its source RPM, binary RPMs and both boot profiles.
+Unstable Rawhide selections consume signed COPR kernels and image helpers.
 Existing core, boot, boot-pair and --check-device commands remain available.
 Run sudo dnf update --refresh after the first Fedora boot. This is required.
 Build output is unqualified until its separate physical installation test.
@@ -148,14 +149,14 @@ public_main() {
     [[ $KERNEL_PROFILE == normal || $channel == testing ]] || die 'EL2 candidates require --channel testing'
     [[ -z $kernel_request || $kernel_request =~ ^(latest|lastest|[0-9]+\.[0-9]+(\.[0-9]+)?)$ ]] ||
         die 'Kernel must be an explicit version such as 7.2.12, latest or lastest'
-    if [[ $target == image && $build_from_source == 0 ]]; then
+    if [[ ( $target == image || $channel == unstable ) && $build_from_source == 0 ]]; then
         [[ -z $kernel_request && $REUSE_KERNEL == 0 ]] || die 'Source kernel options require --build-from-source'
         kernel_rpm=${kernel_rpm:-latest}
     fi
     [[ $build_from_source == 0 || -z $kernel_rpm ]] || die '--build-from-source conflicts with --kernel-rpm'
     if [[ -n $kernel_rpm ]]; then
         [[ $kernel_rpm == latest || $kernel_rpm =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ ]] || die 'Kernel RPM must be latest or an exact 7.3.x-N.fc46 release'
-        [[ $target == image && $KERNEL_PROFILE == normal && $REUSE_KERNEL == 0 && -z $kernel_request ]] || die 'Repository kernel requires an ordinary image without --kernel or --reuse-kernel'
+        [[ ( $target == image || $channel == unstable ) && $fedora_release == rawhide && $KERNEL_PROFILE == normal && $REUSE_KERNEL == 0 && -z $kernel_request ]] || die 'Repository kernel requires a normal Rawhide image or unstable kernel without source/reuse options'
         [[ -z ${UKE_KERNEL_REPO:-} || $UKE_KERNEL_REPO == none ]] || die 'Repository kernel cannot use a local kernel source'
     fi
     [[ $REUSE_KERNEL == 0 || $target == image ]] || die '--reuse-kernel applies to image builds only'
@@ -191,6 +192,7 @@ public_main() {
     else say "Kernel: ${kernel_request:-the policy default version}; source: the policy repository, resolved once when the build starts"; fi
     ((REUSE_KERNEL == 0)) || say 'Kernel: reusing the cached build of this source; a missing cache stops the build'
     ((DRY_RUN == 0)) || return 0
+    [[ $channel != unstable || $fedora_release == rawhide ]] || die 'Unstable packages are available only for Fedora Rawhide AArch64'
     [[ $target != image || $fedora_release == rawhide ]] || die "Unsupported Fedora $fedora_release image: signed native Uke family builds and complete dependency resolution are pending; no Rawhide RPM fallback is allowed"
     [[ $target != image || $desktop != cutefish ]] || die 'Unsupported image: Cutefish packages are built separately in mcc45tr/cutefish; graphical login and secure first-account setup are not validated'
     [[ $target != image || $desktop != nextkde ]] || die 'NextKde unavailable: its COPR project has no published desktop packages'
@@ -220,7 +222,12 @@ public_main() {
     kernel_ref=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].ref // .kernel.ref' "$policy_file")
     KERNEL_CONFIG_SHA=$(jq -r --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].native_config_sha256 // empty' "$policy_file")
     [[ -n $kernel_request ]] || kernel_request=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].default_version // .kernel.default_version' "$policy_file")
-    KERNEL_VERSION=$(kernel_version_resolve "$kernel_request" "$WORK/inputs/releases.json" "$cache_root/releases/releases.json" "$OFFLINE") || exit 1
+    if [[ -n $kernel_rpm ]]; then
+        # Initial policy context only; signed payload metadata replaces this before root composition.
+        KERNEL_VERSION=$kernel_request
+    else
+        KERNEL_VERSION=$(kernel_version_resolve "$kernel_request" "$WORK/inputs/releases.json" "$cache_root/releases/releases.json" "$OFFLINE") || exit 1
+    fi
     kernel_url=$(jq -er .kernel.url "$policy_file")
     if [[ -n $kernel_repo ]]; then
         KERNEL_COMMIT=$(git -C "$kernel_repo" rev-parse HEAD)
@@ -249,17 +256,18 @@ public_main() {
           kernel_commit:$commit,kernel_version:$version,kernel_requested:$requested,kernel_url:$url,kernel_rpm_request:$kernel_rpm,kernel_profile:$profile,kernel_native_config_sha256:$config,run_kernel_tests:($tests==1)}
          + (if $bundle == "" then {} else {kernel_bundle:$bundle} end)' > "$WORK/request.json"
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
-    local native_image arm_image native_base arm_base recipe_sha arm_recipe=Containerfile.public
+    local native_image arm_image native_base arm_base recipe_sha arm_recipe=Containerfile.public native_recipe=Containerfile.public-native
     [[ -z $kernel_rpm ]] || arm_recipe=Containerfile.public-repository
+    if [[ $channel == unstable && -n $kernel_rpm ]]; then arm_recipe=Containerfile.public-unstable; native_recipe=$arm_recipe; fi
     native_base=$(jq -er --arg release "$fedora_release" --arg arch "$architecture" '.fedora_targets[$release].images[$arch]' "$WORK/recipe/configs/build-rules.json")
     arm_base=$(jq -er --arg release "$fedora_release" '.fedora_targets[$release].images.aarch64' "$WORK/recipe/configs/build-rules.json")
-    recipe_sha=$({ printf '%s\n' "$fedora_release" "$native_base" "$arm_base" "$arm_recipe"; cat "$WORK/recipe/configs/Containerfile.public" "$WORK/recipe/configs/Containerfile.public-native" "$WORK/recipe/configs/Containerfile.public-repository" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json"; } | sha256sum | cut -d ' ' -f1)
+    recipe_sha=$({ printf '%s\n' "$fedora_release" "$native_base" "$arm_base" "$arm_recipe"; cat "$WORK/recipe/configs/Containerfile.public" "$WORK/recipe/configs/Containerfile.public-native" "$WORK/recipe/configs/Containerfile.public-repository" "$WORK/recipe/configs/Containerfile.public-unstable" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json"; } | sha256sum | cut -d ' ' -f1)
     native_image=localhost/uke-public-native:${recipe_sha:0:16}-$architecture
     arm_image=localhost/uke-public-arm64:${recipe_sha:0:16}
-    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 ]]; then
+    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $channel != unstable ]]; then
         arm_image=localhost/uke-public-repository:${recipe_sha:0:16}-$architecture
     fi
-    public_worker "$native_image" "$host_platform" "$native_base" Containerfile.public-native
+    public_worker "$native_image" "$host_platform" "$native_base" "$native_recipe"
     TEST_IMAGE=$arm_base
     "$ENGINE" image inspect "$arm_base" >/dev/null 2>&1 || { ((OFFLINE == 0)) && "$ENGINE" pull --platform linux/arm64 "$arm_base"; }
     if [[ $architecture == x86_64 ]]; then
@@ -268,7 +276,7 @@ public_main() {
         UKE_AARCH64_INTERPRETER=$WORK/inputs/qemu-aarch64-static
         [[ -n $kernel_rpm ]] || prepare_aarch64
     fi
-    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 ]]; then
+    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $channel != unstable ]]; then
         # Package retrieval and native dnf do not execute target code. Only RPM
         # scriptlets use the verified AArch64 interpreter during root assembly.
         public_worker "$arm_image" "$host_platform" "$native_base" "$arm_recipe"
@@ -279,7 +287,7 @@ public_main() {
     # host's binfmt handler still runs RPM scriptlets and chroot commands. UKE_CROSS=0 emulates all steps.
     local cross=0 cross_image=localhost/uke-public-cross:${recipe_sha:0:16} root_image=$arm_image root_platform=linux/arm64
     # shortcut: KVM helpers build on AArch64; enable cross after porting their prebuilt paths.
-    if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $KERNEL_PROFILE == normal ]]; then
+    if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $KERNEL_PROFILE == normal && $channel != unstable ]]; then
         cross=1 root_image=$cross_image root_platform=$host_platform
         public_worker "$cross_image" "$host_platform" "$native_base" "$arm_recipe"
     fi
@@ -326,12 +334,18 @@ public_main() {
         ((cross == 0)) || say 'Installing the AArch64 root with native dnf; only package scriptlets are emulated'
         if [[ -n $kernel_rpm && $architecture == x86_64 ]]; then prepare_aarch64; fi
         public_stage "$root_image" "$root_platform" root
-        public_stage "$native_image" "$host_platform" filesystem
+        if [[ $channel == unstable ]]; then public_stage "$arm_image" linux/arm64 filesystem
+        else public_stage "$native_image" "$host_platform" filesystem; fi
     fi
-    jq --arg native "$("$ENGINE" image inspect --format '{{.Id}}' "$native_image")" \
+    local image_tools=null
+    if [[ $channel == unstable && -f $WORK/artifacts/tools/manifest.json ]]; then
+        image_tools=$(cat "$WORK/artifacts/tools/manifest.json")
+    fi
+    jq --argjson tools "$image_tools" --arg native "$("$ENGINE" image inspect --format '{{.Id}}' "$native_image")" \
         --arg arm "$("$ENGINE" image inspect --format '{{.Id}}' "$arm_image")" \
         --arg cross "$( ((cross == 0)) || "$ENGINE" image inspect --format '{{.Id}}' "$cross_image")" \
-        '. + {native_worker:$native,aarch64_worker:$arm} + (if $cross == "" then {} else {cross_worker:$cross} end)' \
+        '. + {native_worker:$native,aarch64_worker:$arm} + (if $cross == "" then {} else {cross_worker:$cross} end)
+         + (if $tools == null then {} else {image_tools:$tools} end)' \
         "$WORK/artifacts/manifest.json" > "$WORK/manifest.tmp"
     mv "$WORK/manifest.tmp" "$WORK/artifacts/manifest.json"
     if [[ $target == image ]]; then public_flash_help "$partition" > "$WORK/artifacts/FLASHING.txt";

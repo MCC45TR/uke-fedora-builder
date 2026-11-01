@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Real local image round trip; creates only a disposable scratch image/container.
+# Exercise the production worker builder against an immutable recipe copy.
+# Worker archive export was retired; the production path retains a frozen recipe.
 # shellcheck disable=SC2034
 set -Eeuo pipefail
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -9,34 +10,30 @@ source "$root/src/image/core.sh"
 # shellcheck source=../src/public/entry.sh
 # shellcheck disable=SC1091
 source "$root/src/public/entry.sh"
-ENGINE=${1:-podman}
-WORK=$(mktemp -d /tmp/uke-worker-snapshot.XXXXXX)
+ENGINE=${1:-docker}
+WORK=$(mktemp -d /tmp/uke-worker-recipe.XXXXXX)
 tag=localhost/uke-worker-fixture:$(basename "$WORK")
-image='' container=''
+container=''
 finish() {
-    [[ -z $container ]] || "$ENGINE" rm "$container" > /dev/null 2>&1 || true
-    [[ -z $image ]] || "$ENGINE" image rm -f "$image" > /dev/null 2>&1 || true
-    "$ENGINE" image rm -f "$tag" > /dev/null 2>&1 || true
+    [[ -z $container ]] || "$ENGINE" rm "$container" >/dev/null 2>&1 || true
+    "$ENGINE" image rm -f "$tag" >/dev/null 2>&1 || true
     find "$WORK" -depth -delete
 }
 trap finish EXIT
-mkdir -p "$WORK/context" "$WORK/inputs"
-printf 'worker archive fixture %s\n' "$WORK" > "$WORK/context/payload"
-printf 'FROM scratch\nCOPY payload /payload\n' > "$WORK/context/Containerfile"
-"$ENGINE" build --network=none -t "$tag" -f "$WORK/context/Containerfile" "$WORK/context" > "$WORK/build.log" 2>&1
-image=$("$ENGINE" image inspect --format '{{.Id}}' "$tag")
-image=sha256:${image#sha256:}
-[[ $(public_snapshot_worker "$tag") == "$image" ]]
-[[ $(public_snapshot_worker "$image") == "$image" ]]
-[[ $(find "$WORK/inputs" -type f | wc -l) == 1 ]]
-archive=$WORK/inputs/worker-${image#sha256:}.tar
-"$ENGINE" image rm "$tag" > /dev/null
-if "$ENGINE" image inspect "$image" > /dev/null 2>&1; then exit 1; fi
-"$ENGINE" load --input "$archive" > "$WORK/load.log" 2>&1
-restored=$("$ENGINE" image inspect --format '{{.Id}}' "$image")
-[[ sha256:${restored#sha256:} == "$image" ]]
-container=$("$ENGINE" create "$image" /unused)
+mkdir -p "$WORK/live/configs" "$WORK/recipe"
+printf 'frozen worker bytes\n' > "$WORK/live/configs/payload"
+printf 'FROM scratch\nCOPY payload /payload\n' > "$WORK/live/configs/Containerfile"
+cp -a "$WORK/live/configs" "$WORK/recipe/"
+printf 'later live edit\n' > "$WORK/live/configs/payload"
+OFFLINE=0
+public_worker "$tag" "linux/$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')" scratch Containerfile > "$WORK/build.log" 2>&1
+identity=$("$ENGINE" image inspect --format '{{.Id}}' "$tag")
+OFFLINE=1
+public_worker "$tag" unused scratch Containerfile
+[[ $("$ENGINE" image inspect --format '{{.Id}}' "$tag") == "$identity" ]]
+container=$("$ENGINE" create "$tag" /unused)
 "$ENGINE" cp "$container:/payload" "$WORK/readback"
-cmp "$WORK/context/payload" "$WORK/readback"
-if public_snapshot_worker localhost/uke-worker-fixture:missing > /dev/null 2>&1; then exit 1; fi
-echo 'Worker archive restores the exact image ID and payload after local removal; repeated/missing-image checks passed'
+cmp "$WORK/recipe/configs/payload" "$WORK/readback"
+if cmp -s "$WORK/live/configs/payload" "$WORK/readback"; then exit 1; fi
+if (public_worker "$tag-missing" unused scratch Containerfile) > "$WORK/refused" 2>&1; then exit 1; fi
+printf 'Production worker uses frozen recipe bytes, reuses exact cached identity and rejects a missing offline worker\n'

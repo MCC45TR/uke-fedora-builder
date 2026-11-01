@@ -122,12 +122,13 @@ admitted by the selected SRPM producer.
 | `gnome` | Original Fedora GNOME Shell, GDM and GNOME Initial Setup. |
 | `stable` | Packages from `mcc45tr/uke-linux`, plus the pinned local platform-family builds described below. This is not a stable Fedora release or hardware qualification. |
 | `testing` | Signed packages from `mcc45tr/uke-linux-test`; the installed control channel is named `test`. |
-| `unstable` | The test repository with the installed control channel named `unstable`. |
+| `unstable` | Signed individual packages from `mcc45tr/uke-linux-unstable`; Fedora Rawhide AArch64 only. |
 
-All three channels build the same kernel source and version, selected by
-[`configs/public-build.json`](../configs/public-build.json) and `--kernel`. An unstable
-selection does not silently replace it with an unported kernel.org release candidate.
-Kernel-only output uses that same source/spec and produces both root profiles.
+The stable/testing source routes use the kernel policy in
+[`configs/public-build.json`](../configs/public-build.json) and `--kernel`.
+Unstable consumes matching signed kernel RPMs, defaults to `--kernel-rpm latest`
+and refuses local source substitution. Kernel-only output retains both root
+profiles for the selected source or signed RPM set.
 The stable repository predates the current source families. Stable image builds
 therefore also compile `uke-additional`, `uke-sensors`, `uke-hw`, `uke-power`,
 `uke-core` and `uke-metas` from the exact public hardware commit in that policy.
@@ -140,7 +141,8 @@ The pinned source producer's four historical SRPM inputs are cached from the
 checksum-locked GitHub archive before composition. This preserves the selected
 commit and input bytes after the retired COPR archive projects are removed.
 Online builds verify each download; offline builds require the exact cached
-bytes. Only `uke-linux` and `uke-linux-test` remain active Uke COPR projects.
+bytes. The three current Uke COPR channels are `uke-linux`, `uke-linux-test` and
+`uke-linux-unstable`; retired archive projects are not build inputs.
 
 ## Host preparation and input verification
 

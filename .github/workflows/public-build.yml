@@ -54,7 +54,7 @@ jobs:
             git -C "$job/source" submodule status --recursive
           } | tee "$job/source-identity.txt"
           export UKE_KERNEL_REPO="$job/source/senemos-uke-kernel"
-          "$job/source/ukelinux.sh" --build image --mode "$MODE" --filesystem "$FILESYSTEM" \
+          "$job/source/ukelinux.sh" --build image --build-from-source --mode "$MODE" --filesystem "$FILESYSTEM" \
             --desktop "$DESKTOP" --channel "$CHANNEL" --kernel "$KERNEL_VERSION" --out "$job/out" --yes
           # Results remain local; this job does not publish firmware or device data.
           find "$job/out" -path '*/artifacts/manifest.json' -exec cat {} \;

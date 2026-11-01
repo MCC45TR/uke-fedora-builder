@@ -7,5 +7,6 @@ RUN --mount=type=secret,id=proxy_ca if [ -f /run/secrets/proxy_ca ]; then printf
     bc bison flex clang llvm lld make gcc perl compiler-rt elfutils-libelf-devel \
     openssl-devel systemd-devel libasan libubsan ncurses-devel alsa-topology-utils rsync kmod dtc python3 \
     dracut systemd systemd-udev grep sed gzip f2fs-tools createrepo_c \
+    libguestfs-tools-c qemu-kvm-core kernel-core kernel-modules \
     && dnf clean all && sed -i '/^sslcacert=\/run\/secrets\/proxy_ca$/d' /etc/dnf/dnf.conf
 ENV LANG=C.UTF-8 LC_ALL=C.UTF-8 TZ=UTC

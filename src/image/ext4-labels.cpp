@@ -7,6 +7,7 @@
 #include <array>
 #include <cerrno>
 #include <cstring>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
 #include <stdexcept>
@@ -16,10 +17,48 @@ namespace fs = std::filesystem;
 static void check(errcode_t code, const char *operation) {
     if (code) throw std::runtime_error(std::string(operation) + ": " + error_message(code));
 }
+static int verify_tree(const fs::path &directory, const char *contexts) {
+    struct stat root_stat {};
+    if (lstat(directory.c_str(), &root_stat) || !S_ISDIR(root_stat.st_mode))
+        throw std::runtime_error("Tree must be a directory, never a symlink");
+    const fs::path root = fs::canonical(directory);
+    selinux_opt options[] = {{SELABEL_OPT_PATH, contexts}};
+    selabel_handle *labels = selabel_open(SELABEL_CTX_FILE, options, 1);
+    if (!labels) throw std::runtime_error("Cannot load the target file-context policy");
+    unsigned long count = 0, excluded = 0;
+    auto visit = [&](const fs::path &entry) {
+        const std::string path = entry == root ? "/" : "/" + entry.lexically_relative(root).generic_string();
+        struct stat metadata {};
+        if (lstat(entry.c_str(), &metadata)) throw std::runtime_error("Cannot stat " + path);
+        char *expected = nullptr;
+        if (selabel_lookup_raw(labels, &expected, path.c_str(), metadata.st_mode)) {
+            if (errno == ENOENT) { ++excluded; return; }
+            throw std::runtime_error("Policy has no context for " + path);
+        }
+        char *actual = nullptr;
+        const int length = lgetfilecon_raw(entry.c_str(), &actual);
+        const bool matches = length >= 0 && actual && !std::strcmp(expected, actual);
+        const std::string difference = matches ? "" : "Context differs at " + path +
+            ": expected " + expected + "; found " + (actual ? actual : "<missing>");
+        freecon(expected);
+        if (actual) freecon(actual);
+        if (!matches) throw std::runtime_error(difference);
+        ++count;
+    };
+    try {
+        visit(root);
+        for (const auto &entry : fs::recursive_directory_iterator(root)) visit(entry.path());
+    } catch (...) { selabel_close(labels); throw; }
+    selabel_close(labels);
+    std::cout << "Verified " << count << " SELinux tree contexts; " << excluded << " policy-excluded paths\n";
+    return 0;
+}
 int main(int argc, char **argv) {
     try {
+        if (argc == 4 && !std::strcmp(argv[1], "verify-tree")) return verify_tree(argv[2], argv[3]);
+        initialize_ext2_error_table();
         if (argc != 5 || (std::strcmp(argv[1], "apply") && std::strcmp(argv[1], "verify")))
-            throw std::runtime_error("Usage: ext4-labels apply|verify IMAGE ROOT FILE_CONTEXTS");
+            throw std::runtime_error("Usage: ext4-labels apply|verify IMAGE ROOT FILE_CONTEXTS; verify-tree ROOT FILE_CONTEXTS");
         struct stat image_stat {};
         if (lstat(argv[2], &image_stat) || !S_ISREG(image_stat.st_mode))
             throw std::runtime_error("Image must be a regular file, never a symlink or block device");
@@ -37,8 +76,8 @@ int main(int argc, char **argv) {
             check(ext2fs_namei(image, EXT2_ROOT_INO, EXT2_ROOT_INO, path.c_str(), &number), "resolve inode");
             ext2_inode inode {};
             check(ext2fs_read_inode(image, number, &inode), "read inode");
+            struct stat original {};
             if (!generated) {
-                struct stat original {};
                 if (lstat(source.c_str(), &original)) throw std::runtime_error("Cannot stat source");
                 if (inode.i_mode != original.st_mode || inode_uid(inode) != original.st_uid ||
                     inode_gid(inode) != original.st_gid)
@@ -82,6 +121,32 @@ int main(int argc, char **argv) {
                 ext2fs_free_mem(&actual);
             }
             ext2fs_xattrs_close(&attrs);
+            if (!generated) {
+                // Population does not retain root time or subsecond precision.
+                // Copy the actual staging mtime after xattr writes, then verify it.
+                ext2_inode_large timed {};
+                check(ext2fs_read_inode_full(image, number, reinterpret_cast<ext2_inode *>(&timed),
+                                            sizeof(timed)), "read extended inode time");
+                if (!ext2fs_inode_includes(EXT2_GOOD_OLD_INODE_SIZE + timed.i_extra_isize, i_mtime_extra))
+                    throw std::runtime_error("Image inode cannot retain subsecond time: " + path);
+                const std::int64_t seconds = original.st_mtim.tv_sec;
+                const auto nanoseconds = original.st_mtim.tv_nsec;
+                if (seconds < -2147483648LL || seconds > ((3LL << 32) + 2147483647LL) ||
+                    nanoseconds < 0 || nanoseconds >= 1000000000L)
+                    throw std::runtime_error("Source mtime is outside EXT4 range: " + path);
+                const auto low = static_cast<std::uint32_t>(seconds);
+                const auto epoch = static_cast<std::uint32_t>(
+                    (seconds - static_cast<std::int32_t>(low)) / (1LL << 32));
+                const auto extra = (static_cast<std::uint32_t>(nanoseconds) << 2) | epoch;
+                if (write) {
+                    timed.i_mtime = low;
+                    timed.i_mtime_extra = extra;
+                    check(ext2fs_write_inode_full(image, number, reinterpret_cast<ext2_inode *>(&timed),
+                                                 sizeof(timed)), "write original inode mtime");
+                } else if (timed.i_mtime != low || timed.i_mtime_extra != extra) {
+                    throw std::runtime_error("Mtime differs at " + path);
+                }
+            }
             if (context) { freecon(context); ++count; }
             else ++excluded;
         };
