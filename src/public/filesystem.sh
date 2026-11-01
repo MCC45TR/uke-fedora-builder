@@ -77,7 +77,9 @@ else
     metadata_auditor=/job/compare-root-metadata
     c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/compare-root-metadata.cpp -o "$metadata_auditor"
 fi
-public_root_compare /job/root /job/rootfs.tar /job/root-readback.tar /job "$metadata_auditor"
+public_root_compare /job/root /job/rootfs.tar /job/root-readback.tar /job "$metadata_auditor" \
+    /job/artifacts "$(jq -er .desktop /job/request.json)"
+[[ -s /job/artifacts/serialized-language-audit.json ]]
 if [[ $channel == unstable ]]; then cp "$UKE_IMAGE_TOOLS/android-sparse" /job/android-sparse
 else c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse; fi
 /job/android-sparse encode /job/root.raw "/job/artifacts/$partition.img"
@@ -109,6 +111,7 @@ jq --arg fs "$filesystem" --arg raw "$(cut -d ' ' -f1 /job/root.raw.sha256)" --a
     --argjson boot_bytes "$(stat -c %s /job/artifacts/boot.img)" \
     '. + {root_raw_bytes:$bytes,root_raw_sha256:$raw,root_sparse_sha256:$sparse,boot_sha256:$boot,boot_bytes:$boot_bytes,
       image_built:true,filesystem_contents_readback:true,filesystem_metadata_readback:true,selinux_relabel_performed:true,
+      serialized_language_payload_verified:true,translated_documentation_included:true,
       selinux_policy_contexts_verified:($fs=="ext4"),
       sparse_roundtrip_verified:true,independent_aosp_decoder_verified:true,physical_boot_tested:false,hardware_tested:false}
       | .cohort_validation.final_filesystem_hashes_verified = true' \

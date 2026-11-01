@@ -312,8 +312,7 @@ if [[ $(jq -r '.shared_core_phase // "none"' "$request") == import ]]; then
     cp -a /job/shared-core/original-fedora/. /job/original-fedora/
     # Installing a DE cannot repair files stripped from already-installed core
     # RPMs. Fail before DNF; an affected frozen core must be recreated.
-    rpm --root "$root" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\n]' > /job/imported-core-language-files.tsv
-    chroot "$root" /usr/bin/locale -a > /job/imported-core-locales.txt
+    public_language_inventory "$root" /job/imported-core-language-files.tsv /job/imported-core-locales.txt
     public_language_audit "$root" /job/imported-core-language-files.tsv core /job/imported-core-locales.txt /job/artifacts/imported-core-language-audit.json || die 'Imported core has an incomplete language payload; rebuild the common core'
 fi
 mkdir -p "$root/proc"
@@ -386,7 +385,7 @@ dnf=(dnf5 "${cache_flags[@]}" ${arch_flags[@]+"${arch_flags[@]}"} --use-host-con
     --setopt=install_weak_deps=False --setopt=gpgcheck=True --setopt=installonly_limit=0
     # Uke packages require files such as /usr/lib/systemd/systemd-growfs, which only the filelists metadata resolves.
     --setopt=optional_metadata_types=filelists --setopt=max_parallel_downloads=10
-    --setopt=tsflags=nodocs --setopt="excludepkgs=$excluded")
+    --setopt=tsflags= --setopt="excludepkgs=$excluded")
 if [[ -n $copr_inputs ]]; then dnf+=(--enable-repo=copr-frozen-fedora)
 else
     while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
@@ -404,9 +403,10 @@ public_root_transaction "$root" /job/root-install.log dnf local_rpms packages
 # shellcheck disable=SC2016
 chroot "$root" /usr/bin/bash -ec 'for tool in clear ps ip ping file find which curl tar gzip unzip; do command -v "$tool" >/dev/null; done; TERM=xterm clear >/dev/null'
 mkdir -p "$root/etc/rpm"
-printf '%%_install_langs all\n' > "$root/etc/rpm/macros.zz-uke-languages"
-rpm --root "$root" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\t%{FILEMODES}\n]' > /job/artifacts/rpm-language-files.tsv
-chroot "$root" /usr/bin/locale -a > /job/artifacts/supported-locales.txt
+printf '%%_install_langs all\n%%_excludedocs 0\n' > "$root/etc/rpm/macros.zz-uke-languages"
+public_language_inventory "$root" /job/artifacts/rpm-language-files.tsv /job/artifacts/supported-locales.txt
+public_language_repair "$root" /job/artifacts/rpm-language-files.tsv /job/artifacts/supported-locales.txt dnf \
+    /job/language-repair.log /job/artifacts/language-repair.json || die 'Complete RPM translation repair failed'
 public_language_audit "$root" /job/artifacts/rpm-language-files.tsv "$desktop" /job/artifacts/supported-locales.txt /job/artifacts/language-audit.json || die 'Installed language payload is incomplete'
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
 # shellcheck source=desktop-isolation.sh

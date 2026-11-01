@@ -36,5 +36,13 @@ public_root_compare() {
     tar --extract --numeric-owner --acls --xattrs --xattrs-include=security.capability \
         -f "$readback" -C "$comparison/root" || return
     "$auditor" "$root" "$comparison/root" || return
+    if [[ $# == 7 ]]; then
+        # Re-audit the complete translated payload in independent readback.
+        # shellcheck source=languages.sh
+        # shellcheck disable=SC1091
+        source "$(dirname -- "${BASH_SOURCE[0]}")/languages.sh"
+        public_language_audit "$comparison/root" "$6/rpm-language-files.tsv" "$7" \
+            "$6/supported-locales.txt" "$6/serialized-language-audit.json" || return
+    fi
     find "$comparison" -depth -delete
 }

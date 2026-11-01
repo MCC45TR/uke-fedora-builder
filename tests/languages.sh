@@ -10,6 +10,9 @@ work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 reject() { if (set -Eeuo pipefail; "$@") > "$work/rejected" 2>&1; then echo "Incomplete languages accepted: $*" >&2; exit 1; fi; }
 mkdir -p "$work/base/usr/share/locale/tr/LC_MESSAGES" "$work/base/usr/lib/locale" "$work/base/usr/share/doc/example"
+mkdir -p "$work/base/usr/share/help/tr/malcontent" "$work/base/usr/share/help/de/example" "$work/base/usr/share/gnome/help/example/tr"
+printf 'translated documentation\n' > "$work/base/usr/share/doc/example/tr.txt"
+printf 'translated help\n' > "$work/base/usr/share/help/de/example/index.page"
 printf 'Turkish libc messages\n' > "$work/base/usr/share/locale/tr/LC_MESSAGES/libc.mo"
 printf 'all-language archive fixture\n' > "$work/base/usr/lib/locale/locale-archive"
 printf '/usr/lib/locale/locale-archive\t0\t(none)\n/usr/share/locale/tr/LC_MESSAGES/libc.mo\t0\ttr\n/usr/share/doc/example/tr.txt\t2\ttr\n/ghost\t64\ttr\n' > "$work/base.tsv"
@@ -48,6 +51,11 @@ for desktop in core kde nextkde plasma-mobile gnome cutefish; do
     cp "$work/base/usr/share/locale/tr/LC_MESSAGES/libc.mo" "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/"
 done
 public_language_receipt "$work/core.json"
+jq '.schema=1 | del(.documentation_translations_included)' "$work/core.json" > "$work/runtime-only.json"
+reject public_language_receipt "$work/runtime-only.json"
+rm "$work/core/usr/share/doc/example/tr.txt"
+reject public_language_audit "$work/core" "$work/core.tsv" core "$work/locales" "$work/rejected.json"
+cp "$work/base/usr/share/doc/example/tr.txt" "$work/core/usr/share/doc/example/tr.txt"
 cp "$work/core.tsv" "$work/non-doc-help.tsv"
 printf '/usr/share/help/tr/runtime/translated.page\t0\ttr\t33188\n' >> "$work/non-doc-help.tsv"
 reject public_language_audit "$work/core" "$work/non-doc-help.tsv" core "$work/locales" "$work/rejected.json"
@@ -68,15 +76,20 @@ mkdir "$work/bin" "$work/macros"
 cat > "$work/bin/rpm" <<'SH'
 #!/usr/bin/env bash
 set -euo pipefail
-[[ $* == "--eval %{_install_langs}" ]]
+case $* in
+    '--eval %{_install_langs}') macro=%_install_langs;;
+    '--eval %{_excludedocs}') macro=%_excludedocs;;
+    *) exit 1;;
+esac
 if [[ ${UKE_TEST_LANGUAGE_STUCK:-0} == 1 ]]; then printf 'en_US\n'; exit; fi
-awk '$1=="%_install_langs"{value=$2} END{print value}' "$UKE_TEST_LANGUAGE_MACROS"/macros.*
+awk -v macro="$macro" '$1==macro{value=$2} END{print value}' "$UKE_TEST_LANGUAGE_MACROS"/macros.*
 SH
 chmod +x "$work/bin/rpm"
 export PATH="$work/bin:$PATH" UKE_TEST_LANGUAGE_MACROS=$work/macros
 printf '%%_install_langs en_US\n' > "$work/macros/macros.image-language-conf"
 public_language_policy "$work/macros"
 [[ $(rpm --eval '%{_install_langs}') == all ]]
+[[ $(rpm --eval '%{_excludedocs}') == 0 ]]
 export UKE_TEST_LANGUAGE_STUCK=1
 reject public_language_policy "$work/macros"
-echo 'All DEs retain declared translations; missing catalogs/locales, empty setup catalogs, package-only evidence and surviving host filters reject.'
+echo 'All DEs require complete RPM translations including help/docs; ghost entries alone are exempt; missing catalogs, Qt payloads, docs, locales and surviving host filters reject.'

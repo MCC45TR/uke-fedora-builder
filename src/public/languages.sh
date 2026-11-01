@@ -3,11 +3,67 @@
 public_language_policy() {
     local macros=${1:-/etc/rpm}
     mkdir -p "$macros" || return
-    printf '%%_install_langs all\n' > "$macros/macros.zz-uke-languages" || return
-    [[ $(rpm --eval '%{_install_langs}') == all ]] || {
-        echo 'RPM still filters installed languages; root composition refused' >&2
+    printf '%%_install_langs all\n%%_excludedocs 0\n' > "$macros/macros.zz-uke-languages" || return
+    [[ $(rpm --eval '%{_install_langs}') == all && $(rpm --eval '%{_excludedocs}') == 0 ]] || {
+        echo 'RPM still filters installed languages or documentation; root composition refused' >&2
         return 1
     }
+}
+
+public_language_inventory() {
+    rpm --root "$1" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\t%{FILEMODES}\t%{=NEVRA}\n]' > "$2" || return
+    chroot "$1" /usr/bin/locale -a > "$3"
+}
+
+public_language_candidates() {
+    LC_ALL=C awk -F '\t' '
+        (NF<3 || NF>5) || $1!~/^\// || $1~/\/\.\.?($|\/)/ || $2!~/^[0-9]+$/ || (NF>=4 && $4!~/^[0-9]+$/) {exit 1}
+        {
+            # Only genuine RPM ghost entries lack an installed payload.
+            if (int(($2+0)/64)%2) next
+            if (($3!="" && $3!="(none)") || $1~/^\/usr\/share\/(locale|help|gnome\/help)\// || $1~/^\/usr\/share\/qt[56]\/translations\//) print
+        }' "$1"
+}
+
+# Restore missing translations from their exact installed RPM versions, using
+# the caller's signature-enforcing repositories and ordinary scriptlet checks.
+public_language_repair() {
+    local root=$1 inventory=$2 locales=$3 dnf_name=$4 log=$5 output=$6 listing record path owner json invalid=0
+    local -A owners=()
+    # Consumed by public_root_transaction through the array name.
+    # shellcheck disable=SC2034
+    local -a repair_rpms=()
+    local -a repair_packages=()
+    listing=$(mktemp) || return
+    if ! public_language_candidates "$inventory" > "$listing"; then rm -f "$listing"; return 1; fi
+    while IFS= read -r record; do
+        path=${record%%$'\t'*}; owner=${record##*$'\t'}
+        [[ ! -e $root$path && ! -L $root$path ]] || continue
+        [[ $owner =~ ^[A-Za-z0-9][A-Za-z0-9._+~^:-]*[.](aarch64|noarch)$ ]] || {
+            echo 'Missing translation has no exact RPM owner identity' >&2; invalid=1; break;
+        }
+        owners[$owner]=1
+    done < "$listing"
+    if ((invalid)); then rm -f "$listing"; return 1; fi
+    if ((${#owners[@]})); then
+        mapfile -t repair_packages < <(printf '%s\n' "${!owners[@]}" | LC_ALL=C sort)
+        public_root_transaction "$root" "$log" "$dnf_name" repair_rpms repair_packages reinstall || { rm -f "$listing"; return 1; }
+        public_language_inventory "$root" "$inventory" "$locales" || { rm -f "$listing"; return 1; }
+        public_language_candidates "$inventory" > "$listing" || { rm -f "$listing"; return 1; }
+        while IFS= read -r record; do
+            path=${record%%$'\t'*}
+            [[ -e $root$path || -L $root$path ]] || {
+                printf 'Translation still missing after exact-owner reinstall: %s\n' "$path" >&2
+                invalid=1; break;
+            }
+        done < "$listing"
+        if ((invalid)); then rm -f "$listing"; return 1; fi
+    fi
+    rm -f "$listing"
+    json='[]'
+    if ((${#repair_packages[@]})); then json=$(printf '%s\n' "${repair_packages[@]}" | jq -Rsc 'split("\n")[:-1]') || return; fi
+    jq -n --argjson owners "$json" '{exact_rpm_owners_reinstalled:$owners,missing_translated_paths_after_repair:0,
+        includes_localized_documentation:true,signature_policy:"unchanged caller repositories"}' > "$output"
 }
 
 public_language_audit() {
@@ -27,19 +83,9 @@ public_language_audit() {
         return 1
     }
     listing=$(mktemp) || return
-    # RPM flags: documentation=2, ghost=64. Documentation is deliberately
-    # omitted; translated runtime files must survive the nodocs transaction.
-    if ! LC_ALL=C awk -F '\t' '
-        (NF!=3 && NF!=4) || $1!~/^\// || $1~/\/\.\.?($|\/)/ || $2!~/^[0-9]+$/ || (NF==4 && $4!~/^[0-9]+$/) {exit 1}
-        {
-            flags=$2+0
-            if (int(flags/64)%2 || int(flags/2)%2 || $1~/^\/usr\/share\/(doc|man|info)\//) next
-            # GNOME marks help pages DOC but their localized directories can
-            # remain unmarked. nodocs omits those directories too. Admit only
-            # RPM-declared directory metadata, never a non-DOC help file.
-            if (NF==4 && int($4/4096)%16==4 && $1~/^\/usr\/share\/(help|gnome\/help)\//) next
-            if (($3!="" && $3!="(none)") || $1~/^\/usr\/share\/locale\// || $1~/^\/usr\/share\/qt[56]\/translations\//) print
-        }' "$inventory" > "$listing"; then
+    # Include translated documentation and its directory entries too. Locale
+    # sentinels supplement this complete RPM inventory; they never replace it.
+    if ! public_language_candidates "$inventory" > "$listing"; then
         rm -f "$listing"
         echo 'Invalid RPM language file inventory' >&2
         return 1
@@ -85,13 +131,14 @@ public_language_audit() {
     esac
     jq -n --arg desktop "$desktop" --argjson checked "$checked" --argjson turkish "$turkish" \
         --argjson directories "${#directories[@]}" --argjson shell "$shell" --argjson setup "$setup" --argjson login "$login" --argjson qt "$qt" \
-        '{schema:1,desktop:$desktop,rpm_install_languages:"all",localized_paths_checked:$checked,
+        '{schema:2,desktop:$desktop,rpm_install_languages:"all",localized_paths_checked:$checked,
+          documentation_translations_included:true,
           turkish_catalogs:$turkish,missing_localized_paths:0,turkish_utf8_locale:true,locale_directories:$directories,
           plasmashell_catalogs:$shell,plasma_setup_catalogs:$setup,plasmalogin_catalogs:$login,qt_translation_paths:$qt}' > "$output"
 }
 
 public_language_receipt() {
-    jq -e '.schema==1 and .desktop=="core" and .rpm_install_languages=="all" and
+    jq -e '.schema==2 and .documentation_translations_included==true and .desktop=="core" and .rpm_install_languages=="all" and
         .localized_paths_checked>0 and .turkish_catalogs>0 and .missing_localized_paths==0 and
         .turkish_utf8_locale==true' "$1" >/dev/null
 }

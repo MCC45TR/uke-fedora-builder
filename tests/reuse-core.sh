@@ -14,7 +14,7 @@ jq -n '{builder_commit:("b"*40),desktop:"core",shared_core_phase:"export",target
     distribution:"fedora",fedora_release:"rawhide",channel:"unstable",default_shell:"bash",mode:"singleboot",
     partition:"userdata",filesystem:"ext4",kernel_profile:"normal",kernel_rpm_request:"latest",size_mib:8192}' > "$state/payload/request.json"
 printf 'bash-0:1-1.fc46.aarch64\nplasma-workspace-common-0:6-1.fc46.aarch64\n' > "$state/payload/artifacts/core-installed-rpms.tsv"
-jq -n '{schema:1,desktop:"core",rpm_install_languages:"all",localized_paths_checked:100,
+jq -n '{schema:2,documentation_translations_included:true,desktop:"core",rpm_install_languages:"all",localized_paths_checked:100,
     turkish_catalogs:2,missing_localized_paths:0,turkish_utf8_locale:true}' > "$state/payload/artifacts/language-audit.json"
 seal() {
     tar --zstd -cf "$state/core.tar.zst" -C "$state/payload" request.json artifacts
@@ -71,6 +71,10 @@ cp "$state/payload/artifacts/language-audit.json" "$work/language-valid.json"
 rm "$state/payload/artifacts/language-audit.json"
 seal
 reject missing-language-audit
+cp "$work/language-valid.json" "$state/payload/artifacts/language-audit.json"
+jq '.schema=1 | del(.documentation_translations_included)' "$work/language-valid.json" > "$state/payload/artifacts/language-audit.json"
+seal
+reject runtime-only-language-audit
 cp "$work/language-valid.json" "$state/payload/artifacts/language-audit.json"
 printf 'gnome-shell-0:1-1.fc46.aarch64\n' >> "$state/payload/artifacts/core-installed-rpms.tsv"
 seal

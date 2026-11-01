@@ -15,7 +15,7 @@ jq '. + {credentials_included:false,image_built:false}' "$work/export/request.js
 printf 'owned-root-archive\n' > "$work/export/rootfs.tar"
 printf 'signed-original-fedora-bytes\n' > "$work/export/original-fedora/fixture"
 printf 'shared-kernel\n' > "$work/export/artifacts/kernel/fixture"
-jq -n '{schema:1,desktop:"core",rpm_install_languages:"all",localized_paths_checked:100,
+jq -n '{schema:2,documentation_translations_included:true,desktop:"core",rpm_install_languages:"all",localized_paths_checked:100,
     turkish_catalogs:2,missing_localized_paths:0,turkish_utf8_locale:true}' > "$work/export/artifacts/language-audit.json"
 printf 'bash-0:1-1.fc46.aarch64\nlibplasma-0:6-1.fc46.aarch64\nplasma-workspace-common-0:6-1.fc46.aarch64\n' > "$work/export/artifacts/core-installed-rpms.tsv"
 public_core_desktop_free "$work/export/artifacts/core-installed-rpms.tsv"
@@ -76,6 +76,10 @@ cp "$work/export/artifacts/language-audit.json" "$work/language-valid.json"
 rm "$work/export/artifacts/language-audit.json"
 seal; candidate stripped-language-core
 reject public_core_restore "$work/core.tar.zst" "$work/stripped-language-core"
+cp "$work/language-valid.json" "$work/export/artifacts/language-audit.json"
+jq '.schema=1 | del(.documentation_translations_included)' "$work/language-valid.json" > "$work/export/artifacts/language-audit.json"
+seal; candidate runtime-only-core
+reject public_core_restore "$work/core.tar.zst" "$work/runtime-only-core"
 cp "$work/language-valid.json" "$work/export/artifacts/language-audit.json"
 printf tampered > "$work/export/rootfs.tar"
 tar --zstd -cf "$work/core.tar.zst" -C "$work/export" .

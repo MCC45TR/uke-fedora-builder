@@ -13,6 +13,7 @@ boot_sha=$(sha256sum "$work/kde/boot.img" | cut -d ' ' -f1)
 root_sha=$(sha256sum "$work/kde/userdata.img" | cut -d ' ' -f1)
 jq -n --arg boot "$boot_sha" --arg root "$root_sha" '{distribution:"fedora",architecture:"aarch64",fedora_release:"rawhide",release:"rawhide",
  image_built:true,rpm_transaction_validated:true,source_checked:true,mode:"singleboot",partition:"userdata",filesystem:"ext4",desktop:"kde",
+ language_payload_verified:true,translated_documentation_included:true,serialized_language_payload_verified:true,
  size_mib:8192,root_raw_bytes:8589934592,device_private_data_included:false,credentials_included:false,ssh_enabled:false,automatic_kernel_activation:false,
  kernel_rpm_signature:"verified COPR signature",kernel_rpms_locally_built:false,filesystem_contents_readback:true,filesystem_metadata_readback:true,
  selinux_policy_contexts_verified:true,independent_aosp_decoder_verified:true,sparse_roundtrip_verified:true,

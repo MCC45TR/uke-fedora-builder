@@ -119,6 +119,11 @@ release_desktop_set() {
         jq -e --arg core "$core" '.shared_core_sha256==$core and .desktop_isolation_audited==true and
             .previous_desktop_image_input==false and .fedora_release=="rawhide" and .channel=="unstable" and .default_shell=="bash"' \
             "$manifest" >/dev/null || release_fail 'Desktop set has a different core, profile or unverified isolation'
+        if [[ $policy == gnome-plasma ]]; then
+            jq -e '.language_payload_verified==true and .translated_documentation_included==true and
+                .serialized_language_payload_verified==true' "$manifest" >/dev/null ||
+                release_fail 'Complete translated RPM and serialized-filesystem audits are required'
+        fi
     done
 }
 release_stage() {
@@ -164,7 +169,7 @@ release_stage() {
     install -m644 "$artifacts/manifest.json" "$delivery/receipts/images/$system.json"
     local records=$delivery/receipts/builds/${system%.img.zst}
     mkdir -p "$records"
-    for file in FLASHING.txt installed-rpms.tsv fedora-inputs.tsv desktop-inputs.tsv language-audit.json supported-locales.txt first-boot-policy.json fstab-generated-links.txt kio-admin-files.txt; do
+    for file in FLASHING.txt installed-rpms.tsv fedora-inputs.tsv desktop-inputs.tsv language-audit.json language-repair.json serialized-language-audit.json supported-locales.txt first-boot-policy.json fstab-generated-links.txt kio-admin-files.txt; do
         [[ ! -f $artifacts/$file ]] || install -m644 "$artifacts/$file" "$records/$file"
     done
     if [[ -d $artifacts/kernel ]]; then
@@ -216,7 +221,7 @@ release_body() {
     printf 'Preserve stock early firmware and calibration partitions. Restore only your own matching backups through your verified recovery route; changing slots alone does not restore userdata. No device write was performed by the builder.\n\n'
     printf 'Automatic kernel activation and SSH remain disabled. No private touch reference is included; firmware redistribution review remains required. KDE Plasma uses Plasma Setup; GNOME uses GNOME Initial Setup.\n\n'
     if [[ ${UKE_DESKTOP_SET_POLICY:-} == gnome-plasma ]]; then
-        printf 'This revision supports GNOME and KDE Plasma only; NextKDE and Cutefish are suspended. All RPM runtime translations, including Turkish setup/desktop and Qt catalogs, are retained and audited.\n\n'
+        printf 'This revision supports GNOME and KDE Plasma only; NextKDE and Cutefish are suspended. All RPM translations, including localized help, Turkish setup/desktop and Qt catalogs, are retained. Missing payloads trigger exact-owner RPM reinstallation and a complete re-audit; the independently read-back filesystem receives the same complete translation audit.\n\n'
         printf 'Ordinary fastboot installation is used; no computer helper is required. At first boot, original systemd-growfs expands EXT4 to the actual userdata partition capacity. A separate read-only capacity gate must pass before disk swap and graphical setup. Do not interrupt filesystem growth. The existing Uke swap manager uses half physical RAM for a managed disk swap file, or preserves a valid unique linux_swap partition. No zram swap is added. Initial image capacity is not the final partition capacity. Physical boot, growth and swap acceptance on the tablet remain pending.\n\n'
     fi
     if grep -q -- '-cutefish-uke-senemos-system-' "$inventory"; then

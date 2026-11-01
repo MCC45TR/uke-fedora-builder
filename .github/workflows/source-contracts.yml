@@ -37,6 +37,10 @@ jobs:
           bash tests/public-channel-contract.sh
           shellcheck src/public/languages.sh tests/languages.sh
           bash tests/languages.sh
+          shellcheck tests/language-repair.sh
+          bash tests/language-repair.sh
+          shellcheck tests/serialized-languages.sh
+          bash tests/serialized-languages.sh
           shellcheck src/public/first-boot-policy.sh tests/first-boot-policy.sh
           bash tests/first-boot-policy.sh
           bash tests/repository-kernel-plan.sh
