@@ -31,6 +31,14 @@ unzip -p "$work/core.zip" core.tar.zst > "$work/core.tar.zst"
 rm "$work/core.zip"
 tar --zstd -xOf "$work/core.tar.zst" request.json > "$work/request.json"
 tar --zstd -xOf "$work/core.tar.zst" artifacts/core-installed-rpms.tsv > "$work/core-installed-rpms.tsv"
+tar --zstd -xOf "$work/core.tar.zst" artifacts/language-audit.json > "$work/language-audit.json" || {
+    echo 'Frozen core has no complete-language receipt; rebuild the core' >&2
+    exit 1
+}
+# shellcheck source=../src/public/languages.sh
+# shellcheck disable=SC1091
+source "$builder/src/public/languages.sh"
+public_language_receipt "$work/language-audit.json"
 jq -e --arg producer "$producer" --arg kernel "${IMAGE_KERNEL_RPM:-latest}" --argjson size "${IMAGE_SIZE_MIB:-8192}" '
     .builder_commit==$producer and .desktop=="core" and .shared_core_phase=="export" and .target=="image" and
     .architecture=="aarch64" and .distribution=="fedora" and .fedora_release=="rawhide" and .channel=="unstable" and

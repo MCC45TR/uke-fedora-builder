@@ -396,3 +396,16 @@ Missing metadata is refused rather than interpreted as a legacy default.
 Synthetic tests cover both profiles across three Fedora target labels,
 metadata mismatches and failed/partial traversal. They do not build packages,
 run a VM or qualify EL2 entry, firmware, boot or rollback.
+# Runtime language payloads
+
+Every Fedora core and desktop transaction overrides the container RPM language
+filter with `%_install_langs all` and persists that policy in the target root.
+The host audits declared, non-documentation RPM translation files, the installed
+Turkish UTF-8 locale and the Turkish catalogs used by each desktop's setup/login
+path. `glibc-all-langpacks` in an RPM inventory is insufficient evidence.
+
+Frozen cores require a sealed language-audit receipt and another payload check
+after extraction. A core produced with stripped translations must be rebuilt;
+installing a desktop does not restore files from already-installed core RPMs.
+Language receipts accompany future image diagnostics. Existing r1 release bytes
+are unchanged by this source correction.

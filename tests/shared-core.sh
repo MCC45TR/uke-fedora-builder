@@ -15,6 +15,8 @@ jq '. + {credentials_included:false,image_built:false}' "$work/export/request.js
 printf 'owned-root-archive\n' > "$work/export/rootfs.tar"
 printf 'signed-original-fedora-bytes\n' > "$work/export/original-fedora/fixture"
 printf 'shared-kernel\n' > "$work/export/artifacts/kernel/fixture"
+jq -n '{schema:1,desktop:"core",rpm_install_languages:"all",localized_paths_checked:100,
+    turkish_catalogs:2,missing_localized_paths:0,turkish_utf8_locale:true}' > "$work/export/artifacts/language-audit.json"
 printf 'bash-0:1-1.fc46.aarch64\nlibplasma-0:6-1.fc46.aarch64\nplasma-workspace-common-0:6-1.fc46.aarch64\n' > "$work/export/artifacts/core-installed-rpms.tsv"
 public_core_desktop_free "$work/export/artifacts/core-installed-rpms.tsv"
 printf 'bash-1\ncommon-1\n' > "$work/baseline"
@@ -70,6 +72,11 @@ for key in builder_commit default_shell size_mib mode partition kernel_rpm_reque
     mv "$work/next" "$work/$key/request.json"
     reject public_core_restore "$work/core.tar.zst" "$work/$key"
 done
+cp "$work/export/artifacts/language-audit.json" "$work/language-valid.json"
+rm "$work/export/artifacts/language-audit.json"
+seal; candidate stripped-language-core
+reject public_core_restore "$work/core.tar.zst" "$work/stripped-language-core"
+cp "$work/language-valid.json" "$work/export/artifacts/language-audit.json"
 printf tampered > "$work/export/rootfs.tar"
 tar --zstd -cf "$work/core.tar.zst" -C "$work/export" .
 candidate corrupt

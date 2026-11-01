@@ -40,6 +40,13 @@ public_core_restore() {
     # Retain the exact source/module tuple resolved by the core producer. Only
     # the desktop selection and current worker count may change in the request.
     public_core_desktop_free "$work/shared-core/artifacts/core-installed-rpms.tsv" || return
+    # shellcheck source=languages.sh
+    # shellcheck disable=SC1091
+    source "$(dirname -- "${BASH_SOURCE[0]}")/languages.sh"
+    public_language_receipt "$work/shared-core/artifacts/language-audit.json" || {
+        echo 'Frozen core predates the complete-language audit; rebuild the core' >&2
+        return 1
+    }
     jq --slurpfile selected "$work/request.json" --arg producer "$producer" \
         '. + {desktop:$selected[0].desktop,jobs:$selected[0].jobs,builder_commit:$selected[0].builder_commit,
             shared_core_producer_builder_commit:$producer,shared_core_phase:"import"}' \
@@ -59,15 +66,19 @@ public_core_pack() {
     [[ $(id -u) == 0 && -s $job/rootfs.tar && -d $job/original-fedora && ! -e $job/core.tar.zst ]] || return 1
     jq -e '.desktop=="core" and .shared_core_phase=="export" and .image_built==false and
         .rpm_transaction_validated==true and .credentials_included==false' "$job/artifacts/manifest.json" >/dev/null || return
+    # shellcheck source=languages.sh
+    # shellcheck disable=SC1091
+    source "$(dirname -- "${BASH_SOURCE[0]}")/languages.sh"
+    public_language_receipt "$job/artifacts/language-audit.json" || return
     (
         cd "$job" || exit
         cp artifacts/installed-rpms.tsv artifacts/core-installed-rpms.tsv
         public_core_desktop_free artifacts/core-installed-rpms.tsv || exit
         find request.json rootfs.tar fedora-inputs.tsv original-fedora artifacts/kernel artifacts/tools \
-            artifacts/manifest.json artifacts/core-installed-rpms.tsv artifacts/boot.img artifacts/boot-linux.img artifacts/boot-userdata.img \
+            artifacts/manifest.json artifacts/language-audit.json artifacts/core-installed-rpms.tsv artifacts/boot.img artifacts/boot-linux.img artifacts/boot-userdata.img \
             -type f -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > core-SHA256SUMS
         tar --create --format=posix --numeric-owner --sort=name -I 'zstd -T2 -3' -f core.tar.zst \
             core-SHA256SUMS request.json rootfs.tar fedora-inputs.tsv original-fedora \
-            artifacts/kernel artifacts/tools artifacts/manifest.json artifacts/core-installed-rpms.tsv artifacts/boot.img artifacts/boot-linux.img artifacts/boot-userdata.img
+            artifacts/kernel artifacts/tools artifacts/manifest.json artifacts/language-audit.json artifacts/core-installed-rpms.tsv artifacts/boot.img artifacts/boot-linux.img artifacts/boot-userdata.img
     )
 }

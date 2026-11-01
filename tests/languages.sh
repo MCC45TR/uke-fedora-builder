@@ -1,0 +1,60 @@
+#!/usr/bin/env bash
+# Catch the released-image regression: installed RPM names do not prove that
+# RPM retained their translated runtime files.
+set -Eeuo pipefail
+builder=$(cd -- "$(dirname -- "$0")/.." && pwd)
+# shellcheck source=../src/public/languages.sh
+# shellcheck disable=SC1091
+source "$builder/src/public/languages.sh"
+work=$(mktemp -d)
+trap 'rm -rf -- "$work"' EXIT
+reject() { if (set -Eeuo pipefail; "$@") > "$work/rejected" 2>&1; then echo "Incomplete languages accepted: $*" >&2; exit 1; fi; }
+mkdir -p "$work/base/usr/share/locale/tr/LC_MESSAGES" "$work/base/usr/lib/locale" "$work/base/usr/share/doc/example"
+printf 'Turkish libc messages\n' > "$work/base/usr/share/locale/tr/LC_MESSAGES/libc.mo"
+printf 'all-language archive fixture\n' > "$work/base/usr/lib/locale/locale-archive"
+printf '/usr/lib/locale/locale-archive\t0\t(none)\n/usr/share/locale/tr/LC_MESSAGES/libc.mo\t0\ttr\n/usr/share/doc/example/tr.txt\t2\ttr\n/ghost\t64\ttr\n' > "$work/base.tsv"
+printf 'C\nC.utf8\nen_US.utf8\ntr_TR.utf8\n' > "$work/locales"
+for desktop in core kde nextkde plasma-mobile gnome cutefish; do
+    cp -a "$work/base" "$work/$desktop"
+    cp "$work/base.tsv" "$work/$desktop.tsv"
+    case $desktop in
+        core) catalogs='';;
+        kde|nextkde|plasma-mobile) catalogs='org.kde.plasmasetup.mo plasma_login.mo plasmashell.mo';;
+        gnome) catalogs='gnome-initial-setup.mo gnome-shell.mo gdm.mo';;
+        cutefish) catalogs='gnome-shell.mo gdm.mo mutter.mo';;
+    esac
+    for catalog in $catalogs; do
+        printf 'catalog payload\n' > "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/$catalog"
+        printf '/usr/share/locale/tr/LC_MESSAGES/%s\t0\ttr\n' "$catalog" >> "$work/$desktop.tsv"
+    done
+    public_language_audit "$work/$desktop" "$work/$desktop.tsv" "$desktop" "$work/locales" "$work/$desktop.json"
+    # Locale archive/package presence still cannot excuse stripped catalogs.
+    rm "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/libc.mo"
+    reject public_language_audit "$work/$desktop" "$work/$desktop.tsv" "$desktop" "$work/locales" "$work/rejected.json"
+    cp "$work/base/usr/share/locale/tr/LC_MESSAGES/libc.mo" "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/"
+done
+public_language_receipt "$work/core.json"
+printf '{"glibc_all_langpacks_installed":true}\n' > "$work/package-only.json"
+reject public_language_receipt "$work/package-only.json"
+printf 'C\nen_US.utf8\n' > "$work/english-only"
+reject public_language_audit "$work/core" "$work/core.tsv" core "$work/english-only" "$work/rejected.json"
+: > "$work/kde/usr/share/locale/tr/LC_MESSAGES/org.kde.plasmasetup.mo"
+reject public_language_audit "$work/kde" "$work/kde.tsv" kde "$work/locales" "$work/rejected.json"
+printf '/usr/share/locale/../outside\t0\ttr\n' > "$work/unsafe.tsv"
+reject public_language_audit "$work/core" "$work/unsafe.tsv" core "$work/locales" "$work/rejected.json"
+mkdir "$work/bin" "$work/macros"
+cat > "$work/bin/rpm" <<'SH'
+#!/usr/bin/env bash
+set -euo pipefail
+[[ $* == "--eval %{_install_langs}" ]]
+if [[ ${UKE_TEST_LANGUAGE_STUCK:-0} == 1 ]]; then printf 'en_US\n'; exit; fi
+awk '$1=="%_install_langs"{value=$2} END{print value}' "$UKE_TEST_LANGUAGE_MACROS"/macros.*
+SH
+chmod +x "$work/bin/rpm"
+export PATH="$work/bin:$PATH" UKE_TEST_LANGUAGE_MACROS=$work/macros
+printf '%%_install_langs en_US\n' > "$work/macros/macros.image-language-conf"
+public_language_policy "$work/macros"
+[[ $(rpm --eval '%{_install_langs}') == all ]]
+export UKE_TEST_LANGUAGE_STUCK=1
+reject public_language_policy "$work/macros"
+echo 'All DEs retain declared translations; missing catalogs/locales, empty setup catalogs, package-only evidence and surviving host filters reject.'

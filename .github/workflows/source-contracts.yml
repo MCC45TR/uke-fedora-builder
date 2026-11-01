@@ -35,6 +35,8 @@ jobs:
           shellcheck tests/distribution-routing.sh
           bash tests/distribution-routing.sh
           bash tests/public-channel-contract.sh
+          shellcheck src/public/languages.sh tests/languages.sh
+          bash tests/languages.sh
           bash tests/repository-kernel-plan.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
