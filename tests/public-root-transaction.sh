@@ -6,6 +6,8 @@ source "$repo/src/public/root-transaction.sh"
 work=$(mktemp -d)
 trap 'find "$work" -depth -delete' EXIT
 mkdir "$work/root"
+# Passed by name to the shared transaction helper.
+# shellcheck disable=SC2034
 dnf_policy=(fake_dnf) local_inputs=() selection=(fixture)
 fake_dnf() {
     if [[ $1 == check ]]; then return "${check_status:-0}"; fi

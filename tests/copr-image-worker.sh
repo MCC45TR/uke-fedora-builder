@@ -16,8 +16,11 @@ probe() {
 }
 printf 'UKE_IMAGE_WORKER_PROBE root_identity=%s\n' "$([[ $(id -u) == 0 ]] && printf true || printf false)"
 probe current_identity_wrapper bash "$owner/src/public/worker-namespace.sh" /usr/bin/true
+# Expansion belongs to the child Bash process.
+# shellcheck disable=SC2016
 probe mapped_root_mount unshare --user --map-root-user --mount --propagation private --pid --fork --mount-proc \
     /bin/bash -euc 'test "$(id -u)" = 0; mount -t tmpfs tmpfs "$1"; touch "$1/probe"; chroot / /usr/bin/true; umount "$1"' probe "$work/mount"
+# shellcheck disable=SC2016
 probe subordinate_ids unshare --user --map-auto --map-root-user --mount --propagation private --pid --fork --mount-proc \
     /bin/bash -euc 'test "$(id -u)" = 0; mount -t tmpfs tmpfs "$1"; touch "$1/probe"; chown 65534:65534 "$1/probe"; test "$(stat -c %u:%g "$1/probe")" = 65534:65534; umount "$1"' probe "$work/mount"
 for name in current_identity_wrapper mapped_root_mount subordinate_ids;do

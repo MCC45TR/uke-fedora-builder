@@ -2,6 +2,7 @@
 # Readback comparison and negative metadata controls, inside the COPR SDK only.
 set -Eeuo pipefail
 [[ $(id -u) == 0 && -f /job/root-readback.tar && -f /job/rootfs.tar ]]
+# shellcheck disable=SC1091
 source /builder/src/public/root-metadata.sh
 exec 3>&2 4>&1
 exec > /job/metadata-compare.log 2>&1
