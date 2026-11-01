@@ -5,11 +5,11 @@ public_root_packages() {
     local release=$2 channel=$3 desktop=$4 login_shell=$5 package
     case $release in 44|45|rawhide) ;; *) return 1;; esac
     case $channel in stable|testing|unstable) ;; *) return 1;; esac
-    case $desktop in kde|plasma-mobile|gnome) ;; *) return 1;; esac
+    case $desktop in core|kde|plasma-mobile|gnome|cutefish|nextkde) ;; *) return 1;; esac
     case $login_shell in bash|fish|zsh) ;; *) return 1;; esac
     selection=(fedora-release fedora-repos bash "$login_shell" coreutils dnf5 dnf5-plugins glibc-all-langpacks
         systemd systemd-udev systemd-pam NetworkManager NetworkManager-wifi bluez chrony
-        firewalld openssh-server sudo shadow-utils selinux-policy-targeted policycoreutils
+        firewalld openssh-server sudo shadow-utils cracklib-dicts selinux-policy-targeted policycoreutils
         e2fsprogs f2fs-tools btrfs-progs xfsprogs util-linux kbd less nano fastfetch
         pipewire pipewire-pulseaudio wireplumber
         uke-core uke-hw uke-power uke-sensors uke-additional uke-firmware
@@ -28,12 +28,15 @@ public_root_packages() {
         done
         selection=("${individual[@]}" uke-core-meta)
     fi
-    if [[ $desktop == kde || $desktop == plasma-mobile ]]; then
+    if [[ $desktop == kde || $desktop == plasma-mobile || $desktop == nextkde ]]; then
         selection+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin)
         [[ $desktop != plasma-mobile ]] || selection+=(plasma-mobile plasma-settings)
-    else
+        [[ $desktop != nextkde ]] || selection+=(nextkde quickshell)
+    elif [[ $desktop == gnome ]]; then
         selection+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
             gnome-control-center gnome-software gnome-console nautilus)
+    elif [[ $desktop == cutefish ]]; then
+        selection+=(cutefish-desktop gdm)
     fi
 }
 

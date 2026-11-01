@@ -40,4 +40,6 @@ jobs:
           bash tests/original-kde-payload.sh
           shellcheck src/public/release-layout.sh scripts/publish-image-release.sh tests/release-layout.sh
           bash tests/release-layout.sh
+          shellcheck src/public/shared-core.sh src/public/desktop-repository.sh src/public/desktop-setup.sh src/public/nextkde-session.sh scripts/hosted-core.sh scripts/hosted-image.sh tests/shared-core.sh
+          bash tests/shared-core.sh
           echo 'Native helper builds and file fixtures run in the uke-image-tools COPR build.' >> "$GITHUB_STEP_SUMMARY"

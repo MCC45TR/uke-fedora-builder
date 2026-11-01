@@ -9,7 +9,11 @@ release_manifest() {
       (.fedora_release | IN("rawhide","44","45")) and .release==.fedora_release and
       .image_built and .rpm_transaction_validated and .source_checked and
       .mode=="singleboot" and .partition=="userdata" and .filesystem=="ext4" and
-      .device_private_data_included==false and .credentials_included==false and .ssh_enabled==false and .automatic_kernel_activation==false and
+      .device_private_data_included==false and .ssh_enabled==false and .automatic_kernel_activation==false and
+      ((.desktop=="cutefish" and .credentials_included==true and .public_test_account=="senemos" and
+        .account_setup=="gdm-expired-public-test-account" and .password_change_required==true and .password_change_backend_tested==true and
+        .autologin_enabled==false and .remote_password_login==false and .passwordless_sudo==false) or
+       (.desktop!="cutefish" and .credentials_included==false)) and
       .kernel_rpm_signature=="verified COPR signature" and .kernel_rpms_locally_built==false and
       .filesystem_contents_readback and .filesystem_metadata_readback and
       .selinux_policy_contexts_verified and .independent_aosp_decoder_verified and .sparse_roundtrip_verified and
@@ -182,7 +186,10 @@ release_body() {
     printf 'zstd -d %s -o system.img\nfastboot getvar product\nfastboot getvar current-slot\nfastboot getvar partition-size:userdata\nfastboot getvar partition-size:boot_b\nfastboot flash userdata system.img\nfastboot flash boot_b %s\n```\n\n' "$example" "$boot"
     printf 'Confirm boot_b is the intended target and retain matching slot-B firmware. Slot selection and reboot are separate manual steps in the verified device-specific procedure.\n\n'
     printf 'Preserve stock early firmware and calibration partitions. Restore only your own matching backups through your verified recovery route; changing slots alone does not restore userdata. No device write was performed by the builder.\n\n'
-    printf 'This profile keeps automatic kernel activation and SSH disabled, includes no login credentials or private touch reference, and retains the firmware redistribution review requirement. Create the account through Plasma Setup or GNOME Initial Setup using qualified input.\n\n'
+    printf 'Automatic kernel activation and SSH remain disabled. No private touch reference is included; firmware redistribution review remains required. KDE Plasma and NextKDE use Plasma Setup; GNOME uses GNOME Initial Setup. NextKDE services start only in a normal account after setup.\n\n'
+    if grep -q -- '-cutefish-uke-senemos-system-' "$inventory"; then
+        printf '**Cutefish only:** public test login `senemos`, initial password `fedora`. GDM requires a password change at first login. The real GDM worker/PAM change-password conversation was tested during assembly; the tablet graphical login remains unqualified. Automatic login, remote password login and passwordless sudo are disabled. Change the published test password before use.\n\n'
+    fi
     printf 'Exact manifests, RPM inventories, checksums and diagnostics remain in Actions artifacts, separately from the image-only release assets.\n'
     if [[ -n ${GITHUB_REPOSITORY:-} && -n $runs ]]; then
         local -a run_ids=()

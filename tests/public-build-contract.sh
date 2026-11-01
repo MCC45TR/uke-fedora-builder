@@ -45,7 +45,6 @@ reject --release
 reject --shell
 reject --build kernel --shell bash --dry-run
 reject --build kernel --desktop kde --dry-run
-reject --desktop cutefish --yes
 reject --release 44 --yes
 reject --release 45 --yes
 for pair in '--release 46' '--release ../45' '--shell sh' '--mode bad' '--filesystem zfs' '--desktop xfce' '--channel latest' '--build plasma' '--jobs 0' '--jobs 99999' '--linux-size 65537'; do

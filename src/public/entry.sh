@@ -81,6 +81,7 @@ public_main() {
     local target=image mode=multiboot filesystem=ext4 desktop=kde channel=testing fedora_release=rawhide login_shell=bash
     local output=$PWD/out out_given=0 reference='' root_mib=16384 key value argument prior='' kernel_request='' kernel_rpm=''
     local build_from_source=0
+    local core_phase=${UKE_SHARED_CORE_PHASE:-none} core_input=${UKE_SHARED_CORE_INPUT:-}
     local -A selected=()
     KERNEL_PROFILE=normal RUN_TESTS=1 KERNEL_CONFIG_SHA=''
     JOBS=$(getconf _NPROCESSORS_ONLN 2>/dev/null || nproc 2>/dev/null || echo 1) OFFLINE=0 DRY_RUN=0 UKE_ASSUME_YES=0 REUSE_KERNEL=0 ENGINE='' CID='' PAUSED=0
@@ -177,7 +178,6 @@ public_main() {
     say "$target: Fedora $release_label AArch64; $mode; $filesystem; $desktop; $channel; $JOBS workers"
     say "Fedora chroot: fedora-$fedora_release-aarch64; new user shell: $login_shell; RPM dist resolved in target worker"
     say "Root target: $partition; userdata flashing destroys Android data; linux must already exist. Builds never flash."
-    [[ $desktop != cutefish || $target != image ]] || say 'Image support: blocked until Cutefish graphical login and first-account setup are validated'
     say "Output parent: $output (a new run directory is created; existing output is preserved)"
     say "Kernel profile: $KERNEL_PROFILE; kernel tests enabled: $RUN_TESTS"
     [[ -z $kernel_rpm ]] || say "Kernel input: signed $channel RPMs ($kernel_rpm), with signature and matching boot/module checks; no source fallback"
@@ -194,8 +194,12 @@ public_main() {
     ((DRY_RUN == 0)) || return 0
     [[ $channel != unstable || $fedora_release == rawhide ]] || die 'Unstable packages are available only for Fedora Rawhide AArch64'
     [[ $target != image || $fedora_release == rawhide ]] || die "Unsupported Fedora $fedora_release image: signed native Uke family builds and complete dependency resolution are pending; no Rawhide RPM fallback is allowed"
-    [[ $target != image || $desktop != cutefish ]] || die 'Unsupported image: Cutefish packages are built separately in mcc45tr/cutefish; graphical login and secure first-account setup are not validated'
-    [[ $target != image || $desktop != nextkde ]] || die 'NextKde unavailable: its COPR project has no published desktop packages'
+    case $core_phase in none|export|import) ;; *) die 'Invalid shared core phase';; esac
+    if [[ $core_phase != none ]]; then
+        [[ $target == image && $channel == unstable && $fedora_release == rawhide && $mode == singleboot && $filesystem == ext4 &&
+           $KERNEL_PROFILE == normal && $build_from_source == 0 && -z $reference ]] || die 'Shared core requires the public Rawhide unstable EXT4 singleboot package profile'
+        [[ $core_phase != import || ( -f $core_input && ! -L $core_input ) ]] || die 'Missing regular shared core archive'
+    fi
     bootstrap
     architecture=$(uname -m)
     case $architecture in x86_64) host_platform=linux/amd64;; aarch64) host_platform=linux/arm64;; *) die 'Supported architectures: x86_64 and AArch64';; esac
@@ -255,6 +259,15 @@ public_main() {
         '{device:"uke",architecture:"aarch64",distribution:"fedora",fedora_release:$release,release:$release,default_shell:$shell,copr_chroot:("fedora-"+$release+"-aarch64"),source_checked:false,rpm_transaction_validated:false,image_built:false,vm_tested:false,tablet_tested:false,target:$target,mode:$mode,filesystem:$fs,desktop:$desktop,channel:$channel,partition:$partition,size_mib:$size,jobs:$jobs,builder_commit:$builder,
           kernel_commit:$commit,kernel_version:$version,kernel_requested:$requested,kernel_url:$url,kernel_rpm_request:$kernel_rpm,kernel_profile:$profile,kernel_native_config_sha256:$config,run_kernel_tests:($tests==1)}
          + (if $bundle == "" then {} else {kernel_bundle:$bundle} end)' > "$WORK/request.json"
+    if [[ $core_phase == export ]]; then
+        jq '.desktop="core"|.shared_core_phase="export"' "$WORK/request.json" > "$WORK/request.next"
+        mv "$WORK/request.next" "$WORK/request.json"
+    elif [[ $core_phase == import ]]; then
+        # shellcheck source=shared-core.sh
+        # shellcheck disable=SC1091
+        source "$BUILDER/src/public/shared-core.sh"
+        public_core_restore "$core_input" "$WORK" || die 'Shared core is corrupt or belongs to another recipe/profile'
+    fi
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha arm_recipe=Containerfile.public native_recipe=Containerfile.public-native
     [[ -z $kernel_rpm ]] || arm_recipe=Containerfile.public-repository
@@ -291,7 +304,9 @@ public_main() {
         cross=1 root_image=$cross_image root_platform=$host_platform
         public_worker "$cross_image" "$host_platform" "$native_base" "$arm_recipe"
     fi
-    if [[ -n $kernel_rpm ]]; then
+    if [[ $core_phase == import ]]; then
+        say 'Reusing the immutable shared core kernel, modules and signed boot cohort'
+    elif [[ -n $kernel_rpm ]]; then
         public_stage "$root_image" "$root_platform" repository-kernel
     else
     # The cache identifies the producer: route, recipe and the worker images that compile the kernel and link its initramfs.
@@ -334,6 +349,11 @@ public_main() {
         ((cross == 0)) || say 'Installing the AArch64 root with native dnf; only package scriptlets are emulated'
         if [[ -n $kernel_rpm && $architecture == x86_64 ]]; then prepare_aarch64; fi
         public_stage "$root_image" "$root_platform" root
+        if [[ $core_phase == export ]]; then
+            [[ -s $WORK/core.tar.zst ]] || die 'Shared core export is missing'
+            say "Private shared core: $WORK/core.tar.zst (no filesystem image or Release asset)"
+            return
+        fi
         if [[ $channel == unstable ]]; then public_stage "$arm_image" linux/arm64 filesystem
         else public_stage "$native_image" "$host_platform" filesystem; fi
     fi

@@ -7,7 +7,7 @@ root=$(cd "$(dirname "$0")/.." && pwd)
 source "$root/src/public/root-packages.sh"
 contains() { local value; for value in "${packages[@]}"; do [[ $value != "$1" ]] || return 0; done; return 1; }
 for channel in stable testing unstable; do
-    for desktop in kde plasma-mobile gnome; do
+    for desktop in core kde plasma-mobile gnome cutefish nextkde; do
         for login_shell in bash fish zsh; do
             public_root_packages packages rawhide "$channel" "$desktop" "$login_shell"
             contains "$login_shell"
@@ -26,13 +26,20 @@ for channel in stable testing unstable; do
                 contains pipewire
                 contains pipewire-pulseaudio
             fi
-            if [[ $desktop == kde || $desktop == plasma-mobile ]]; then
+            if [[ $desktop == kde || $desktop == plasma-mobile || $desktop == nextkde ]]; then
                 contains plasma-setup
+                [[ $desktop != nextkde ]] || { contains nextkde; contains quickshell; }
                 if [[ $desktop == plasma-mobile ]]; then contains plasma-mobile; contains plasma-settings; fi
                 if contains gdm; then exit 1; fi
-            else
+            elif [[ $desktop == gnome ]]; then
                 contains gnome-initial-setup
                 if contains plasma-setup; then exit 1; fi
+            elif [[ $desktop == cutefish ]]; then
+                contains cutefish-desktop
+                contains gdm
+                if contains gnome-initial-setup || contains plasma-setup; then exit 1; fi
+            else
+                if contains gdm || contains plasma-setup || contains nextkde || contains cutefish-desktop; then exit 1; fi
             fi
         done
     done
@@ -41,7 +48,7 @@ for release in 44 45; do
     public_root_packages packages "$release" testing kde bash
     if contains fedora-repos-rawhide; then exit 1; fi
 done
-for choice in '43 unstable kde bash' 'rawhide invalid kde bash' 'rawhide unstable cutefish bash' 'rawhide unstable kde /bin/sh'; do
+for choice in '43 unstable kde bash' 'rawhide invalid kde bash' 'rawhide unstable nonexistent bash' 'rawhide unstable kde /bin/sh'; do
     packages=(keep-previous-selection)
     # Fixed source fixture arguments, intentionally split.
     # shellcheck disable=SC2086

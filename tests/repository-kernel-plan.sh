@@ -32,6 +32,6 @@ jq -e '.channels.unstable.project == "uke-linux-unstable" and .channels.unstable
 for desktop in cutefish nextkde; do
     status=0
     (public_main --desktop "$desktop" --yes) > "$work/refused" 2>&1 || status=$?
-    ((status > 0 && status < 90))
+    [[ $status == 90 ]]
 done
-printf 'Default signed package routes, distinct unstable repository, source opt-in and unavailable desktop refusals passed\n'
+printf 'Default signed package routes, distinct unstable repository, source opt-in and desktop routing passed\n'

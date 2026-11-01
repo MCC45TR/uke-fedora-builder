@@ -32,6 +32,18 @@ reject bash "$tool" names "$work/kde/manifest.json" 311126 0
 reject bash "$tool" names "$work/kde/manifest.json" 011126 r0
 reject bash "$tool" names "$work/kde/manifest.json" 011126 00
 reject bash "$tool" names "$work/kde/manifest.json" 011126 '0;touch bad'
+cp -a "$work/kde" "$work/cutefish"
+jq '.desktop="cutefish"|.credentials_included=true|.public_test_account="senemos"|
+    .account_setup="gdm-expired-public-test-account"|.password_change_required=true|.password_change_backend_tested=true|
+    .autologin_enabled=false|.remote_password_login=false|.passwordless_sudo=false' \
+    "$work/kde/manifest.json" > "$work/cutefish/manifest.json"
+bash "$tool" names "$work/cutefish/manifest.json" 011126 1 > /dev/null
+for key in password_change_required password_change_backend_tested autologin_enabled remote_password_login passwordless_sudo; do
+    jq --arg key "$key" '.[$key]=(.[$key]|not)' "$work/cutefish/manifest.json" > "$work/invalid-account.json"
+    reject bash "$tool" names "$work/invalid-account.json" 011126 1
+done
+jq '.credentials_included=true' "$work/kde/manifest.json" > "$work/invalid-account.json"
+reject bash "$tool" names "$work/invalid-account.json" 011126 1
 bash "$tool" stage "$work/kde" "$work/delivery" 011126 0
 bash "$tool" stage "$work/gnome" "$work/delivery" 011126 0
 bash "$tool" stage "$work/kde" "$work/delivery" 011126 0

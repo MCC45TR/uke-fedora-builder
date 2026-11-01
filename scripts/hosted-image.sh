@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 root=$(git rev-parse --show-toplevel)
 [[ -x $root/ukelinux.sh && $(uname -m) == aarch64 ]]
-case ${IMAGE_DESKTOP:-kde} in kde|gnome) ;; *) exit 2;; esac
+case ${IMAGE_DESKTOP:-kde} in kde|gnome|cutefish|nextkde) ;; *) exit 2;; esac
 case ${IMAGE_SHELL:-bash} in bash|fish|zsh) ;; *) exit 2;; esac
 case ${IMAGE_CHANNEL:-unstable} in stable|testing|unstable) ;; *) exit 2;; esac
 case ${IMAGE_SIZE_MIB:-16384} in 8192|16384) ;; *) exit 2;; esac
@@ -16,6 +16,9 @@ release=$RUNNER_TEMP/uke-release
 mkdir -p "$output" "$release"
 # Docker is provisioned on the hosted runner. Do not select an unrelated Podman store.
 export UKE_CONTAINER_ENGINE=docker
+if [[ -n ${IMAGE_CORE_INPUT:-} ]]; then
+    export UKE_SHARED_CORE_PHASE=import UKE_SHARED_CORE_INPUT=$IMAGE_CORE_INPUT
+fi
 "$root/ukelinux.sh" --build image --mode singleboot --filesystem ext4 \
     --release rawhide --desktop "${IMAGE_DESKTOP:-kde}" --shell "${IMAGE_SHELL:-bash}" \
     --channel "${IMAGE_CHANNEL:-unstable}" --kernel-rpm "${IMAGE_KERNEL_RPM:-latest}" \

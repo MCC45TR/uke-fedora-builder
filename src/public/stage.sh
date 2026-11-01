@@ -299,6 +299,12 @@ fi
 root=/job/root
 [[ ! -e $root ]]
 mkdir -p "$root" /job/original-fedora /job/keydb
+if [[ $(jq -r '.shared_core_phase // "none"' "$request") == import ]]; then
+    [[ -f /job/shared-core/rootfs.tar && -d /job/shared-core/original-fedora ]]
+    tar --extract --numeric-owner --acls --xattrs --selinux --xattrs-include=security.capability \
+        --xattrs-include=security.selinux -f /job/shared-core/rootfs.tar -C "$root"
+    cp -a /job/shared-core/original-fedora/. /job/original-fedora/
+fi
 mkdir -p "$root/proc"
 # shellcheck source=root-proc.sh
 # shellcheck disable=SC1091
@@ -333,6 +339,10 @@ repository_mode=public
 [[ -z $copr_inputs ]] || repository_mode=copr-frozen
 public_root_repository /etc/yum.repos.d/uke-selected.repo "$project" "$fedora_release" "$repository_mode"
 desktop=$(jq -er .desktop "$request")
+# shellcheck source=desktop-repository.sh
+# shellcheck disable=SC1091
+source /builder/src/public/desktop-repository.sh
+public_desktop_repository "$desktop" /etc/yum.repos.d/uke-desktop.repo /etc/pki/rpm-gpg
 # shellcheck source=root-packages.sh
 # shellcheck disable=SC1091
 source /builder/src/public/root-packages.sh
@@ -367,6 +377,7 @@ if [[ -n $copr_inputs ]]; then dnf+=(--enable-repo=copr-frozen-fedora)
 else
     while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
 fi
+if [[ $desktop == cutefish || $desktop == nextkde ]]; then dnf+=(--enable-repo=uke-desktop); fi
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
@@ -376,6 +387,13 @@ fi
 source /builder/src/public/root-transaction.sh
 public_root_transaction "$root" /job/root-install.log dnf local_rpms packages
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv
+if [[ -f /job/artifacts/core-installed-rpms.tsv ]]; then
+    # shellcheck source=shared-core.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/shared-core.sh
+    public_core_packages_check /job/artifacts/core-installed-rpms.tsv /job/artifacts/installed-rpms.tsv ||
+        die 'Desktop transaction changed an immutable shared core package'
+fi
 [[ $(rpm --root "$root" -q "$base-core" --qf '%{VERSION}-%{RELEASE}') == "$rpm_release$dist" ]]
 bundle=$root/usr/lib/senemos/kernel-updates/$release
 (cd "$root/usr/lib/modules/$release"; sha256sum -c "$bundle/modules.sha256")
@@ -384,6 +402,7 @@ cmp /job/artifacts/boot.img "/job/artifacts/boot-$partition.img"
 # Prove Python exceptions against independently signature-verified Fedora bytes.
 rpmkeys --dbpath /job/keydb --import "$fedora_key"
 : > /job/fedora-inputs.tsv
+if [[ -f /job/shared-core/fedora-inputs.tsv ]]; then cp /job/shared-core/fedora-inputs.tsv /job/fedora-inputs.tsv; fi
 # Only archives whose exact NEVRA is installed in the root count as its original bytes.
 declare -A installed=()
 while IFS=$'\t' read -r nevra _; do installed[$nevra]=1; done < /job/artifacts/installed-rpms.tsv
@@ -395,7 +414,7 @@ while IFS= read -r -d '' archive; do
     rpm2cpio "$archive" | (cd /job/original-fedora; cpio -idmu --quiet --no-absolute-filenames)
 done < <(if [[ -n $copr_inputs ]]; then find "$copr_inputs/rpms/fedora" -type f -name '*.rpm' -print0
          else find "/cache/dnf-$channel" -type f -name '*.rpm' -print0; fi)
-LC_ALL=C sort /job/fedora-inputs.tsv > /job/artifacts/fedora-inputs.tsv
+LC_ALL=C sort -u /job/fedora-inputs.tsv > /job/artifacts/fedora-inputs.tsv
 [[ -s /job/artifacts/fedora-inputs.tsv ]]
 bash /builder/src/public/login-shell.sh "$root" "$(jq -er .default_shell "$request")" > /job/artifacts/login-shell.json
 [[ $(rpm --root "$root" -q fedora-release-common --qf '%{VERSION}') == "$fedora_number" ]]
@@ -407,14 +426,10 @@ chroot "$root" /usr/sbin/usermod -L root
 systemctl --root="$root" enable NetworkManager.service firewalld.service bluetooth.service chronyd.service
 systemctl --root="$root" disable sshd.service sshd.socket
 systemctl --root="$root" mask debug-shell.service uke-boot-guard.service
-systemctl --root="$root" set-default graphical.target
-if [[ $desktop == kde || $desktop == plasma-mobile ]]; then
-    chroot "$root" /usr/bin/kwriteconfig6 --file /etc/xdg/plasmasetuprc --group Accounts --key UserGroups wheel
-    chroot "$root" /usr/bin/systemd-sysusers /usr/lib/sysusers.d/plasma-setup-sysuser.conf
-    systemctl --root="$root" enable plasma-setup.service plasmalogin.service
-else
-    systemctl --root="$root" enable gdm.service
-fi
+# shellcheck source=desktop-setup.sh
+# shellcheck disable=SC1091
+source /builder/src/public/desktop-setup.sh
+public_desktop_setup "$root" "$desktop" /job/artifacts/account-provisioning.json
 mkdir -p "$root/etc/senemos" "$root/etc/uke-control" "$root/etc/dnf" "$root/var/lib/uke-touch"
 printf 'automatic=0\n' > "$root/etc/senemos/kernel-update.conf"
 printf 'automatic=0\n' > "$root/etc/senemos/userdata-update.conf"
@@ -428,6 +443,12 @@ chmod 700 "$root/mnt/vendor/persist"
 printf 'SELINUX=enforcing\nSELINUXTYPE=targeted\n' > "$root/etc/selinux/config"
 install -m644 /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected "$root/etc/pki/rpm-gpg/"
 public_root_repository "$root/etc/yum.repos.d/uke-selected.repo" "$project" "$fedora_release"
+if [[ $desktop == cutefish || $desktop == nextkde ]]; then
+    cp /etc/yum.repos.d/uke-desktop.repo "$root/etc/yum.repos.d/uke-desktop.repo"
+    desktop_project=cutefish
+    [[ $desktop != nextkde ]] || desktop_project=kdenext
+    cp "/etc/pki/rpm-gpg/RPM-GPG-KEY-uke-$desktop_project" "$root/etc/pki/rpm-gpg/"
+fi
 cat > "$root/etc/dnf/dnf.conf" <<'DNF'
 [main]
 install_weak_deps=False
@@ -460,6 +481,8 @@ jq --argjson private "$private" --slurpfile shell /job/artifacts/login-shell.jso
     python_policy:"only byte-identical signature-verified original Fedora packages",
     credentials_included:false,ssh_enabled:false}' /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
+jq --slurpfile account /job/artifacts/account-provisioning.json '. + $account[0]' /job/artifacts/manifest.json > /job/manifest.tmp
+mv /job/manifest.tmp /job/artifacts/manifest.json
 if [[ $channel == unstable ]]; then
     cohort_codec=$UKE_IMAGE_TOOLS/boot-image
 else
@@ -490,3 +513,9 @@ else
         -o "$archive_verifier" -lext2fs -lcom_err -lselinux
 fi
 public_root_archive "$root" /job/rootfs.tar "$archive_verifier"
+if [[ $desktop == core ]]; then
+    # shellcheck source=shared-core.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/shared-core.sh
+    public_core_pack /job
+fi
