@@ -179,7 +179,8 @@ release_body() {
     example=$(awk -F '\t' '$1 ~ /-system-.*\.img\.zst$/ {print $1;exit}' "$inventory")
     [[ -n $example ]] || release_fail 'No system image in checksum inventory'
     printf '**Flashing userdata destroys Android apps, files and encryption metadata.** Choose one desktop root. Example using `%s`, after checksum verification and the device checks:\n\n```sh\n' "$example"
-    printf 'zstd -d %s -o system.img\nfastboot getvar product\nfastboot getvar current-slot\nfastboot getvar partition-size:userdata\nfastboot getvar partition-size:boot_b\nfastboot flash userdata system.img\nfastboot flash boot_b %s\nfastboot set_active b\nfastboot reboot\n```\n\n' "$example" "$boot"
+    printf 'zstd -d %s -o system.img\nfastboot getvar product\nfastboot getvar current-slot\nfastboot getvar partition-size:userdata\nfastboot getvar partition-size:boot_b\nfastboot flash userdata system.img\nfastboot flash boot_b %s\n```\n\n' "$example" "$boot"
+    printf 'Confirm boot_b is the intended target and retain matching slot-B firmware. Slot selection and reboot are separate manual steps in the verified device-specific procedure.\n\n'
     printf 'Preserve stock early firmware and calibration partitions. Restore only your own matching backups through your verified recovery route; changing slots alone does not restore userdata. No device write was performed by the builder.\n\n'
     printf 'This profile keeps automatic kernel activation and SSH disabled, includes no login credentials or private touch reference, and retains the firmware redistribution review requirement. Create the account through Plasma Setup or GNOME Initial Setup using qualified input.\n\n'
     printf 'Exact manifests, RPM inventories, checksums and diagnostics remain in Actions artifacts, separately from the image-only release assets.\n'

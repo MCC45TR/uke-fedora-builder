@@ -44,6 +44,10 @@ automatic activation policy. A root image named `system` targets `userdata` in
 this singleboot profile. Images remain experimental pre-releases.
 
 The publisher verifies local image hashes and the GitHub asset digests. Existing
+drafts are recovered from the authenticated release list and verified by numeric
+ID because GitHub's by-tag endpoint omits unpublished drafts. Installation examples
+leave slot selection and reboot to the verified device-specific procedure.
+Existing
 releases without the new cohort/build-record markers or containing legacy
 metadata assets are preserved and rejected as append targets. Migration of a
 previously downloaded release requires a separate reviewed plan; these scripts

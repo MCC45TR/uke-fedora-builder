@@ -66,10 +66,16 @@ mkdir -p "$state/assets"
 printf '%s\n' "$*" >> "$state/calls"
 option() { local key=$1; shift; while (($#)); do if [[ $1 == "$key" ]]; then printf '%s\n' "$2"; return; fi; shift; done; return 1; }
 if [[ $1 == api ]]; then
- if [[ -f $state/release.json ]]; then cat "$state/release.json"; else printf '{"status":"404"}\n'; exit 1; fi
+ if [[ $2 == *'/releases?per_page=100' ]]; then
+  if [[ -f $state/release.json ]]; then jq '[[.]]' "$state/release.json"; else printf '[]\n'; fi
+ elif [[ $2 == *'/releases/tags/'* ]]; then
+  if [[ -f $state/release.json ]] && jq -e '.draft==false' "$state/release.json" >/dev/null; then cat "$state/release.json"
+  else printf '{"status":"404"}\n'; exit 1; fi
+ elif [[ -f $state/release.json ]]; then cat "$state/release.json"
+ else exit 99; fi
 elif [[ $1 == release && $2 == create ]]; then
  notes=$(option --notes-file "$@")
- jq -n --rawfile body "$notes" '{body:$body,assets:[],draft:true}' > "$state/release.json"
+ jq -n --rawfile body "$notes" '{id:430000001,tag_name:"fedora-rawhide-uke-senemos-011126-r0",body:$body,assets:[],draft:true}' > "$state/release.json"
 elif [[ $1 == release && $2 == upload ]]; then
  shift 3
  while (($#)) && [[ $1 != --* ]]; do
@@ -93,8 +99,11 @@ export PATH="$work/bin:$PATH" GITHUB_REPOSITORY=MCC45TR/fixture SOURCE_COMMIT=aa
 bash "$tool" stage "$work/kde" "$work/kde-only" 011126 0
 bash "$publisher" "$work/kde-only"
 jq -e '.draft==false and (.assets|length==2) and all(.assets[]; .name|test("[.]img([.]zst)?$")) and (.body|contains("| Image | Bytes | SHA256 |"))' "$work/remote/release.json" >/dev/null
+jq -e '(.body|contains("fastboot set_active")|not) and (.body|contains("fastboot reboot")|not)' "$work/remote/release.json" >/dev/null
 bash "$tool" stage "$work/gnome" "$work/gnome-only" 011126 0
 export GITHUB_RUN_ID=456
+jq '.draft=true' "$work/remote/release.json" > "$work/draft.json"
+mv "$work/draft.json" "$work/remote/release.json"
 bash "$publisher" "$work/gnome-only"
 jq -e '(.assets|length==3) and ([.assets[]|select(.name|contains("-boot-"))]|length==1)' "$work/remote/release.json" >/dev/null
 jq -e '.body|contains("<!-- uke-image-build-runs: 123,456 -->")' "$work/remote/release.json" >/dev/null

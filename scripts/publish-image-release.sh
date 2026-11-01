@@ -17,17 +17,33 @@ boot=$(jq -er .boot "$delivery/receipts/layout.json")
 cohort=$(sha256sum "$delivery/receipts/cohort.json"); cohort=${cohort%% *}
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
+query_release() {
+    # GitHub's by-tag endpoint omits unpublished drafts. Search the authenticated
+    # release list before creating a duplicate, then use the stable numeric ID.
+    if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$work/release.json" 2> "$work/query-error"; then return 0; fi
+    jq -e '(.status|tostring)=="404"' "$work/release.json" >/dev/null || return 2
+    gh api "repos/$GITHUB_REPOSITORY/releases?per_page=100" --paginate --slurp > "$work/pages.json" 2> "$work/query-error" || return 2
+    jq --arg tag "$tag" '[.[][]|select(.tag_name==$tag)]' "$work/pages.json" > "$work/matches.json" || return 2
+    case $(jq -r length "$work/matches.json") in
+        0) printf '{"status":"404"}\n' > "$work/release.json"; return 1;;
+        1) jq '.[0]' "$work/matches.json" > "$work/release.json" || return 2; return 0;;
+        *) return 2;;
+    esac
+}
 bash "$layout_tool" inventory "$delivery" > "$work/local.tsv"
 while IFS=$'\t' read -r name bytes _; do
     ((bytes < 2147483648)) || release_fail "Release asset exceeds the 2 GiB limit: $name"
 done < "$work/local.tsv"
 bash "$layout_tool" body "$delivery" "$work/local.tsv" > "$work/notes.md"
 existing=0
-if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$work/release.json" 2> "$work/query-error"; then
+if query_release; then
     existing=1
-elif ! jq -e '(.status|tostring)=="404"' "$work/release.json" >/dev/null; then
-    cat "$work/query-error" >&2
-    release_fail 'Unable to inspect release; no publication attempted'
+else
+    query_status=$?
+    if [[ $query_status != 1 ]]; then
+        cat "$work/query-error" >&2
+        release_fail 'Unable to inspect release; no publication attempted'
+    fi
 fi
 if ((existing)); then
     # Never convert a legacy release by deleting receipts or renaming its assets.
@@ -54,8 +70,10 @@ else
     gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$SOURCE_COMMIT" --draft --prerelease \
         --title "Fedora $(jq -r .version "$delivery/receipts/layout.json") Uke Senemos · $(jq -r .date "$delivery/receipts/layout.json") r$(jq -r .revision "$delivery/receipts/layout.json")" \
         --notes-file "$work/notes.md"
-    printf '{"assets":[]}\n' > "$work/release.json"
+    query_release || release_fail 'New draft cannot be recovered by its authenticated release record'
 fi
+release_id=$(jq -er .id "$work/release.json")
+[[ $release_id =~ ^[0-9]+$ ]] || release_fail 'Invalid release record ID'
 uploads=()
 while IFS=$'\t' read -r name _ _; do
     if ! jq -e --arg name "$name" 'any(.assets[]; .name==$name)' "$work/release.json" >/dev/null; then
@@ -63,7 +81,7 @@ while IFS=$'\t' read -r name _ _; do
     fi
 done < "$work/local.tsv"
 if ((${#uploads[@]})); then gh release upload "$tag" "${uploads[@]}" --repo "$GITHUB_REPOSITORY"; fi
-gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$work/published.json"
+gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > "$work/published.json"
 jq -e '.assets|length>1 and all(.[]; .state=="uploaded" and (.digest|type=="string" and test("^sha256:[0-9a-f]{64}$")))' "$work/published.json" >/dev/null || release_fail 'Uploaded assets have no complete digest inventory'
 while IFS= read -r name; do
     release_asset_name "$delivery/receipts/layout.json" "$name" || release_fail 'Unexpected remote asset; release body was not finalized'
