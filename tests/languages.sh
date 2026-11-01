@@ -13,6 +13,9 @@ mkdir -p "$work/base/usr/share/locale/tr/LC_MESSAGES" "$work/base/usr/lib/locale
 printf 'Turkish libc messages\n' > "$work/base/usr/share/locale/tr/LC_MESSAGES/libc.mo"
 printf 'all-language archive fixture\n' > "$work/base/usr/lib/locale/locale-archive"
 printf '/usr/lib/locale/locale-archive\t0\t(none)\n/usr/share/locale/tr/LC_MESSAGES/libc.mo\t0\ttr\n/usr/share/doc/example/tr.txt\t2\ttr\n/ghost\t64\ttr\n' > "$work/base.tsv"
+# Real GNOME RPMs tag localized help directories without %%doc on the directory;
+# nodocs removes them together with their documented children.
+printf '/usr/share/help/tr/malcontent\t0\ttr\n/usr/share/help/de/example/index.page\t0\tde\n/usr/share/gnome/help/example/tr\t0\ttr\n' >> "$work/base.tsv"
 printf 'C\nC.utf8\nen_US.utf8\ntr_TR.utf8\n' > "$work/locales"
 for desktop in core kde nextkde plasma-mobile gnome cutefish; do
     cp -a "$work/base" "$work/$desktop"

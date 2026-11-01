@@ -33,7 +33,10 @@ public_language_audit() {
         NF!=3 || $1!~/^\// || $1~/\/\.\.?($|\/)/ || $2!~/^[0-9]+$/ {exit 1}
         {
             flags=$2+0
-            if (int(flags/64)%2 || int(flags/2)%2 || $1~/^\/usr\/share\/(doc|man|info)\//) next
+            # GNOME help directories can carry a language tag without the doc
+            # flag even when their children are documentation. RPM nodocs omits
+            # those directories too; they are not runtime UI catalogs.
+            if (int(flags/64)%2 || int(flags/2)%2 || $1~/^\/usr\/share\/(doc|man|info|help|gnome\/help)\//) next
             if (($3!="" && $3!="(none)") || $1~/^\/usr\/share\/locale\// || $1~/^\/usr\/share\/qt[56]\/translations\//) print
         }' "$inventory" > "$listing"; then
         rm -f "$listing"
