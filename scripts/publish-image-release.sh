@@ -12,6 +12,12 @@ export UKE_RELEASE_BUILD_RUNS=$GITHUB_RUN_ID
 # shellcheck disable=SC1091
 source "$layout_tool"
 bash "$layout_tool" verify "$delivery"
+if [[ -n ${UKE_EXPECTED_CORE_SHA:-} ]]; then
+    [[ $UKE_EXPECTED_CORE_SHA =~ ^[0-9a-f]{64}$ ]] || release_fail 'Invalid expected core hash'
+    for manifest in "$delivery/receipts/images/"*.json; do
+        jq -e --arg core "$UKE_EXPECTED_CORE_SHA" '.shared_core_sha256==$core' "$manifest" >/dev/null || release_fail 'Unexpected frozen core source'
+    done
+fi
 if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
     policy=complete
     [[ ${UKE_ALLOW_MISSING_CUTEFISH:-0} != 1 ]] || policy=cutefish-optional
@@ -23,6 +29,12 @@ cohort=$(sha256sum "$delivery/receipts/cohort.json"); cohort=${cohort%% *}
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 query_release() {
+    if [[ -n ${UKE_RELEASE_ID:-} ]]; then
+        [[ $UKE_RELEASE_ID =~ ^[1-9][0-9]+$ ]] || return 2
+        gh api "repos/$GITHUB_REPOSITORY/releases/$UKE_RELEASE_ID" > "$work/release.json" 2> "$work/query-error" || return 2
+        jq -e --arg tag "$tag" '.tag_name==$tag' "$work/release.json" >/dev/null || return 2
+        return 0
+    fi
     # GitHub's by-tag endpoint omits unpublished drafts. Search the authenticated
     # release list before creating a duplicate, then use the stable numeric ID.
     if gh api "repos/$GITHUB_REPOSITORY/releases/tags/$tag" > "$work/release.json" 2> "$work/query-error"; then return 0; fi
@@ -51,6 +63,9 @@ else
     fi
 fi
 if ((existing)); then
+    if [[ ${UKE_REQUIRE_EXISTING_RELEASE:-0} == 1 ]]; then
+        jq -e '.draft==false' "$work/release.json" >/dev/null || release_fail 'The existing release must be published first'
+    fi
     # Never convert a legacy release by deleting receipts or renaming its assets.
     jq -e '.assets|all(.[]; .state=="uploaded" and (.digest|type=="string" and test("^sha256:[0-9a-f]{64}$")))' "$work/release.json" >/dev/null || release_fail 'Incomplete remote assets'
     while IFS= read -r name; do
@@ -75,10 +90,14 @@ if ((existing)); then
         [[ -z $remote || $remote == "sha256:$sha" ]] || release_fail "Published image collision: $name; choose another revision"
     done < "$work/local.tsv"
 else
-    gh release create "$tag" --repo "$GITHUB_REPOSITORY" --target "$SOURCE_COMMIT" --draft --prerelease \
-        --title "Fedora $(jq -r .version "$delivery/receipts/layout.json") Uke Senemos · $(jq -r .date "$delivery/receipts/layout.json") r$(jq -r .revision "$delivery/receipts/layout.json")" \
-        --notes-file "$work/notes.md"
-    query_release || release_fail 'New draft cannot be recovered by its authenticated release record'
+    [[ ${UKE_REQUIRE_EXISTING_RELEASE:-0} != 1 ]] || release_fail 'The existing release must be published first'
+    jq -n --arg tag "$tag" --arg target "$SOURCE_COMMIT" --rawfile body "$work/notes.md" \
+        --arg title "Fedora $(jq -r .version "$delivery/receipts/layout.json") Uke Senemos · $(jq -r .date "$delivery/receipts/layout.json") r$(jq -r .revision "$delivery/receipts/layout.json")" \
+        '{tag_name:$tag,target_commitish:$target,name:$title,body:$body,draft:true,prerelease:true}' > "$work/create.json"
+    # Use the creation response's stable ID. Unpublished drafts may have an
+    # untagged URL and be absent from both by-tag and immediate list lookups.
+    gh api "repos/$GITHUB_REPOSITORY/releases" --method POST --input "$work/create.json" > "$work/release.json"
+    jq -e --arg tag "$tag" '.tag_name==$tag and .draft==true' "$work/release.json" >/dev/null || release_fail 'Unexpected draft creation response'
 fi
 release_id=$(jq -er .id "$work/release.json")
 [[ $release_id =~ ^[0-9]+$ ]] || release_fail 'Invalid release record ID'
@@ -88,7 +107,12 @@ while IFS=$'\t' read -r name _ _; do
         uploads+=("$delivery/assets/$name")
     fi
 done < "$work/local.tsv"
-if ((${#uploads[@]})); then gh release upload "$tag" "${uploads[@]}" --repo "$GITHUB_REPOSITORY"; fi
+for file in "${uploads[@]}"; do
+    name=${file##*/}
+    encoded=$(jq -nr --arg name "$name" '$name|@uri')
+    gh api "https://uploads.github.com/repos/$GITHUB_REPOSITORY/releases/$release_id/assets?name=$encoded" \
+        --method POST --header 'Content-Type: application/octet-stream' --input "$file" > "$work/upload.json"
+done
 gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > "$work/published.json"
 jq -e '.assets|length>1 and all(.[]; .state=="uploaded" and (.digest|type=="string" and test("^sha256:[0-9a-f]{64}$")))' "$work/published.json" >/dev/null || release_fail 'Uploaded assets have no complete digest inventory'
 if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
@@ -103,5 +127,7 @@ while IFS=$'\t' read -r name _ sha; do
 done < "$work/local.tsv"
 jq -r '.assets[]|[.name,(.size|tostring),(.digest|sub("^sha256:";""))]|@tsv' "$work/published.json" | LC_ALL=C sort > "$work/all.tsv"
 bash "$layout_tool" body "$delivery" "$work/all.tsv" > "$delivery/receipts/RELEASE.md"
-gh release edit "$tag" --repo "$GITHUB_REPOSITORY" --notes-file "$delivery/receipts/RELEASE.md" --draft=false --prerelease
-gh release view "$tag" --repo "$GITHUB_REPOSITORY" --json url --jq .url
+jq -n --rawfile body "$delivery/receipts/RELEASE.md" '{body:$body,draft:false,prerelease:true}' > "$work/finalize.json"
+gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" --method PATCH --input "$work/finalize.json" > "$work/final.json"
+jq -e --arg tag "$tag" '.tag_name==$tag and .draft==false and .prerelease==true and .published_at!=null' "$work/final.json" >/dev/null || release_fail 'GitHub did not confirm publication'
+jq -er .html_url "$work/final.json"

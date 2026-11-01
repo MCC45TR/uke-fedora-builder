@@ -139,7 +139,24 @@ mkdir -p "$state/assets"
 printf '%s\n' "$*" >> "$state/calls"
 option() { local key=$1; shift; while (($#)); do if [[ $1 == "$key" ]]; then printf '%s\n' "$2"; return; fi; shift; done; return 1; }
 if [[ $1 == api ]]; then
- if [[ $2 == *'/releases?per_page=100' ]]; then
+ if [[ $2 == */releases && $(option --method "$@" || :) == POST ]]; then
+  input=$(option --input "$@")
+  jq '. + {id:430000001,assets:[]}' "$input" > "$state/release.json"
+  cat "$state/release.json"
+ elif [[ $2 == https://uploads.github.com/*/assets\?name=* ]]; then
+  [[ ${UKE_FAIL_UPLOAD:-0} == 0 ]] || exit 45
+  file=$(option --input "$@"); name=${2#*name=}
+  cp "$file" "$state/assets/$name"
+  sha=$(sha256sum "$file"); sha=${sha%% *}
+  jq --arg name "$name" --arg sha "sha256:$sha" --argjson size "$(stat -c %s "$file")" '.assets += [{name:$name,digest:$sha,size:$size,state:"uploaded"}]' "$state/release.json" > "$state/new.json"
+  mv "$state/new.json" "$state/release.json"
+  jq --arg name "$name" '.assets[]|select(.name==$name)' "$state/release.json"
+ elif [[ $2 == */releases/430000001 && $(option --method "$@" || :) == PATCH ]]; then
+  input=$(option --input "$@")
+  jq --slurpfile update "$input" '. + $update[0] + {published_at:"2026-11-01T00:00:00Z",html_url:"https://example.invalid/release"}' "$state/release.json" > "$state/new.json"
+  mv "$state/new.json" "$state/release.json"; cat "$state/release.json"
+ elif [[ $2 == *'/releases?per_page=100' ]]; then
+  if [[ ${UKE_HIDE_DRAFT_LIST:-0} == 1 && -f $state/release.json ]] && jq -e .draft "$state/release.json" >/dev/null; then printf '[]\n'; exit; fi
   if [[ -f $state/release.json ]]; then jq '[[.]]' "$state/release.json"; else printf '[]\n'; fi
  elif [[ $2 == *'/releases/tags/'* ]]; then
   if [[ -f $state/release.json ]] && jq -e '.draft==false' "$state/release.json" >/dev/null; then cat "$state/release.json"
@@ -172,14 +189,14 @@ export PATH="$work/bin:$PATH" GITHUB_REPOSITORY=MCC45TR/fixture SOURCE_COMMIT=aa
 bash "$tool" stage "$work/kde" "$work/kde-only" 011126 0
 UKE_REQUIRE_DESKTOP_SET=1 UKE_EXPECTED_CORE_SHA=$core_sha reject bash "$publisher" "$work/kde-only"
 [[ ! -e $UKE_GH_STATE/calls ]]
-bash "$publisher" "$work/kde-only"
+UKE_HIDE_DRAFT_LIST=1 bash "$publisher" "$work/kde-only"
 jq -e '.draft==false and (.assets|length==2) and all(.assets[]; .name|test("[.]img([.]zst)?$")) and (.body|contains("| Image | Bytes | SHA256 |"))' "$work/remote/release.json" >/dev/null
 jq -e '(.body|contains("fastboot set_active")|not) and (.body|contains("fastboot reboot")|not)' "$work/remote/release.json" >/dev/null
 bash "$tool" stage "$work/gnome" "$work/gnome-only" 011126 0
 export GITHUB_RUN_ID=456
 jq '.draft=true' "$work/remote/release.json" > "$work/draft.json"
 mv "$work/draft.json" "$work/remote/release.json"
-bash "$publisher" "$work/gnome-only"
+UKE_HIDE_DRAFT_LIST=1 UKE_RELEASE_ID=430000001 bash "$publisher" "$work/gnome-only"
 jq -e '(.assets|length==3) and ([.assets[]|select(.name|contains("-boot-"))]|length==1)' "$work/remote/release.json" >/dev/null
 jq -e '.body|contains("<!-- uke-image-build-runs: 123,456 -->")' "$work/remote/release.json" >/dev/null
 grep -F 'release download' "$work/remote/calls" >/dev/null
@@ -207,4 +224,11 @@ env UKE_GH_STATE="$work/remote-optional-cutefish" UKE_REQUIRE_DESKTOP_SET=1 UKE_
 jq -e '.draft==false and (.assets|length==4) and (.body|contains("Cutefish is currently unavailable"))' "$work/remote-optional-cutefish/release.json" >/dev/null
 env UKE_GH_STATE="$work/remote-optional-cutefish" UKE_REQUIRE_DESKTOP_SET=1 UKE_ALLOW_MISSING_CUTEFISH=1 UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/complete-set"
 jq -e '(.assets|length==5) and (.body|contains("Cutefish is currently unavailable")|not)' "$work/remote-optional-cutefish/release.json" >/dev/null
+# The positional parameters are expanded by the child shell running the pipe.
+# shellcheck disable=SC2016
+if env UKE_GH_STATE="$work/remote-upload-failure" UKE_FAIL_UPLOAD=1 bash -e -o pipefail -c \
+    'bash "$1" "$2" | tee "$3"' fixture "$publisher" "$work/kde-only" "$work/failure-summary" > "$work/failure-output" 2>&1; then
+    echo 'A failed upload was hidden by tee' >&2; exit 1
+fi
+[[ $(jq '.assets|length' "$work/remote-upload-failure/release.json") == 0 ]]
 echo 'Image names, shared boot byte/cohort gates, collisions, image-only publication and legacy-release preservation passed; no GitHub writes ran'
