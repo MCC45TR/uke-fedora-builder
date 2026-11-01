@@ -10,8 +10,8 @@ The public builder accepts Fedora 44, Fedora 45 and Rawhide as
 separate targets, and Bash, Fish or Zsh as the new normal user's login shell.
 The default remains Rawhide, KDE and Bash. Fedora 44/45 image composition stops
 before host preparation until signed Uke family builds and dependency resolution
-are validated. Cutefish image composition also stops: its graphical login and
-secure first-account flow are unvalidated. Dry-run selection is not image support.
+are validated. GNOME and KDE Plasma are the active desktop choices. Cutefish,
+NextKDE and the separate mobile profile are suspended. Historical releases remain available.
 
 The three targets use reviewed per-architecture Fedora image digests in
 `configs/build-rules.json`. Public RPM stages derive the dist tag from that
@@ -31,21 +31,21 @@ remain separate from native x86_64 container user-creation tests.
 `--channel`. Explicit desktop/shell flags are rejected for kernel-only builds.
 Testing selects `uke-linux-test`; unstable selects `uke-linux-unstable` directly.
 Its signing fingerprint is `2204A661EA630A5303500085538797E72A3E4ECA`.
-`--desktop plasma-mobile` adds Fedora Plasma Mobile and Plasma Settings to the
-Plasma account-setup flow; graphical validation is pending. `--desktop nextkde`
-reports that the `mcc45tr/kdenext` project has no published builds.
+Both active desktops retain all RPM-owned translations, Qt catalogs and the
+Turkish first-account catalogs. Plasma also includes `kio-admin`: use Dolphin's
+`admin://` URLs with normal Polkit authorization, rather than running Dolphin as root.
 Builds never flash a device. Singleboot flashing destroys Android userdata;
 multiboot requires an existing physical `linux` partition.
 
 ```sh
 ./ukelinux.sh --build image --release 44 --desktop kde --shell bash --dry-run
-./ukelinux.sh --build image --release 45 --desktop cutefish --shell fish --dry-run
+./ukelinux.sh --build image --release 45 --desktop gnome --shell fish --dry-run
 ./ukelinux.sh --build image --release rawhide --desktop gnome --shell zsh --dry-run
 ./ukelinux.sh --build kernel --release 45 --channel testing
 ./ukelinux.sh --self-test
 ```
 
-All 1080 release/desktop/shell/layout/filesystem/channel plans are checked without
+All 432 active release/desktop/shell/layout/filesystem/channel plans are checked without
 network or host preparation. The Cutefish meta package selects the real,
 separately packaged upstream desktop; it enables no display manager and cannot
 establish image or tablet support. Fedora 44/45 chroots were enabled in

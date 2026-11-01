@@ -27,6 +27,17 @@ for desktop in core kde nextkde plasma-mobile gnome cutefish; do
         printf 'catalog payload\n' > "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/$catalog"
         printf '/usr/share/locale/tr/LC_MESSAGES/%s\t0\ttr\n' "$catalog" >> "$work/$desktop.tsv"
     done
+    case $desktop in
+        kde|nextkde|plasma-mobile)
+            for ((n=0;n<80;n++)); do
+                dir=/usr/share/locale/fixture_$n/LC_MESSAGES
+                mkdir -p "$work/$desktop$dir"
+                for catalog in plasmashell.mo org.kde.plasmasetup.mo plasma_login.mo; do
+                    printf 'catalog\n' > "$work/$desktop$dir/$catalog"
+                    printf '%s/%s\t0\tfixture\n' "$dir" "$catalog" >> "$work/$desktop.tsv"
+                done
+            done;;
+    esac
     public_language_audit "$work/$desktop" "$work/$desktop.tsv" "$desktop" "$work/locales" "$work/$desktop.json"
     # Locale archive/package presence still cannot excuse stripped catalogs.
     rm "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/libc.mo"
@@ -42,6 +53,8 @@ reject public_language_audit "$work/core" "$work/core.tsv" core "$work/english-o
 reject public_language_audit "$work/kde" "$work/kde.tsv" kde "$work/locales" "$work/rejected.json"
 printf '/usr/share/locale/../outside\t0\ttr\n' > "$work/unsafe.tsv"
 reject public_language_audit "$work/core" "$work/unsafe.tsv" core "$work/locales" "$work/rejected.json"
+printf '/usr/share/qt6/translations/qt_tr.qm\t0\t(none)\n' >> "$work/core.tsv"
+reject public_language_audit "$work/core" "$work/core.tsv" core "$work/locales" "$work/rejected.json"
 mkdir "$work/bin" "$work/macros"
 cat > "$work/bin/rpm" <<'SH'
 #!/usr/bin/env bash

@@ -19,7 +19,7 @@ if [[ -n ${UKE_EXPECTED_CORE_SHA:-} ]]; then
     done
 fi
 if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
-    policy=complete
+    policy=${UKE_DESKTOP_SET_POLICY:-complete}
     [[ ${UKE_ALLOW_MISSING_CUTEFISH:-0} != 1 ]] || policy=cutefish-optional
     bash "$layout_tool" desktop-set "$delivery" "${UKE_EXPECTED_CORE_SHA:?Expected immutable core hash}" "$policy"
 fi

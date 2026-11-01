@@ -400,6 +400,9 @@ fi
 # shellcheck disable=SC1091
 source /builder/src/public/root-transaction.sh
 public_root_transaction "$root" /job/root-install.log dnf local_rpms packages
+# The loop variable expands in the target's Bash, after chroot.
+# shellcheck disable=SC2016
+chroot "$root" /usr/bin/bash -ec 'for tool in clear ps ip ping file find which curl tar gzip unzip; do command -v "$tool" >/dev/null; done; TERM=xterm clear >/dev/null'
 mkdir -p "$root/etc/rpm"
 printf '%%_install_langs all\n' > "$root/etc/rpm/macros.zz-uke-languages"
 rpm --root "$root" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\n]' > /job/artifacts/rpm-language-files.tsv
@@ -460,7 +463,9 @@ printf 'automatic=0\n' > "$root/etc/senemos/userdata-update.conf"
 internal_channel=$channel
 [[ $channel != testing ]] || internal_channel='test'
 printf '%s\n' "$internal_channel" > "$root/etc/uke-control/channel"
-printf 'PARTLABEL=%s / %s defaults,noatime 0 0\n' "$partition" "$filesystem" > "$root/etc/fstab"
+root_options=defaults,noatime
+[[ $partition != userdata || $filesystem != ext4 ]] || root_options+=,x-systemd.growfs
+printf 'PARTLABEL=%s / %s %s 0 0\n' "$partition" "$filesystem" "$root_options" > "$root/etc/fstab"
 cat /builder/configs/images/uke-persist.fstab >> "$root/etc/fstab"
 mkdir -p "$root/mnt/vendor/persist"
 chmod 700 "$root/mnt/vendor/persist"
@@ -491,6 +496,17 @@ printf '[Unit]\nConditionPathExists=/var/lib/uke-touch/reference.bin\n' > "$root
 for unit in uke-touchscreen.service uke-wifi-factory.service uke-install-profile.service; do
     systemctl --root="$root" enable "$unit"
 done
+if [[ $partition == userdata && $filesystem == ext4 ]]; then
+    # shellcheck source=first-boot-policy.sh
+    # shellcheck disable=SC1091
+    source /builder/src/public/first-boot-policy.sh
+    public_first_boot_policy "$root" /job/artifacts/first-boot-policy.json
+    mkdir -p /job/fstab-generated/{normal,early,late}
+    SYSTEMD_FSTAB="$root/etc/fstab" SYSTEMD_PROC_CMDLINE='root=PARTLABEL=userdata rw' SYSTEMD_SYSFS_CHECK=0 SYSTEMD_IN_INITRD=0 \
+        /usr/lib/systemd/system-generators/systemd-fstab-generator /job/fstab-generated/normal /job/fstab-generated/early /job/fstab-generated/late
+    find /job/fstab-generated -type l -printf '%P -> %l\n' > /job/artifacts/fstab-generated-links.txt
+    grep -F 'systemd-growfs-root.service' /job/artifacts/fstab-generated-links.txt || die 'Fedora fstab generator did not connect root growth'
+fi
 # The source initramfs grows only provisioned F2FS userdata before mounting it.
 find "$root/etc/ssh" -maxdepth 1 -type f -name 'ssh_host_*' -delete
 find "$root/var/log" "$root/tmp" "$root/var/tmp" -mindepth 1 -depth -delete
@@ -513,6 +529,10 @@ jq --slurpfile languages /job/artifacts/language-audit.json '. + {language_paylo
     rpm_install_languages:$languages[0].rpm_install_languages,turkish_utf8_locale:$languages[0].turkish_utf8_locale}' \
     /job/artifacts/manifest.json > /job/manifest.tmp
 mv /job/manifest.tmp /job/artifacts/manifest.json
+if [[ -f /job/artifacts/first-boot-policy.json ]]; then
+    jq '. + {root_capacity_gate_configured:true,swap_policy:"half",clear_binary_verified:true}' /job/artifacts/manifest.json > /job/manifest.tmp
+    mv /job/manifest.tmp /job/artifacts/manifest.json
+fi
 if [[ $channel == unstable ]]; then
     cohort_codec=$UKE_IMAGE_TOOLS/boot-image
 else

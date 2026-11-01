@@ -4,8 +4,8 @@ set -Eeuo pipefail
 builder=$(cd -- "$(dirname -- "$0")/.." && pwd)
 output=${1:?Expected new output directory} core=${2:?Expected core hash}
 shift 2
-[[ ( $# == 4 || ( $# == 3 && ${UKE_ALLOW_MISSING_CUTEFISH:-0} == 1 ) ) && ! -e $output && ! -L $output && $core =~ ^[0-9a-f]{64}$ ]]
-policy=complete
+policy=${UKE_DESKTOP_SET_POLICY:-complete}
+[[ ( $# == 4 || ( $# == 3 && ${UKE_ALLOW_MISSING_CUTEFISH:-0} == 1 ) || ( $# == 2 && $policy == gnome-plasma ) ) && ! -e $output && ! -L $output && $core =~ ^[0-9a-f]{64}$ ]]
 [[ ${UKE_ALLOW_MISSING_CUTEFISH:-0} != 1 ]] || policy=cutefish-optional
 layout=$builder/src/public/release-layout.sh
 mkdir -p "$output/assets" "$output/receipts/images" "$output/receipts/builds" "$output/receipts/reused"

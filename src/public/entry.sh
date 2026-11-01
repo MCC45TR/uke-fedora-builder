@@ -13,7 +13,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --mode multiboot|singleboot        Root partition: linux or userdata
   --filesystem ext4|f2fs|btrfs|xfs   Single-device root filesystem
   --release 44|45|rawhide            Target Fedora version; default Rawhide
-  --desktop kde|gnome|plasma-mobile|cutefish|nextkde
+  --desktop kde|gnome                 Other desktop profiles are suspended
                                     Graphical session; unavailable sessions fail explicitly
   --build-from-source               Compile kernel and missing platform RPMs (opt-in)
   --shell bash|fish|zsh              New user login shell; default Bash
@@ -77,7 +77,7 @@ TEXT
         '  4. Complete the original desktop account setup.' \
         '     REQUIRED: run sudo dnf update --refresh in Fedora after the first boot.' \
         '     Automatic kernel activation stays disabled. Updates do not authorize a slot write.' \
-        '     F2FS userdata grows offline during first boot; other formats retain the image size.'
+        '     EXT4 userdata grows to its physical partition capacity before graphical setup and disk swap.'
 }
 public_main() {
     # Resolve distribution before legacy routing or any Fedora-specific preparation.
@@ -155,7 +155,7 @@ public_main() {
     if [[ $target == image ]]; then
         public_choice mode 'Boot mode: multiboot or singleboot'
         public_choice filesystem 'Root filesystem: ext4, f2fs, btrfs or xfs'
-        public_choice desktop 'Desktop: kde, gnome, plasma-mobile, cutefish or nextkde'
+        public_choice desktop 'Desktop: kde or gnome'
         public_choice login_shell 'New user shell: bash, fish or zsh'
     fi
     public_choice channel 'Package channel: stable, testing or unstable'
@@ -165,7 +165,11 @@ public_main() {
     case $mode in multiboot|singleboot) :;; *) die 'Mode must be multiboot or singleboot';; esac
     case $filesystem in ext4|f2fs|btrfs|xfs) :;; *) die 'Unsupported root filesystem';; esac
     case $fedora_release in 44|45|rawhide) :;; *) die 'Fedora target must be 44, 45 or rawhide';; esac
-    case $desktop in kde|gnome|plasma-mobile|cutefish|nextkde) :;; *) die 'Unsupported desktop';; esac
+    case $desktop in
+        kde|gnome) :;;
+        cutefish|nextkde|plasma-mobile) die 'This desktop profile is suspended; select kde or gnome';;
+        *) die 'Unsupported desktop';;
+    esac
     case $login_shell in bash|fish|zsh) :;; *) die 'Login shell must be bash, fish or zsh';; esac
     if [[ $target == kernel && ( ${selected[desktop]:-0} == 1 || ${selected[login_shell]:-0} == 1 ) ]]; then
         die 'Desktop and login shell apply only to image builds'

@@ -106,9 +106,11 @@ release_desktop_set() {
     [[ $core =~ ^[0-9a-f]{64}$ ]] || release_fail 'Missing expected common core hash'
     release_verify "$delivery"
     local manifests=("$delivery/receipts/images/"*.json)
-    case $policy in complete|cutefish-optional) ;; *) release_fail 'Unknown desktop publication policy';; esac
+    case $policy in complete|cutefish-optional|gnome-plasma) ;; *) release_fail 'Unknown desktop publication policy';; esac
     actual=$(jq -sr 'map(.desktop)|sort|join(",")' "${manifests[@]}")
-    if [[ $policy == cutefish-optional && $actual == gnome,kde,nextkde ]]; then
+    if [[ $policy == gnome-plasma ]]; then
+        [[ ${#manifests[@]} == 2 && $actual == gnome,kde ]] || release_fail 'Publication requires exactly GNOME and KDE Plasma'
+    elif [[ $policy == cutefish-optional && $actual == gnome,kde,nextkde ]]; then
         [[ ${#manifests[@]} == 3 ]]
     else
         [[ ${#manifests[@]} == 4 && $actual == cutefish,gnome,kde,nextkde ]] || release_fail 'Publication requires KDE, GNOME and NextKDE; only Cutefish may be omitted explicitly'
@@ -162,7 +164,7 @@ release_stage() {
     install -m644 "$artifacts/manifest.json" "$delivery/receipts/images/$system.json"
     local records=$delivery/receipts/builds/${system%.img.zst}
     mkdir -p "$records"
-    for file in FLASHING.txt installed-rpms.tsv fedora-inputs.tsv desktop-inputs.tsv language-audit.json supported-locales.txt; do
+    for file in FLASHING.txt installed-rpms.tsv fedora-inputs.tsv desktop-inputs.tsv language-audit.json supported-locales.txt first-boot-policy.json fstab-generated-links.txt kio-admin-files.txt; do
         [[ ! -f $artifacts/$file ]] || install -m644 "$artifacts/$file" "$records/$file"
     done
     if [[ -d $artifacts/kernel ]]; then
@@ -212,7 +214,11 @@ release_body() {
     printf 'zstd -d %s -o system.img\nfastboot getvar product\nfastboot getvar current-slot\nfastboot getvar partition-size:userdata\nfastboot getvar partition-size:boot_b\nfastboot flash userdata system.img\nfastboot flash boot_b %s\n```\n\n' "$example" "$boot"
     printf 'Confirm boot_b is the intended target and retain matching slot-B firmware. Slot selection and reboot are separate manual steps in the verified device-specific procedure.\n\n'
     printf 'Preserve stock early firmware and calibration partitions. Restore only your own matching backups through your verified recovery route; changing slots alone does not restore userdata. No device write was performed by the builder.\n\n'
-    printf 'Automatic kernel activation and SSH remain disabled. No private touch reference is included; firmware redistribution review remains required. KDE Plasma and NextKDE use Plasma Setup; GNOME uses GNOME Initial Setup. NextKDE services start only in a normal account after setup.\n\n'
+    printf 'Automatic kernel activation and SSH remain disabled. No private touch reference is included; firmware redistribution review remains required. KDE Plasma uses Plasma Setup; GNOME uses GNOME Initial Setup.\n\n'
+    if [[ ${UKE_DESKTOP_SET_POLICY:-} == gnome-plasma ]]; then
+        printf 'This revision supports GNOME and KDE Plasma only; NextKDE and Cutefish are suspended. All RPM runtime translations, including Turkish setup/desktop and Qt catalogs, are retained and audited.\n\n'
+        printf 'Ordinary fastboot installation is used; no computer helper is required. At first boot, original systemd-growfs expands EXT4 to the actual userdata partition capacity. A separate read-only capacity gate must pass before disk swap and graphical setup. Do not interrupt filesystem growth. The existing Uke swap manager uses half physical RAM for a managed disk swap file, or preserves a valid unique linux_swap partition. No zram swap is added. Initial image capacity is not the final partition capacity. Physical boot, growth and swap acceptance on the tablet remain pending.\n\n'
+    fi
     if grep -q -- '-cutefish-uke-senemos-system-' "$inventory"; then
         printf '**Cutefish only:** public test login `senemos`, initial password `fedora`. GDM requires a password change at first login. The real GDM worker/PAM change-password conversation was tested during assembly; the tablet graphical login remains unqualified. Automatic login, remote password login and passwordless sudo are disabled. Change the published test password before use.\n\n'
     elif [[ ${UKE_ALLOW_MISSING_CUTEFISH:-0} == 1 ]]; then

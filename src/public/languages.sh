@@ -12,7 +12,8 @@ public_language_policy() {
 
 public_language_audit() {
     local root=$1 inventory=$2 desktop=$3 locales=$4 output=$5 listing path _flags _language status
-    local checked=0 turkish=0 missing=0 required catalog
+    local checked=0 turkish=0 missing=0 required catalog locale shell=0 setup=0 login=0 qt=0
+    local -A directories=()
     case $desktop in
         core) required='';;
         kde|nextkde|plasma-mobile) required='org.kde.plasmasetup.mo plasma_login.mo plasmashell.mo';;
@@ -33,7 +34,7 @@ public_language_audit() {
         {
             flags=$2+0
             if (int(flags/64)%2 || int(flags/2)%2 || $1~/^\/usr\/share\/(doc|man|info)\//) next
-            if (($3!="" && $3!="(none)") || $1~/^\/usr\/share\/locale\//) print
+            if (($3!="" && $3!="(none)") || $1~/^\/usr\/share\/locale\// || $1~/^\/usr\/share\/qt[56]\/translations\//) print
         }' "$inventory" > "$listing"; then
         rm -f "$listing"
         echo 'Invalid RPM language file inventory' >&2
@@ -47,6 +48,15 @@ public_language_audit() {
             missing=$((missing + 1))
         fi
         [[ $path != /usr/share/locale/tr/LC_MESSAGES/* ]] || turkish=$((turkish + 1))
+        if [[ $path == /usr/share/locale/*/* ]]; then
+            locale=${path#/usr/share/locale/}; directories[${locale%%/*}]=1
+            case $path in
+                */plasmashell.mo) shell=$((shell+1));;
+                */org.kde.plasmasetup.mo) setup=$((setup+1));;
+                */plasma_login.mo) login=$((login+1));;
+            esac
+        fi
+        [[ $path != /usr/share/qt[56]/translations/* ]] || qt=$((qt+1))
     done < "$listing"
     rm -f "$listing"
     [[ $checked -gt 0 && $turkish -gt 0 && $missing == 0 ]] || {
@@ -63,9 +73,17 @@ public_language_audit() {
         if LC_ALL=C awk -F '\t' -v path="$path" '$1==path {found=1} END {exit !found}' "$inventory"; then :
         else status=$?; return "$status"; fi
     done
+    case $desktop in
+        kde|nextkde|plasma-mobile)
+            (( ${#directories[@]} >= 80 && shell >= 40 && setup >= 30 && login >= 30 )) || {
+                echo 'KDE language breadth below the retained multilingual policy' >&2; return 1;
+            };;
+    esac
     jq -n --arg desktop "$desktop" --argjson checked "$checked" --argjson turkish "$turkish" \
+        --argjson directories "${#directories[@]}" --argjson shell "$shell" --argjson setup "$setup" --argjson login "$login" --argjson qt "$qt" \
         '{schema:1,desktop:$desktop,rpm_install_languages:"all",localized_paths_checked:$checked,
-          turkish_catalogs:$turkish,missing_localized_paths:0,turkish_utf8_locale:true}' > "$output"
+          turkish_catalogs:$turkish,missing_localized_paths:0,turkish_utf8_locale:true,locale_directories:$directories,
+          plasmashell_catalogs:$shell,plasma_setup_catalogs:$setup,plasmalogin_catalogs:$login,qt_translation_paths:$qt}' > "$output"
 }
 
 public_language_receipt() {

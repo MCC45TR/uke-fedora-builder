@@ -24,7 +24,7 @@ for fedora_release in 44 45 rawhide; do
 for login_shell in bash fish zsh; do
 for mode in multiboot singleboot; do
     for filesystem in ext4 f2fs btrfs xfs; do
-        for desktop in kde gnome cutefish plasma-mobile nextkde; do
+        for desktop in kde gnome; do
             for channel in stable testing unstable; do
                 (cd "$fixture"; public_main --build-from-source --build image --release "$fedora_release" --shell "$login_shell" --mode "$mode" --filesystem "$filesystem" --desktop "$desktop" --channel "$channel" --offline --dry-run) > "$fixture/plan"
                 grep -F "$mode; $filesystem; $desktop; $channel" "$fixture/plan" >/dev/null
@@ -36,7 +36,8 @@ for mode in multiboot singleboot; do
 done
 done
 done
-[[ $count == 1080 && ! -e $fixture/out ]]
+[[ $count == 432 && ! -e $fixture/out ]]
+for suspended in cutefish nextkde kdenext plasma-mobile kde-mobile; do reject --desktop "$suspended" --dry-run; done
 for channel in stable testing unstable; do
     public_main --build-from-source --build kernel --channel "$channel" --dry-run > "$fixture/plan"
     grep -F 'kernel: Fedora Rawhide AArch64' "$fixture/plan" >/dev/null
@@ -109,7 +110,7 @@ jq -e '.kernel | (.ref|type=="string") and (.default_version|test("^[0-9]+\\.[0-
     "$root/configs/public-build.json" >/dev/null
 bash -n "$root"/src/public/*.sh
 bash "$root/tests/public-source-inputs.sh"
-printf '%s\n' '1080 image selections, three kernel channels, minimal-PATH planning, invalid inputs, local-data refusal and five host-manager mappings passed; no builds ran.'
+printf '%s\n' '432 image selections, suspended desktop refusals, three kernel channels and host-manager mappings passed; no builds ran.'
 quiet_fail() { if ("$@") > /dev/null 2>&1; then echo "Accepted: $*" >&2; exit 1; fi; }
 # Kernel selection: explicit versions, latest and its alias are accepted; anything else is refused before a build starts.
 for choice in 7.2.12 7.3 latest lastest; do public_main --build-from-source --kernel "$choice" --dry-run > /dev/null; done

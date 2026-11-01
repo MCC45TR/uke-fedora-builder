@@ -9,7 +9,12 @@ public_desktop_setup() {
             printf '{"account_setup":"deferred-to-desktop","credentials_included":false}\n' > "$receipt"
             return;;
         kde|plasma-mobile|nextkde)
-            rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin >/dev/null
+            rpm --root "$root" -q plasma-setup plasma-login-manager kde-settings-plasmalogin kio-admin >/dev/null
+            rpm --root "$root" -ql kio-admin > /job/artifacts/kio-admin-files.txt
+            grep -E '/kio/.*admin.*\.so$' /job/artifacts/kio-admin-files.txt
+            grep -E '/polkit-1/actions/.*kio.*admin.*\.policy$' /job/artifacts/kio-admin-files.txt
+            grep -E '/libexec/.*kio.*admin' /job/artifacts/kio-admin-files.txt
+            rpm --root "$root" -q polkit >/dev/null
             [[ ! -e $root/etc/plasma-setup-done ]]
             chroot "$root" /usr/bin/kwriteconfig6 --file /etc/xdg/plasmasetuprc --group Accounts --key UserGroups wheel
             chroot "$root" /usr/bin/systemd-sysusers /usr/lib/sysusers.d/plasma-setup-sysuser.conf

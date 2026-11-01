@@ -14,7 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install source inspection tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep make zstd zip unzip
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep make zstd zip unzip e2fsprogs
       - name: Validate source without compilation or RPM generation
         shell: bash
         run: |
@@ -37,6 +37,8 @@ jobs:
           bash tests/public-channel-contract.sh
           shellcheck src/public/languages.sh tests/languages.sh
           bash tests/languages.sh
+          shellcheck src/public/first-boot-policy.sh tests/first-boot-policy.sh
+          bash tests/first-boot-policy.sh
           bash tests/repository-kernel-plan.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh

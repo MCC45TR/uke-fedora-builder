@@ -88,6 +88,9 @@ done
 merge=$builder/scripts/merge-desktop-deliveries.sh
 bash "$merge" "$work/complete-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish,nextkde}
 [[ $(find "$work/complete-set/assets" -type f | wc -l) == 5 ]]
+env UKE_DESKTOP_SET_POLICY=gnome-plasma bash "$merge" "$work/two-desktops" "$core_sha" "$work/set-delivery-"{kde,gnome}
+[[ $(find "$work/two-desktops/assets" -type f | wc -l) == 3 ]]
+reject env UKE_DESKTOP_SET_POLICY=gnome-plasma bash "$merge" "$work/wrong-two-desktops" "$core_sha" "$work/set-delivery-"{kde,nextkde}
 reject bash "$merge" "$work/incomplete-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish}
 reject bash "$merge" "$work/duplicate-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish,kde}
 reject bash "$tool" desktop-set "$work/complete-set" "$(printf 'e%.0s' {1..64})"
@@ -186,6 +189,8 @@ else exit 99; fi
 SH
 chmod +x "$work/bin/gh"
 export PATH="$work/bin:$PATH" GITHUB_REPOSITORY=MCC45TR/fixture SOURCE_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_RUN_ID=123 UKE_GH_STATE=$work/remote
+env UKE_GH_STATE="$work/remote-two-desktops" UKE_REQUIRE_DESKTOP_SET=1 UKE_DESKTOP_SET_POLICY=gnome-plasma UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/two-desktops"
+jq -e '.prerelease and (.assets|length==3)' "$work/remote-two-desktops/release.json" >/dev/null
 bash "$tool" stage "$work/kde" "$work/kde-only" 011126 0
 UKE_REQUIRE_DESKTOP_SET=1 UKE_EXPECTED_CORE_SHA=$core_sha reject bash "$publisher" "$work/kde-only"
 [[ ! -e $UKE_GH_STATE/calls ]]

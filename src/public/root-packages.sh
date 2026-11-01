@@ -10,7 +10,10 @@ public_root_packages() {
     selection=(fedora-release fedora-repos bash "$login_shell" coreutils dnf5 dnf5-plugins glibc-all-langpacks
         systemd systemd-udev systemd-pam NetworkManager NetworkManager-wifi bluez chrony
         firewalld openssh-server sudo shadow-utils cracklib-dicts selinux-policy-targeted policycoreutils
-        e2fsprogs f2fs-tools btrfs-progs xfsprogs util-linux kbd less nano fastfetch
+        e2fsprogs f2fs-tools btrfs-progs xfsprogs util-linux kbd ncurses less nano fastfetch
+        procps-ng iproute iputils psmisc usbutils file findutils which curl tar gzip unzip jq bash-completion
+        google-noto-sans-vf-fonts google-noto-sans-cjk-vf-fonts google-noto-color-emoji-fonts
+        ibus ibus-gtk3 ibus-gtk4 uke-control
         pipewire pipewire-pulseaudio wireplumber
         uke-core uke-hw uke-power uke-sensors uke-additional uke-firmware
         uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
@@ -29,12 +32,18 @@ public_root_packages() {
         selection=("${individual[@]}" uke-core-meta)
     fi
     if [[ $desktop == kde || $desktop == plasma-mobile || $desktop == nextkde ]]; then
-        selection+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin)
+        selection+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin kio-admin)
         [[ $desktop != plasma-mobile ]] || selection+=(plasma-mobile plasma-settings)
         [[ $desktop != nextkde ]] || selection+=(nextkde quickshell)
     elif [[ $desktop == gnome ]]; then
         selection+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
-            gnome-control-center gnome-software gnome-console nautilus)
+            gnome-control-center gnome-software ptyxis nautilus firefox
+            gnome-text-editor gnome-calculator loupe papers showtime decibels
+            gnome-calendar gnome-contacts gnome-clocks gnome-weather gnome-maps
+            gnome-system-monitor gnome-disk-utility baobab gnome-logs gnome-font-viewer gnome-characters
+            file-roller gnome-backgrounds xdg-desktop-portal-gnome xdg-desktop-portal-gtk xdg-user-dirs-gtk
+            gvfs-mtp gvfs-smb gvfs-afc gvfs-fuse gvfs-goa gvfs-gphoto2 sushi glib-networking
+            gnome-keyring PackageKit PackageKit-gtk3-module yelp orca)
     elif [[ $desktop == cutefish ]]; then
         # The standalone bus is used by the isolated real GDM/PAM probe.
         selection+=(cutefish-desktop gdm dbus-daemon)
