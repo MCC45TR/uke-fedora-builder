@@ -3,14 +3,21 @@
 set -Eeuo pipefail
 [[ $(id -u) == 0 && -f /inputs/SHA256SUMS && ! -e /job/root ]]
 export HOME=/root LANG=C.UTF-8 PATH=/usr/sbin:/usr/bin:/sbin:/bin
+# shellcheck disable=SC1091
 source /builder/src/public/root-proc.sh
+# shellcheck disable=SC1091
 source /builder/src/public/root-transaction.sh
+# shellcheck disable=SC1091
 source /builder/src/public/ext4-filesystem.sh
+# shellcheck disable=SC1091
 source /builder/src/public/root-metadata.sh
+# shellcheck disable=SC1091
 source /builder/src/public/guest-runtime.sh
 mkdir -p /job/root/proc /etc/yum.repos.d /var/cache/dnf /var/lib/rpm /proc /sys /dev /run
 # guestfish command chroots into the SDK without preparing virtual filesystems.
 # These mounts exist only inside the appliance; no host mount is exposed.
+# Shared with public_guest_unmounts in the sourced runtime.
+# shellcheck disable=SC2034
 PUBLIC_GUEST_MOUNTS=()
 target_proc_mounted=0
 guest_cleanup() {
@@ -42,11 +49,15 @@ skip_if_unavailable=False
 REPO
 # The actual full-image transaction helper runs unmodified. This deliberately
 # bounded selection exercises native RPM scriptlets and persistent system IDs.
+# Passed by name to public_root_transaction.
+# shellcheck disable=SC2034
 dnf=(dnf5 --use-host-config --installroot=/job/root --releasever=rawhide
     --disable-repo='*' --enable-repo=copr-public-fedora
     --setopt=install_weak_deps=False --setopt=gpgcheck=True
     --setopt=keepcache=True --setopt=installonly_limit=0 --setopt=tsflags=nodocs)
+# shellcheck disable=SC2034
 rpms=()
+# shellcheck disable=SC2034
 mapfile -t packages < <(jq -er '.[]' /builder/configs/copr-image-fixture-packages.json)
 public_root_proc_mount /job/root
 target_proc_mounted=1

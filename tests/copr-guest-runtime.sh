@@ -2,6 +2,7 @@
 # Real mount ownership/refusal controls, only inside the disposable COPR SDK.
 set -Eeuo pipefail
 [[ $(id -u) == 0 && -f /.uke-copr-sdk && $(< /.uke-copr-sdk) == 1 ]]
+# shellcheck disable=SC1091
 source /builder/src/public/guest-runtime.sh
 work=$(mktemp -d /job/runtime.XXXXXX)
 PUBLIC_GUEST_MOUNTS=()
