@@ -13,7 +13,8 @@ public_root_packages() {
         e2fsprogs f2fs-tools btrfs-progs xfsprogs util-linux kbd ncurses less nano fastfetch
         procps-ng iproute iputils psmisc usbutils file findutils which curl tar gzip unzip jq bash-completion
         google-noto-sans-vf-fonts google-noto-sans-cjk-vf-fonts google-noto-color-emoji-fonts
-        ibus ibus-gtk3 ibus-gtk4 uke-control
+        qt6-qttranslations ibus ibus-gtk3 ibus-gtk4
+        ibus-libpinyin ibus-hangul ibus-anthy ibus-chewing ibus-m17n uke-control
         pipewire pipewire-pulseaudio wireplumber
         uke-core uke-hw uke-power uke-sensors uke-additional uke-firmware
         uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
