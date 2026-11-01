@@ -15,7 +15,7 @@ printf 'all-language archive fixture\n' > "$work/base/usr/lib/locale/locale-arch
 printf '/usr/lib/locale/locale-archive\t0\t(none)\n/usr/share/locale/tr/LC_MESSAGES/libc.mo\t0\ttr\n/usr/share/doc/example/tr.txt\t2\ttr\n/ghost\t64\ttr\n' > "$work/base.tsv"
 # Real GNOME RPMs tag localized help directories without %%doc on the directory;
 # nodocs removes them together with their documented children.
-printf '/usr/share/help/tr/malcontent\t0\ttr\n/usr/share/help/de/example/index.page\t0\tde\n/usr/share/gnome/help/example/tr\t0\ttr\n' >> "$work/base.tsv"
+printf '/usr/share/help/tr/malcontent\t0\ttr\t16877\n/usr/share/help/de/example/index.page\t2\tde\t33188\n/usr/share/gnome/help/example/tr\t0\ttr\t16877\n' >> "$work/base.tsv"
 printf 'C\nC.utf8\nen_US.utf8\ntr_TR.utf8\n' > "$work/locales"
 for desktop in core kde nextkde plasma-mobile gnome cutefish; do
     cp -a "$work/base" "$work/$desktop"
@@ -48,6 +48,12 @@ for desktop in core kde nextkde plasma-mobile gnome cutefish; do
     cp "$work/base/usr/share/locale/tr/LC_MESSAGES/libc.mo" "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/"
 done
 public_language_receipt "$work/core.json"
+cp "$work/core.tsv" "$work/non-doc-help.tsv"
+printf '/usr/share/help/tr/runtime/translated.page\t0\ttr\t33188\n' >> "$work/non-doc-help.tsv"
+reject public_language_audit "$work/core" "$work/non-doc-help.tsv" core "$work/locales" "$work/rejected.json"
+cp "$work/core.tsv" "$work/untyped-help.tsv"
+printf '/usr/share/help/tr/untyped\t0\ttr\n' >> "$work/untyped-help.tsv"
+reject public_language_audit "$work/core" "$work/untyped-help.tsv" core "$work/locales" "$work/rejected.json"
 printf '{"glibc_all_langpacks_installed":true}\n' > "$work/package-only.json"
 reject public_language_receipt "$work/package-only.json"
 printf 'C\nen_US.utf8\n' > "$work/english-only"

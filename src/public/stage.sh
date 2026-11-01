@@ -405,7 +405,7 @@ public_root_transaction "$root" /job/root-install.log dnf local_rpms packages
 chroot "$root" /usr/bin/bash -ec 'for tool in clear ps ip ping file find which curl tar gzip unzip; do command -v "$tool" >/dev/null; done; TERM=xterm clear >/dev/null'
 mkdir -p "$root/etc/rpm"
 printf '%%_install_langs all\n' > "$root/etc/rpm/macros.zz-uke-languages"
-rpm --root "$root" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\n]' > /job/artifacts/rpm-language-files.tsv
+rpm --root "$root" -qa --qf '[%{FILENAMES}\t%{FILEFLAGS}\t%{FILELANGS}\t%{FILEMODES}\n]' > /job/artifacts/rpm-language-files.tsv
 chroot "$root" /usr/bin/locale -a > /job/artifacts/supported-locales.txt
 public_language_audit "$root" /job/artifacts/rpm-language-files.tsv "$desktop" /job/artifacts/supported-locales.txt /job/artifacts/language-audit.json || die 'Installed language payload is incomplete'
 rpm --root "$root" -qa --qf '%{NEVRA}\t%{SOURCERPM}\t%{VENDOR}\n' | LC_ALL=C sort > /job/artifacts/installed-rpms.tsv

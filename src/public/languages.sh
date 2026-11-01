@@ -11,7 +11,7 @@ public_language_policy() {
 }
 
 public_language_audit() {
-    local root=$1 inventory=$2 desktop=$3 locales=$4 output=$5 listing path _flags _language status
+    local root=$1 inventory=$2 desktop=$3 locales=$4 output=$5 listing path _flags _language _mode status
     local checked=0 turkish=0 missing=0 required catalog locale shell=0 setup=0 login=0 qt=0
     local -A directories=()
     case $desktop in
@@ -30,20 +30,21 @@ public_language_audit() {
     # RPM flags: documentation=2, ghost=64. Documentation is deliberately
     # omitted; translated runtime files must survive the nodocs transaction.
     if ! LC_ALL=C awk -F '\t' '
-        NF!=3 || $1!~/^\// || $1~/\/\.\.?($|\/)/ || $2!~/^[0-9]+$/ {exit 1}
+        (NF!=3 && NF!=4) || $1!~/^\// || $1~/\/\.\.?($|\/)/ || $2!~/^[0-9]+$/ || (NF==4 && $4!~/^[0-9]+$/) {exit 1}
         {
             flags=$2+0
-            # GNOME help directories can carry a language tag without the doc
-            # flag even when their children are documentation. RPM nodocs omits
-            # those directories too; they are not runtime UI catalogs.
-            if (int(flags/64)%2 || int(flags/2)%2 || $1~/^\/usr\/share\/(doc|man|info|help|gnome\/help)\//) next
+            if (int(flags/64)%2 || int(flags/2)%2 || $1~/^\/usr\/share\/(doc|man|info)\//) next
+            # GNOME marks help pages DOC but their localized directories can
+            # remain unmarked. nodocs omits those directories too. Admit only
+            # RPM-declared directory metadata, never a non-DOC help file.
+            if (NF==4 && int($4/4096)%16==4 && $1~/^\/usr\/share\/(help|gnome\/help)\//) next
             if (($3!="" && $3!="(none)") || $1~/^\/usr\/share\/locale\// || $1~/^\/usr\/share\/qt[56]\/translations\//) print
         }' "$inventory" > "$listing"; then
         rm -f "$listing"
         echo 'Invalid RPM language file inventory' >&2
         return 1
     fi
-    while IFS=$'\t' read -r path _flags _language; do
+    while IFS=$'\t' read -r path _flags _language _mode; do
         checked=$((checked + 1))
         if [[ ! -e $root$path && ! -L $root$path ]]; then
             # Bound the diagnostics while retaining the full failure count.
