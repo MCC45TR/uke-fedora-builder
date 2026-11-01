@@ -24,5 +24,6 @@ workspace=$(git -C "$root" rev-parse HEAD)
 jq -n --arg workspace "$workspace" --arg producer "$producer" --arg run "$GITHUB_RUN_ID" \
     --arg sha "$(sha256sum "${archives[0]}" | cut -d ' ' -f1)" '{producer_workspace_commit:$workspace,producer_builder_commit:$producer,
     producer_run_id:$run,core_archive_sha256:$sha,desktop_sessions_in_core:false,core_rebuilt:true}' > "$receipts/core-origin.json"
-printf 'core_archive=%s\nbuild_date=%s\nproducer_builder=%s\nproducer_workspace=%s\nproducer_run_id=%s\ncore_receipts=%s\n' \
-    "${archives[0]}" "$(TZ=Europe/Istanbul date +%d%m%y)" "$producer" "$workspace" "$GITHUB_RUN_ID" "$receipts" >> "$GITHUB_OUTPUT"
+printf 'core_archive=%s\nbuild_date=%s\nproducer_builder=%s\nproducer_workspace=%s\nproducer_run_id=%s\ncore_receipts=%s\ncore_sha256=%s\n' \
+    "${archives[0]}" "$(TZ=Europe/Istanbul date +%d%m%y)" "$producer" "$workspace" "$GITHUB_RUN_ID" "$receipts" \
+    "$(cut -d ' ' -f1 "$RUNNER_TEMP/core.sha256")" >> "$GITHUB_OUTPUT"

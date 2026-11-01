@@ -1,8 +1,8 @@
-# Sequential desktop images
+# Parallel desktop images with one publisher
 
-The root repository's manual **Sequential shared-core desktop images** workflow
+The root repository's manual **Parallel shared-core desktop images** workflow
 installs the signed Fedora Rawhide AArch64 unstable core once, then runs KDE
-Plasma, GNOME, Cutefish and NextKDE jobs in that order. All images use Bash,
+Plasma, GNOME, Cutefish and NextKDE jobs independently in parallel. All images use Bash,
 singleboot userdata and the same EXT4 capacity. No source compilation is used.
 
 The core is an internal seven-day Actions artifact, not a flashable image or
@@ -14,12 +14,14 @@ or replacement/removal of any core RPM fail the job. Desktop dependency solving
 and signature verification still run; failures never fall back to source builds
 or another desktop.
 
-Each completed desktop is independently checked through filesystem readback,
+Each desktop is independently checked through filesystem readback,
 SELinux metadata, both Android sparse decoders and the kernel/module/DT/root
-cohort checks. Publication appends only images to one dated experimental Release.
-Before reusing the published boot, the publisher downloads it, compares its
-bytes and checks the canonical cohort. A changed boot or root collision requires
-a new revision. Old Release assets and URLs remain intact. Receipts stay in
+cohort checks. One publisher waits for all four successful jobs. It downloads
+each delivery into its own directory, checks the exact four-desktop set, equal
+core hashes, compatible cohorts and byte-identical boot files, then creates one
+experimental Release containing exactly one boot and four root images. Missing
+desktops or conflicting receipts fail before publication. A changed boot or root
+collision requires a new revision. Old Release assets and URLs remain intact. Receipts stay in
 seven-day delivery and 90-day metadata Actions artifacts.
 
 An explicit `core_run_id` can recover an already validated core after a desktop
@@ -32,6 +34,14 @@ and original producer source/run/hash are recorded separately in each root
 manifest. This is explicit reuse, never an automatic fallback. All current RPM
 signature, unchanged-core-package, module/DT/boot and filesystem checks still
 run. Each worker initializes its own pinned kernel signer database.
+
+Explicit `kde_run_id`, `gnome_run_id`, `cutefish_run_id` and `nextkde_run_id` inputs
+can preserve an already validated delivery from a successful composition job,
+including a run cancelled before publication. Reuse verifies repository, source
+gitlink, successful composition, artifact ZIP SHA256, root/boot hashes, profile,
+date/revision and the expected common core hash. The image is not rebuilt and
+its original source record is preserved. These inputs never install one desktop
+image into another desktop root.
 
 Both producer and consumer reject full desktop sessions/display managers in
 the common RPM inventory. Shared libraries such as `libplasma` and

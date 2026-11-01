@@ -70,6 +70,64 @@ mkdir -p "$work/unsafe/assets"
 ln -s "$work/not-created" "$work/unsafe/assets/fedora-rawhide-uke-senemos-boot-011126-r0.img"
 reject bash "$tool" stage "$work/kde" "$work/unsafe" 011126 0
 [[ ! -e $work/not-created ]]
+# Four independent roots must converge before the one publisher is allowed.
+core_sha=$(printf 'f%.0s' {1..64})
+for desktop in kde gnome cutefish nextkde; do
+    cp -a "$work/kde" "$work/set-$desktop"
+    printf '%s independent root\n' "$desktop" > "$work/set-$desktop/userdata.img"
+    jq --arg desktop "$desktop" --arg core "$core_sha" --arg sha "$(sha256sum "$work/set-$desktop/userdata.img" | cut -d ' ' -f1)" \
+        '.desktop=$desktop|.shared_core_sha256=$core|.desktop_isolation_audited=true|.previous_desktop_image_input=false|
+         .channel="unstable"|.default_shell="bash"|.builder_commit=("b"*40)|.root_sparse_sha256=$sha|
+         if $desktop=="cutefish" then .credentials_included=true|.public_test_account="senemos"|
+           .account_setup="gdm-expired-public-test-account"|.password_change_required=true|.password_change_backend_tested=true|
+           .autologin_enabled=false|.remote_password_login=false|.passwordless_sudo=false else . end' \
+        "$work/kde/manifest.json" > "$work/set-$desktop/manifest.json"
+    bash "$tool" stage "$work/set-$desktop" "$work/set-delivery-$desktop" 011126 1
+    printf 'workspace %s\n' "$(printf 'a%.0s' {1..40})" > "$work/set-delivery-$desktop/receipts/SOURCE.txt"
+done
+merge=$builder/scripts/merge-desktop-deliveries.sh
+bash "$merge" "$work/complete-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish,nextkde}
+[[ $(find "$work/complete-set/assets" -type f | wc -l) == 5 ]]
+reject bash "$merge" "$work/incomplete-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish}
+reject bash "$merge" "$work/duplicate-set" "$core_sha" "$work/set-delivery-"{kde,gnome,cutefish,kde}
+reject bash "$tool" desktop-set "$work/complete-set" "$(printf 'e%.0s' {1..64})"
+cp -a "$work/set-gnome" "$work/set-conflicting-cohort"
+jq '.payload_sha256=("e"*64)' "$work/set-gnome/manifest.json" > "$work/set-conflicting-cohort/manifest.json"
+bash "$tool" stage "$work/set-conflicting-cohort" "$work/conflicting-cohort-delivery" 011126 1
+reject bash "$merge" "$work/conflicting-complete-set" "$core_sha" "$work/set-delivery-kde" "$work/conflicting-cohort-delivery" "$work/set-delivery-cutefish" "$work/set-delivery-nextkde"
+# Preserve a validated delivery from a completed/cancelled series without rebuilding.
+mkdir -p "$work/reuse-bin" "$work/reuse-state"
+reuse_state=$work/reuse-state
+(cd "$work/set-delivery-kde"; zip -q -r "$reuse_state/delivery.zip" .)
+jq -n '{repository:{full_name:"MCC45TR/fixture"},event:"workflow_dispatch",head_branch:"Fedora",
+    path:".github/workflows/desktop-images.yml",status:"completed",head_sha:("a"*40)}' > "$reuse_state/run.json"
+printf '[{"jobs":[{"name":"kde / compose","conclusion":"success"}]}]\n' > "$reuse_state/jobs.json"
+jq -n '{tree:[{path:"uke-fedora-builder",mode:"160000",sha:("b"*40)}]}' > "$reuse_state/tree.json"
+jq -n --arg sha "sha256:$(sha256sum "$reuse_state/delivery.zip" | cut -d ' ' -f1)" \
+    '[{artifacts:[{id:456,name:"desktop-delivery-kde",expired:false,digest:$sha}]}]' > "$reuse_state/artifacts.json"
+cat > "$work/reuse-bin/gh" <<'SH'
+#!/bin/bash
+set -euo pipefail
+[[ $1 == api ]]
+case $2 in
+ */actions/runs/123) cat "$UKE_REUSE_STATE/run.json";;
+ */actions/runs/123/jobs*) cat "$UKE_REUSE_STATE/jobs.json";;
+ */git/trees/*) cat "$UKE_REUSE_STATE/tree.json";;
+ */actions/runs/123/artifacts*) cat "$UKE_REUSE_STATE/artifacts.json";;
+ */actions/artifacts/456/zip) cat "$UKE_REUSE_STATE/delivery.zip";;
+ *) exit 99;;
+esac
+SH
+chmod +x "$work/reuse-bin/gh"
+reuse_request() {
+    env PATH="$work/reuse-bin:$PATH" UKE_REUSE_STATE="$reuse_state" GITHUB_REPOSITORY=MCC45TR/fixture GITHUB_OUTPUT="$work/reuse-outputs" \
+        RUNNER_TEMP="$1" REUSE_DESKTOP_RUN_ID=123 IMAGE_DESKTOP=kde IMAGE_CORE_SHA="$2" IMAGE_BUILD_DATE=011126 IMAGE_REVISION=1 \
+        bash "$builder/scripts/reuse-validated-desktop.sh"
+}
+reuse_request "$work/reuse-positive" "$core_sha"
+cmp "$work/set-delivery-kde/assets/$(jq -er .boot "$work/set-delivery-kde/receipts/layout.json")" \
+    "$work/reuse-positive/verified-desktop-reuse/delivery/assets/$(jq -er .boot "$work/set-delivery-kde/receipts/layout.json")"
+reject reuse_request "$work/reuse-wrong-core" "$(printf 'e%.0s' {1..64})"
 cat > "$work/bin/gh" <<'SH'
 #!/usr/bin/env bash
 set -Eeuo pipefail
@@ -87,7 +145,7 @@ if [[ $1 == api ]]; then
  else exit 99; fi
 elif [[ $1 == release && $2 == create ]]; then
  notes=$(option --notes-file "$@")
- jq -n --rawfile body "$notes" '{id:430000001,tag_name:"fedora-rawhide-uke-senemos-011126-r0",body:$body,assets:[],draft:true}' > "$state/release.json"
+ jq -n --rawfile body "$notes" --arg tag "$3" '{id:430000001,tag_name:$tag,body:$body,assets:[],draft:true}' > "$state/release.json"
 elif [[ $1 == release && $2 == upload ]]; then
  shift 3
  while (($#)) && [[ $1 != --* ]]; do
@@ -109,6 +167,8 @@ SH
 chmod +x "$work/bin/gh"
 export PATH="$work/bin:$PATH" GITHUB_REPOSITORY=MCC45TR/fixture SOURCE_COMMIT=aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa GITHUB_RUN_ID=123 UKE_GH_STATE=$work/remote
 bash "$tool" stage "$work/kde" "$work/kde-only" 011126 0
+UKE_REQUIRE_DESKTOP_SET=1 UKE_EXPECTED_CORE_SHA=$core_sha reject bash "$publisher" "$work/kde-only"
+[[ ! -e $UKE_GH_STATE/calls ]]
 bash "$publisher" "$work/kde-only"
 jq -e '.draft==false and (.assets|length==2) and all(.assets[]; .name|test("[.]img([.]zst)?$")) and (.body|contains("| Image | Bytes | SHA256 |"))' "$work/remote/release.json" >/dev/null
 jq -e '(.body|contains("fastboot set_active")|not) and (.body|contains("fastboot reboot")|not)' "$work/remote/release.json" >/dev/null
@@ -138,4 +198,6 @@ jq '.assets += [{name:"manifest.json",state:"uploaded",digest:("sha256:"+("e"*64
 before=$(wc -l < "$work/remote/calls")
 reject bash "$publisher" "$work/gnome-only"
 [[ $(wc -l < "$work/remote/calls") == $((before + 1)) ]]
+env UKE_GH_STATE="$work/remote-complete-set" UKE_REQUIRE_DESKTOP_SET=1 UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/complete-set"
+jq -e '.draft==false and (.assets|length==5) and ([.assets[]|select(.name|contains("-boot-"))]|length==1)' "$work/remote-complete-set/release.json" >/dev/null
 echo 'Image names, shared boot byte/cohort gates, collisions, image-only publication and legacy-release preservation passed; no GitHub writes ran'

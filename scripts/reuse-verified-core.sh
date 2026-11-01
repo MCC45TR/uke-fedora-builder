@@ -48,5 +48,5 @@ jq -n --arg source "$source" --arg producer "$producer" --arg run "$CORE_RUN_ID"
 printf 'Verified frozen core from run %s, workspace %s, builder %s; %s RPM records.\n' \
     "$CORE_RUN_ID" "$source" "$producer" "$(wc -l < "$work/core-installed-rpms.tsv")"
 cat "$work/core-installed-rpms.tsv"
-printf 'core_archive=%s\nbuild_date=%s\nproducer_builder=%s\nproducer_workspace=%s\nproducer_run_id=%s\ncore_receipts=%s\n' "$work/core.tar.zst" \
-    "$(TZ=Europe/Istanbul date +%d%m%y)" "$producer" "$source" "$CORE_RUN_ID" "$work" >> "$GITHUB_OUTPUT"
+printf 'core_archive=%s\nbuild_date=%s\nproducer_builder=%s\nproducer_workspace=%s\nproducer_run_id=%s\ncore_receipts=%s\ncore_sha256=%s\n' "$work/core.tar.zst" \
+    "$(TZ=Europe/Istanbul date +%d%m%y)" "$producer" "$source" "$CORE_RUN_ID" "$work" "$core_sha" >> "$GITHUB_OUTPUT"

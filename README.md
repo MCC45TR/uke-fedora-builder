@@ -66,8 +66,9 @@ uses Plasma Setup and starts its KOS services after normal account login.
 Cutefish uses GDM with the public test account `senemos` / `fedora`, requires a
 password change, and must pass the real GDM/PAM backend probe during assembly.
 No desktop silently substitutes another; tablet login and runtime remain
-unqualified. The [sequential shared-core workflow](docs/SHARED-CORE-IMAGES.md)
-builds the common core once and appends each completed desktop to one Release.
+unqualified. The [parallel shared-core workflow](docs/SHARED-CORE-IMAGES.md)
+builds the common core once, composes four independent desktop roots, and waits
+for all four before publishing one boot and four root images together.
 
 Managed build environments may set `UKE_CA_BUNDLE` to a PEM trust bundle. It is
 mounted temporarily into workers and BuildKit build steps; it is not copied into

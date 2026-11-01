@@ -12,6 +12,9 @@ export UKE_RELEASE_BUILD_RUNS=$GITHUB_RUN_ID
 # shellcheck disable=SC1091
 source "$layout_tool"
 bash "$layout_tool" verify "$delivery"
+if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
+    bash "$layout_tool" desktop-set "$delivery" "${UKE_EXPECTED_CORE_SHA:?Expected immutable core hash}"
+fi
 tag=$(jq -er .tag "$delivery/receipts/layout.json")
 boot=$(jq -er .boot "$delivery/receipts/layout.json")
 cohort=$(sha256sum "$delivery/receipts/cohort.json"); cohort=${cohort%% *}
@@ -50,6 +53,9 @@ if ((existing)); then
     jq -e '.assets|all(.[]; .state=="uploaded" and (.digest|type=="string" and test("^sha256:[0-9a-f]{64}$")))' "$work/release.json" >/dev/null || release_fail 'Incomplete remote assets'
     while IFS= read -r name; do
         release_asset_name "$delivery/receipts/layout.json" "$name" || release_fail 'Existing release contains legacy or non-image assets; preserve it and choose a new revision'
+        if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
+            awk -F '\t' -v name="$name" '$1==name {found=1} END {exit !found}' "$work/local.tsv" || release_fail 'Existing release has an asset outside the required four-desktop set'
+        fi
     done < <(jq -r '.assets[].name' "$work/release.json")
     mapfile -t markers < <(jq -r .body "$work/release.json" | sed -n 's/^<!-- uke-image-cohort-sha256: \([0-9a-f]\{64\}\) -->$/\1/p')
     [[ ${#markers[@]} == 1 && ${markers[0]} == "$cohort" ]] || release_fail 'Existing release has a different or unrecorded boot cohort'
@@ -83,6 +89,9 @@ done < "$work/local.tsv"
 if ((${#uploads[@]})); then gh release upload "$tag" "${uploads[@]}" --repo "$GITHUB_REPOSITORY"; fi
 gh api "repos/$GITHUB_REPOSITORY/releases/$release_id" > "$work/published.json"
 jq -e '.assets|length>1 and all(.[]; .state=="uploaded" and (.digest|type=="string" and test("^sha256:[0-9a-f]{64}$")))' "$work/published.json" >/dev/null || release_fail 'Uploaded assets have no complete digest inventory'
+if [[ ${UKE_REQUIRE_DESKTOP_SET:-0} == 1 ]]; then
+    jq -e '.assets|length==5' "$work/published.json" >/dev/null || release_fail 'The complete set must contain exactly one boot and four root images'
+fi
 while IFS= read -r name; do
     release_asset_name "$delivery/receipts/layout.json" "$name" || release_fail 'Unexpected remote asset; release body was not finalized'
 done < <(jq -r '.assets[].name' "$work/published.json")

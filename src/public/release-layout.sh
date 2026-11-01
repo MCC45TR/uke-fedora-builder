@@ -101,6 +101,20 @@ release_inventory() {
         printf '%s\t%s\t%s\n' "${file##*/}" "$(stat -c %s "$file")" "${sha%% *}"
     done | LC_ALL=C sort
 }
+release_desktop_set() {
+    local delivery=$1 core=$2 manifest actual
+    [[ $core =~ ^[0-9a-f]{64}$ ]] || release_fail 'Missing expected common core hash'
+    release_verify "$delivery"
+    local manifests=("$delivery/receipts/images/"*.json)
+    [[ ${#manifests[@]} == 4 ]] || release_fail 'Publication requires all four desktop images'
+    actual=$(jq -sr 'map(.desktop)|sort|join(",")' "${manifests[@]}")
+    [[ $actual == cutefish,gnome,kde,nextkde ]] || release_fail 'Publication requires exactly KDE, GNOME, Cutefish and NextKDE'
+    for manifest in "${manifests[@]}"; do
+        jq -e --arg core "$core" '.shared_core_sha256==$core and .desktop_isolation_audited==true and
+            .previous_desktop_image_input==false and .fedora_release=="rawhide" and .channel=="unstable" and .default_shell=="bash"' \
+            "$manifest" >/dev/null || release_fail 'Desktop set has a different core, profile or unverified isolation'
+    done
+}
 release_stage() {
     local artifacts=$1 delivery=$2 day=$3 revision=$4 compressed=${5:-} names boot system cohort stage file
     release_manifest "$artifacts/manifest.json"
@@ -209,7 +223,7 @@ if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
     command=${1:-}; shift || :
     case $command in
         names) release_names "$@";; stage) release_stage "$@";; verify) release_verify "$@";;
-        inventory) release_inventory "$@";; body) release_body "$@";; cohort) release_cohort "$@";;
+        inventory) release_inventory "$@";; body) release_body "$@";; cohort) release_cohort "$@";; desktop-set) release_desktop_set "$@";;
         *) release_fail 'Expected names, stage, verify, inventory, body or cohort';;
     esac
 fi
