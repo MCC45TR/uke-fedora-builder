@@ -67,7 +67,8 @@ release_verify() {
     ((${#manifests[@]} > 0 && ${#entries[@]} == ${#manifests[@]} + 1)) || release_fail 'Unexpected image or receipt count'
     for file in "${entries[@]}"; do
         name=${file##*/}
-        [[ -f $file && ! -L $file ]] && release_asset_name "$delivery/receipts/layout.json" "$name" || release_fail "Unexpected release asset: $name"
+        [[ -f $file && ! -L $file ]] || release_fail "Unexpected release asset: $name"
+        release_asset_name "$delivery/receipts/layout.json" "$name" || release_fail "Unexpected release asset: $name"
     done
     for manifest in "${manifests[@]}"; do
         [[ -f $manifest && ! -L $manifest ]] || release_fail 'Unsafe image receipt'
@@ -116,7 +117,8 @@ release_stage() {
         [[ $(jq -Sc 'del(.system)' "$delivery/receipts/layout.json") == "$(jq -Sc 'del(.system)' <<< "$names")" ]] || release_fail 'Delivery name/revision mismatch'
     fi
     if [[ -e $delivery/assets/$boot ]]; then
-        [[ ! -L $delivery/assets/$boot ]] && cmp -s "$delivery/assets/$boot" "$artifacts/boot.img" || release_fail 'Desktop-independent boot name collision: boot bytes differ'
+        [[ ! -L $delivery/assets/$boot ]] || release_fail 'Symlink in shared boot path'
+        cmp -s "$delivery/assets/$boot" "$artifacts/boot.img" || release_fail 'Desktop-independent boot name collision: boot bytes differ'
     fi
     if [[ -e $delivery/assets/$system ]]; then
         release_verify "$delivery"
