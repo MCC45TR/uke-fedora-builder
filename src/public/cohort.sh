@@ -15,7 +15,9 @@ cohort_identity() {
       $r.kernel_profile == $k.kernel_profile and
       (($k.kernel_profile == "normal" and
         $k.kernel_family == "senemos-uke-linux-kernel-mainline" and
-        $k.kernel_release == $k.rpm_version_release) or
+        ($k.kernel_release == $k.rpm_version_release or
+         (($k.rpm_version_release | startswith($k.kernel_release + ".")) and
+          ($k.rpm_version_release | ltrimstr($k.kernel_release + ".") | test("^[1-9][0-9]*$"))))) or
        ($k.kernel_profile == "el2-require" and
         $k.kernel_family == "senemos-uke-linux-kernel-mainline-kvm" and
         $k.kernel_release == ($k.rpm_version_release + "-kvm"))) and
@@ -35,6 +37,33 @@ cohort_identity() {
        (.mode == "multiboot" and .partition == "linux"))
     ' "$manifest" >/dev/null
 }
+
+# Run only after verifying all producer RPM signatures. A packaging-only RPM
+# revision may preserve the kernel ABI, but its signed composition must attest
+# that exact relationship; never infer an ABI by dropping arbitrary suffixes.
+cohort_repository_release() (
+    set -Eeuo pipefail
+    local root=$1 rpm_release=$2 abi source composition bundle
+    [[ $rpm_release =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?$ ]] || return 1
+    abi=$(find "$root/usr/lib/modules" -mindepth 1 -maxdepth 1 -printf '%f\n') || return 1
+    [[ $abi =~ ^7[.]3[.][0-9]+-[1-9][0-9]*$ &&
+       -d $root/usr/lib/modules/$abi && ! -L $root/usr/lib/modules/$abi ]] || return 1
+    bundle=$root/usr/lib/senemos/kernel-updates/$abi
+    [[ -d $bundle && ! -L $bundle && -f $bundle/manifest && ! -L $bundle/manifest ]] || return 1
+    [[ $(awk -F= '$1=="kernel_release" {print $2}' "$bundle/manifest") == "$abi" ]] || return 1
+    if [[ $rpm_release != "$abi" ]]; then
+        [[ $rpm_release == "$abi".* && ${rpm_release#"$abi".} =~ ^[1-9][0-9]*$ ]] || return 1
+        source=$root/usr/share/senemos/uke/$abi/source-commit
+        composition=$root/usr/share/senemos/uke/$abi/source-composition.json
+        [[ -f $source && ! -L $source && -f $composition && ! -L $composition ]] || return 1
+        [[ $(< "$source") =~ ^[0-9a-f]{40}$ ]] || return 1
+        jq -e --arg abi "$abi" --arg evr "$rpm_release" --arg source "$(< "$source")" '
+          .kernel_release==$abi and .source_commit==$source and
+          .upstream_version==($abi|split("-")[0]) and
+          .rpm_revision==($evr|split("-")[1])' "$composition" >/dev/null || return 1
+    fi
+    printf '%s\n' "$abi"
+)
 
 # Canonical producer/root byte inventory. Do not parse filenames supplied by a receipt.
 cohort_payload_inventory() (
@@ -99,6 +128,10 @@ cohort_root_check_main() (
     family=$(jq -er .kernel_family "$info")
     rpm_release=$(jq -er .rpm_version_release "$info")
     dist=$(jq -er .rpm_dist "$info")
+    if [[ $(jq -er .kernel_profile "$info") == normal && $rpm_release != "$release" ]]; then
+        [[ $(cohort_repository_release "$root" "$rpm_release") == "$release" ]]
+        [[ $(< "$root/usr/share/senemos/uke/$release/source-commit") == "$(jq -er .kernel_source_commit "$info")" ]]
+    fi
     partition=$(jq -er .partition "$request")
     filesystem=$(jq -er .filesystem "$request")
     modules=$root/usr/lib/modules/$release

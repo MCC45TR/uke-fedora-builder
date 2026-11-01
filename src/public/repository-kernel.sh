@@ -47,7 +47,7 @@ release=$(jq -er .kernel_rpm_request /job/request.json)
 if [[ $release == latest ]]; then
     release=$("${dnf[@]}" repoquery --latest-limit=1 --arch=aarch64 --qf '%{version}-%{release}' "$base-core")
 fi
-[[ $release =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ ]]
+[[ $release =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?[.]fc46$ ]]
 packages=()
 for component in '' -core -modules -dtbs -boot -singleboot; do
     packages+=("$base$component-$release.aarch64")
@@ -62,9 +62,9 @@ for archive in "${archives[@]}"; do
     (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /job/payload.cpio)
 done
 rpm_evr=$release
-release=${release%"$dist"}
+rpm_release=${release%"$dist"}
+release=$(cohort_repository_release /job/kernel-payload "$rpm_release")
 version=${release%-*}
-rpm_release=$release
 source_commit=$(cat "/job/kernel-payload/usr/share/senemos/uke/$release/source-commit")
 [[ $source_commit =~ ^[0-9a-f]{40}$ ]]
 if [[ -n ${UKE_COPR_ROOT_INPUTS:-} ]]; then

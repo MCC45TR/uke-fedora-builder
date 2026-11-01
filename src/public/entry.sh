@@ -189,7 +189,7 @@ public_main() {
     fi
     [[ $build_from_source == 0 || -z $kernel_rpm ]] || die '--build-from-source conflicts with --kernel-rpm'
     if [[ -n $kernel_rpm ]]; then
-        [[ $kernel_rpm == latest || $kernel_rpm =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ ]] || die 'Kernel RPM must be latest or an exact 7.3.x-N.fc46 release'
+        [[ $kernel_rpm == latest || $kernel_rpm =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?[.]fc46$ ]] || die 'Kernel RPM must be latest or an exact 7.3.x-N[.revision].fc46 release'
         [[ ( $target == image || $channel == unstable ) && $fedora_release == rawhide && $KERNEL_PROFILE == normal && $REUSE_KERNEL == 0 && -z $kernel_request ]] || die 'Repository kernel requires a normal Rawhide image or unstable kernel without source/reuse options'
         [[ -z ${UKE_KERNEL_REPO:-} || $UKE_KERNEL_REPO == none ]] || die 'Repository kernel cannot use a local kernel source'
     fi

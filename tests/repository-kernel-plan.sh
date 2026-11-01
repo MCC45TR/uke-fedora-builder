@@ -12,7 +12,7 @@ bootstrap() { exit 90; }
 work=$(mktemp -d)
 trap 'rm -rf -- "$work"' EXIT
 for channel in stable testing unstable; do
-    for rpm in latest 7.3.0-48.fc46; do
+    for rpm in latest 7.3.0-48.fc46 7.3.1-1010.1.fc46; do
         public_main --kernel-rpm "$rpm" --channel "$channel" --mode singleboot --filesystem ext4 --dry-run > "$work/plan"
         grep -F "Kernel input: signed $channel RPMs" "$work/plan" >/dev/null
     done
@@ -21,7 +21,7 @@ for channel in stable testing unstable; do
     public_main --build-from-source --channel "$channel" --dry-run > "$work/source"
     if grep -F 'Kernel input: signed' "$work/source"; then exit 1; fi
 done
-for options in '--kernel-rpm invalid' '--kernel-rpm 7.4-rc1' '--kernel-rpm 7.3.0-1.fc45' '--kernel-rpm latest --build kernel' '--kernel-rpm latest --build-from-source' '--reuse-kernel' '--kernel 7.3' '--kernel-profile el2-require'; do
+for options in '--kernel-rpm invalid' '--kernel-rpm 7.4-rc1' '--kernel-rpm 7.3.0-1.fc45' '--kernel-rpm 7.3.1-1010.0.fc46' '--kernel-rpm 7.3.1-1010.1.2.fc46' '--kernel-rpm latest --build kernel' '--kernel-rpm latest --build-from-source' '--reuse-kernel' '--kernel 7.3' '--kernel-profile el2-require'; do
     status=0
     # Intentional splitting of fixed fixture option strings.
     # shellcheck disable=SC2086

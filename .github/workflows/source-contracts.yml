@@ -40,6 +40,8 @@ jobs:
           shellcheck src/public/first-boot-policy.sh tests/first-boot-policy.sh
           bash tests/first-boot-policy.sh
           bash tests/repository-kernel-plan.sh
+          shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
+          bash tests/repository-kernel-identity.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
           bash tests/payload-traversal.sh
