@@ -472,6 +472,10 @@ chmod 700 "$root/mnt/vendor/persist"
 printf 'SELINUX=enforcing\nSELINUXTYPE=targeted\n' > "$root/etc/selinux/config"
 install -m644 /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected "$root/etc/pki/rpm-gpg/"
 public_root_repository "$root/etc/yum.repos.d/uke-selected.repo" "$project" "$fedora_release"
+if [[ $project == uke-linux-unstable ]]; then
+    mkdir -p "$root/etc/dnf/vendors.d"
+    public_root_vendor_policy "$root/etc/dnf/vendors.d/50-uke-kernel-policy.conf" "$project"
+fi
 if [[ $desktop == cutefish || $desktop == nextkde ]]; then
     cp /etc/yum.repos.d/uke-desktop.repo "$root/etc/yum.repos.d/uke-desktop.repo"
     desktop_project=cutefish

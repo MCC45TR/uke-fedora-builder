@@ -43,3 +43,47 @@ includepkgs=selinux-policy,selinux-policy-targeted
 REPO
     fi
 }
+
+# Keep the default vendor restriction and permit only the named policy family
+# to move between the selected COPR vendor and the original Fedora vendor.
+public_root_vendor_policy() {
+    local output=$1 project=$2
+    case $project in
+        uke-linux-unstable) ;;
+        uke-linux|uke-linux-test) return 0;;
+        *) return 1;;
+    esac
+    cat > "$output" <<'POLICY'
+version = '1.1'
+
+[[equivalent_vendors]]
+vendor = 'Fedora Project'
+
+[[equivalent_vendors]]
+vendor = 'Fedora Copr - user mcc45tr'
+
+[[outgoing_packages]]
+filters = [
+    { filter = 'name', value = 'selinux-policy' },
+    { filter = 'source_name', value = 'selinux-policy' }
+]
+
+[[outgoing_packages]]
+filters = [
+    { filter = 'name', value = 'selinux-policy-targeted' },
+    { filter = 'source_name', value = 'selinux-policy' }
+]
+
+[[incoming_packages]]
+filters = [
+    { filter = 'name', value = 'selinux-policy' },
+    { filter = 'source_name', value = 'selinux-policy' }
+]
+
+[[incoming_packages]]
+filters = [
+    { filter = 'name', value = 'selinux-policy-targeted' },
+    { filter = 'source_name', value = 'selinux-policy' }
+]
+POLICY
+}
