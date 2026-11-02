@@ -24,4 +24,22 @@ skip_if_unavailable=False
 priority=40
 includepkgs=uke-*,senemos-uke-linux-kernel-*
 REPO
+    # Deliver the reviewed kernel-policy update without giving Fedora-named
+    # packages the higher priority reserved for Uke packages. Frozen assembly
+    # inputs retain their original, explicitly resolved repository selection.
+    if [[ $project == uke-linux-unstable && $mode == public ]]; then
+        cat >> "$output" <<REPO
+
+[uke-policy]
+name=Uke kernel policy compatibility
+baseurl=$baseurl
+enabled=1
+gpgcheck=1
+repo_gpgcheck=0
+gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
+skip_if_unavailable=False
+priority=99
+includepkgs=selinux-policy,selinux-policy-targeted
+REPO
+    fi
 }
