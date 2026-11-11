@@ -88,5 +88,11 @@
     "independent_of_userdata": true,
     "non_destructive_by_default": true,
     "physical_entry_tested": false
-  }
+  },
+  "current_boot_blockers": [
+    "The current root-selector-v2 admits linux/userdata only; add a versioned Live Recovery root contract.",
+    "Current root-guard requires a physical supported filesystem; add reviewed mapper-aware unlock and super root admission.",
+    "The current boot-image creator accepts linux/userdata only; produce a matched Live Recovery boot path.",
+    "Current18 disables dm-crypt/fscrypt; integrate the already separately qualified native prerequisites."
+  ]
 }

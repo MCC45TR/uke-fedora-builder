@@ -57,6 +57,13 @@ upstream7.3 interface currently lacks cryptsetup/LUKS integration. Do not
 fork cryptsetup or embed shared encryption keys in the archive. TEE/HWKM
 wrapped-key boot and recovery remain separate unaccepted work.
 
+Current root-selector-v2 and the boot-image creator accept only linux/userdata.
+The initramfs root guard also requires the selected physical filesystem and
+rejects mapper roots. Live Recovery on super and encrypted root therefore need
+a versioned selector extension,mapper-aware admission and a corresponding boot
+image. Preserve the old two-root ABI and its accepted rollback path. Use standard
+udev/device events for new discovery and key handling;no healthy idle poller.
+
 `src/image/plan-fastboot-update.sh SOURCE_COMPOSITION OUTPUT` emits the
 release plan and proposed original-fastboot task files. It creates no ZIP,
 filesystem, payload or device change. Next implement the matched DTBO and
