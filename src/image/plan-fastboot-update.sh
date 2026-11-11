@@ -10,8 +10,9 @@ jq -e '.kernel_release|test("^[0-9]+[.][0-9]+[.][0-9]+-[1-9][0-9]*-unstable$")' 
 jq -e '.source_commit|test("^[a-f0-9]{40}$")' "$composition" >/dev/null
 mkdir -m755 "$output"
 jq --slurpfile source "$composition" \
+   --arg planner "$(git -C "$repo" rev-parse HEAD)" \
    --arg hash "$(sha256sum "$composition" | cut -d ' ' -f1)" \
-   '. + {kernel:{release:$source[0].kernel_release,source_commit:$source[0].source_commit,composition_sha256:$hash},
+   '. + {planner_commit:$planner,kernel:{release:$source[0].kernel_release,source_commit:$source[0].source_commit,composition_sha256:$hash},
      payloads_available:false,archive_created:false,
      kernel_encryption_in_full_candidate:($source[0].storage_encryption_enabled_in_full_candidate==true)}' \
    "$repo/configs/images/fastboot-update-uke.json" > "$output/release-plan.json"

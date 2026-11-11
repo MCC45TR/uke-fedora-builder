@@ -38,6 +38,13 @@ non-destructive inspection. No automatic format,unlimited reboot loop or
 new recovery partition size is authorized by this plan. Physical key entry
 and automatic fallback remain untested.
 
+A bounded read of both slots found DTBO table version0 with one entry and
+592,014 declared bytes,and vendor_boot version4 with37,136,921 vendor-ramdisk
+bytes. Only fixed headers/table metadata were read;this does not establish
+whole-image equality or acceptance of rebuilt payloads. The new signed cohort
+also needs an explicit AVB/vbmeta chain;do not use blanket verification-disable
+flags as a secure-boot implementation.
+
 Build the DTBO table from the current cumulative native sources and exact
 OEM selection metadata. Preserve both O82 suppliers, entry IDs/revisions,
 ABL selection, memory reservations and runtime firmware information. A raw

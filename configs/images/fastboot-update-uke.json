@@ -76,7 +76,8 @@
     "mapper-aware initramfs unlock plus rescue without userdata dependency",
     "encrypted I/O,key recovery and accepted rollback kernel compatibility",
     "fresh image excludes device-private identities and calibration",
-    "no automatic publication from plan generation"
+    "no automatic publication from plan generation",
+    "Matched AVB/vbmeta chain for new boot/vendor_boot/dtbo; no blanket verification-disable policy"
   ],
   "physical_flash_tested": false,
   "physical_boot_tested": false,
@@ -94,5 +95,15 @@
     "Current root-guard requires a physical supported filesystem; add reviewed mapper-aware unlock and super root admission.",
     "The current boot-image creator accepts linux/userdata only; produce a matched Live Recovery boot path.",
     "Current18 disables dm-crypt/fscrypt; integrate the already separately qualified native prerequisites."
-  ]
+  ],
+  "observed_fixed_boot_headers": {
+    "scope": "fixed header fields and DTBO table metadata only; no complete image identity",
+    "both_slots": {
+      "dtbo_table_version": 0,
+      "dtbo_entries": 1,
+      "dtbo_declared_bytes": 592014,
+      "vendor_boot_version": 4,
+      "vendor_ramdisk_bytes": 37136921
+    }
+  }
 }
