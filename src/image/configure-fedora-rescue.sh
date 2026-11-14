@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Configure an owned offline root; never mount or repair userdata.
 set -Eeuo pipefail
+trap 'printf "UKE_RESCUE_CONFIG_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 [[ $# == 1 && $(id -u) == 0 && -d $1 && ! -L $1 ]]
 root=$(realpath "$1")
 [[ $root != / && -f $root/usr/lib/os-release && -x $root/usr/bin/systemctl && -f $root/etc/shadow ]]

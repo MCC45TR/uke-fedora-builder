@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Isolated native AArch64 host assembly from signed RPMs. Never a tablet tool.
 set -Eeuo pipefail
+trap 'printf "UKE_RESCUE_COMPOSE_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 export LC_ALL=C
 umask 077
 fail() { printf 'UKE_RESCUE_REJECTED: %s\n' "$*" >&2; exit 1; }
@@ -28,6 +29,9 @@ cleanup() {
     if [[ $mounted == true ]]; then umount "$root/proc" || status=1; fi
     if ((status)); then
         for log in "$work/"*.log; do [[ ! -f $log ]] || tail -n 12 "$log" >&2; done
+        for log in "$out/"{units,python,filesystem,selinux}-audit.txt; do
+            [[ ! -f $log ]] || { printf '%s\n' "${log##*/}" >&2; tail -n 12 "$log" >&2; }
+        done
     fi
     exit "$status"
 }
