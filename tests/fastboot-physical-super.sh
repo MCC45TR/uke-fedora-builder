@@ -50,6 +50,7 @@ reset_view() {
     ln -s "../../$name" "$view/dev/disk/by-partlabel/super"
     mknod -m666 "$view/dev/null" c 1 3
     mknod -m666 "$view/dev/zero" c 1 5
+    ln -s /proc/self/fd "$view/dev/fd"
 }
 cat > "$work/run-in-view.sh" <<'SH'
 #!/usr/bin/env bash

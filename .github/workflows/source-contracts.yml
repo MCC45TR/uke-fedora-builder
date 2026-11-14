@@ -84,7 +84,7 @@ jobs:
           retention-days: 14
   rescue-root:
     if: github.event_name == 'workflow_dispatch' && (inputs.build_rescue || inputs.build_super_seed)
-    needs: source
+    needs: [source, logical-container]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
     steps:
