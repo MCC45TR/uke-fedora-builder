@@ -29,6 +29,14 @@ historical layouts and overlapping storage; their reported sizes cannot be
 added together. The new installation creates one consistent two-role layout.
 It must not put a raw EXT4 filesystem over the outer super container.
 
+Both 256-GB and 512-GB storage models are required. Measure actual geometry;
+marketed storage/RAM size and another donor's BoardConfig are not capacity
+evidence. Validate expanded sparse/raw payload extents against every destination
+before any write, and retain full-capacity first-boot growth. A full-size super
+container composed for one capacity cannot simply be advertised as universal
+for smaller super devices. Cross-capacity packaging/provisioning and actual
+fastboot-side admission remain open before the common ZIP is qualified.
+
 Calculate sizes from the actual device capacity, reserving liblp geometry,
 primary/backup metadata and alignment. The measured 512-GB tablet has
 11,274,289,152 super bytes. The current calculator assigns 9,017,753,600 bytes
@@ -53,6 +61,26 @@ EXT4 to its physical capacity, retaining the independent capacity gate. Do not
 grow an inner filesystem across a logical-partition boundary. Swap must not
 expose decrypted user data after encryption is selected; its key lifecycle
 needs an independently qualified inline-crypto path.
+
+Use the validated linux_swap block device whenever present, without allocating
+a parallel managed swapfile. Native zswap supplies a bounded compressed RAM
+cache with real disk backing; it does not turn zram into a persistent resume
+device or guarantee a larger swap capacity for incompressible data.
+
+Hibernation is required. Leave availability to original systemd/logind's actual
+resource/kernel/resume checks, with no hard-coded 8/12-GB model visibility rule
+and no capacity-check bypass. Kernel hibernation-image compression is separate
+from zswap. The user explicitly confirmed that choosing userdata encryption
+also protects swap/hibernation data; rescue remains independent. Persistent
+hardware-bound resume keys, authenticated snapshot restoration and matching
+kernel/DT/module identity must survive power loss. A fresh random swap key per
+boot cannot support that resume path.
+
+The current kernel26 live check has HIBERNATION=y and LZO image compression,
+but power/state exposes only freeze/mem and power/disk is disabled under active
+integrity lockdown. Zswap is compiled with the LZ4 default but disabled at
+runtime. These are open integration gates; do not disable lockdown or report
+successful hibernation from the kernel config or swap size alone.
 
 ## Encryption and key release
 
@@ -180,6 +208,9 @@ This image selection does not itself qualify rescue, encryption or secure boot.
 - [U-Boot FIT verification](https://docs.u-boot.org/en/latest/usage/fit/signature.html)
 - [dm-inlinecrypt](https://docs.kernel.org/admin-guide/device-mapper/dm-inlinecrypt.html)
 - [Inline encryption](https://docs.kernel.org/block/inline-encryption.html)
+- [zswap](https://docs.kernel.org/admin-guide/mm/zswap.html)
+- [Original systemd sleep availability](https://www.freedesktop.org/software/systemd/man/latest/systemd-sleep.conf.html)
+- [Original systemd resume generator](https://www.freedesktop.org/software/systemd/man/latest/systemd-hibernate-resume-generator.html)
 - [fscrypt](https://docs.kernel.org/filesystems/fscrypt.html)
 - [Trusted keys](https://docs.kernel.org/security/keys/trusted-encrypted.html)
 - [Hardware-wrapped keys](https://source.android.com/docs/security/features/encryption/hw-wrapped-keys)

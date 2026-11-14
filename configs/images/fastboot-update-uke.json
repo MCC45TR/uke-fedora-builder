@@ -13,6 +13,12 @@
   "kernel_family": "senemos-uke-linux-kernel-mainline-unstable",
   "kernel_profile": "unstable",
   "normal_updates": "signed DNF packages with automatic inactive-slot seamless staging",
+  "storage_variants": {
+    "required_models": ["256-GB storage", "512-GB storage"],
+    "geometry": "measure actual physical and logical capacities; never infer them from the marketed model",
+    "payload_fit": "check expanded raw image extent against every destination, not ZIP or sparse file size",
+    "universal_archive_qualified": false
+  },
   "super_layout": {
     "kind": "liblp",
     "capacity": "measured per device, never copied from another storage variant",
@@ -44,9 +50,30 @@
     "preferred_key_release": "hardware-bound, verified-boot-bound automatic release",
     "permitted_fallback": "unlock at user login if hardware-bound release cannot be provided",
     "passphrase_role": "user-selected recovery credential for hardware automatic release",
+    "primary_data_scope": "userdata",
+    "protect_swap_and_hibernation_when_selected": true,
+    "encrypt_rescue": false,
     "plaintext_key_in_archive": false,
     "hardware_key_acceptance": false,
     "hardware_encrypted_io_accepted": false
+  },
+  "swap": {
+    "preferred_backend": "validated linux_swap block mapping",
+    "managed_file_when_linux_swap_available": false,
+    "compressed_cache": "native zswap with bounded memory and real disk backing",
+    "compression_is_not_extra_guaranteed_disk_capacity": true,
+    "ephemeral_per_boot_key_when_hibernating": false,
+    "physical_acceptance": false
+  },
+  "hibernation": {
+    "required": true,
+    "availability": "original systemd/logind using actual swap, memory, kernel and resume support",
+    "model_specific_ram_visibility_rule": false,
+    "bypass_native_capacity_checks": false,
+    "snapshot_compression": "native kernel hibernation compression, separate from zswap",
+    "authenticated_restore_required": true,
+    "disable_lockdown_to_enable": false,
+    "physical_save_and_resume_tested": false
   },
   "first_boot": {
     "seamless_update_enabled": true,
@@ -85,6 +112,10 @@
     "full filesystem capacity and swap ownership without overlapping extents",
     "hardware encrypted I/O,key recovery and accepted rollback compatibility",
     "first-login offer,decline path and recoverable encrypted conversion",
+    "256/512-GB expanded payload fit and full-capacity growth without fixed cross-model geometry",
+    "linux_swap block preference without managed file allocation when it is available",
+    "bounded compressed swap cache and native hibernation eligibility",
+    "encrypted and authenticated hibernation save/resume without weakening boot lockdown",
     "original fastboot parses the ZIP with both boot slots and no wipe/relock task",
     "Actions artifact download,full content validation and no public release"
   ],

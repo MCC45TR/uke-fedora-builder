@@ -118,7 +118,7 @@ jobs:
             '
           # The host lends only this owned loop device and the DM control node.
           # No tablet, physical disk, host root mount or privileged container.
-          sudo modprobe loop dm_mod
+          sudo modprobe -a loop dm_mod
           sudo dmsetup version
           loop=$(sudo losetup --find --show "$fixture/rescue-map/super.raw")
           [[ $loop =~ ^/dev/loop[0-9]+$ ]]

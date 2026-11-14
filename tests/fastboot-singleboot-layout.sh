@@ -12,7 +12,7 @@ for invalid in 310226 290227 000126 141326 14112026 abcdef; do
     if fastboot_install_name "$invalid" >/dev/null 2>&1; then printf 'Invalid date accepted: %s\n' "$invalid" >&2; exit 1; fi
 done
 # Check varied, nonuniform device capacities rather than pinning one tablet size.
-for capacity in 4294967296 8589934592 11274289152 12884901888 17179869184 11274289664; do
+for capacity in 4294967296 8321499136 8589934592 9126805504 11274289152 12884901888 17179869184 11274289664; do
     fastboot_super_layout "$capacity" > "$work/layout.json"
     jq -e --argjson size "$capacity" '.super_bytes == $size and .opt_partition == false and
       .partition_table_changes == false and

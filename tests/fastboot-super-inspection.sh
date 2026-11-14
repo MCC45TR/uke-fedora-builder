@@ -27,7 +27,7 @@ reject() {
     fi
     [[ ! -s $work/refusal.json ]]
 }
-for capacity in 4294967296 8589934592 11274289152 12884901888; do
+for capacity in 4294967296 8321499136 8589934592 9126805504 11274289152 12884901888; do
     plan=$(fastboot_super_layout "$capacity")
     swap=$(jq -er '.partitions[0].bytes' <<< "$plan")
     rescue=$(jq -er '.partitions[1].bytes' <<< "$plan")
