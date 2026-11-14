@@ -17,6 +17,8 @@ source "$repo/src/image/fastboot-singleboot-layout.sh"
 # shellcheck disable=SC1091
 source "$repo/src/image/fastboot-requirements.sh"
 archive=$(fastboot_install_name "$day")
+planner=$(git -c safe.directory="$repo" -C "$repo" rev-parse HEAD)
+[[ $planner =~ ^[0-9a-f]{40}$ ]]
 [[ -f $composition && ! -L $composition && -f $geometry && ! -L $geometry && ! -e $output && ! -L $output ]]
 jq -e '.kernel_release|test("^[0-9]+[.][0-9]+[.][0-9]+-[1-9][0-9]*-unstable$")' "$composition" >/dev/null
 jq -e '.source_commit|test("^[a-f0-9]{40}$")' "$composition" >/dev/null
@@ -31,7 +33,7 @@ trap 'status=$?; if ((status != 0)); then rm -rf -- "$output"; fi' EXIT
 jq -n --argjson layout "$layout" '$layout' > "$output/super-layout.json"
 jq --slurpfile source "$composition" \
    --slurpfile geometry "$geometry" --argjson layout "$layout" --arg archive "$archive" \
-   --arg planner "$(git -C "$repo" rev-parse HEAD)" \
+   --arg planner "$planner" \
    --arg hash "$(sha256sum "$composition" | cut -d ' ' -f1)" \
    '. + {planner_commit:$planner,archive_name:$archive,measured_geometry:$geometry[0],
      resolved_super_layout:$layout,

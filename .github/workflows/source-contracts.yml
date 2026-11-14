@@ -111,12 +111,19 @@ jobs:
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$fixture,target=/fixture" \
             "$image" bash -Eeuo pipefail -c '
-              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils socat zip
+              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils socat zip git-core strace
               mkdir -m700 /fixture/result
               rpm -q android-tools e2fsprogs util-linux jq coreutils > /fixture/result/original-tools.txt
               bash /source/tests/fastboot-update-parser.sh /fixture/result/fastboot-parser.json
               bash /source/tests/fastboot-super-inspection.sh
               bash /source/tests/fastboot-super-provision-plan.sh
+              # Bound syscall evidence for the intermittent host lpdump timeout.
+              # No alternate parser, retry or raised production resource limit.
+              mkdir /fixture/trace-bin
+              printf "%s\n" "#!/bin/sh" "exec /usr/bin/strace -qq -T -s80 -e trace=openat,flock,lseek,read,pread64 -o /fixture/lpdump-last.trace /usr/bin/lpdump \"\$@\"" > /fixture/trace-bin/lpdump
+              chmod +x /fixture/trace-bin/lpdump
+              export PATH=/fixture/trace-bin:$PATH
+              trap '\''status=$?; if ((status)); then tail -n24 /fixture/lpdump-last.trace >&2; cat /sys/fs/cgroup/memory.events /sys/fs/cgroup/cpu.stat >&2; fi; exit "$status"'\'' EXIT
               bash /source/tests/fastboot-super-composition.sh /fixture/reports
               cp /fixture/reports/* /fixture/result/
               bash /source/tests/fastboot-rescue-map.sh prepare /fixture/rescue-map
