@@ -163,7 +163,7 @@ jobs:
               --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
               --mount "type=bind,source=$job,target=/job" \
               "$image" bash -Eeuo pipefail -c '
-                dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils bubblewrap
+                dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
                 mkdir /job/artifacts/super-seed/growth
                 bash /builder/tests/fastboot-super-grow.sh run "$1" /job/super-grow /job/artifacts/super-seed/growth/real-fedora-growth.json
                 bash /builder/tests/fastboot-physical-super.sh "$1" /job/super-grow /job/artifacts/super-seed/growth/real-fedora-growth.json /job/artifacts/super-seed/growth/physical-selection-fixture.json
@@ -353,7 +353,7 @@ jobs:
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$fixture,target=/fixture" \
             "$image" bash -Eeuo pipefail -c '
-              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils bubblewrap
+              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
               bash /source/tests/fastboot-super-grow.sh run "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json
               bash /source/tests/fastboot-physical-super.sh "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json /fixture/result/physical-selection-fixture.json
               cp /fixture/super-grow/provision-{result,noop}.json /fixture/result/

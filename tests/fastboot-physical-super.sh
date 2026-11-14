@@ -48,15 +48,43 @@ reset_view() {
         "${devno%:*}" "${devno#*:}" "$name" > "$view$node/uevent"
     mknod "$view/dev/$name" b "${devno%:*}" "${devno#*:}"
     ln -s "../../$name" "$view/dev/disk/by-partlabel/super"
-    : > "$view/dev/null"
-    : > "$view/dev/zero"
+    mknod -m666 "$view/dev/null" c 1 3
+    mknod -m666 "$view/dev/zero" c 1 5
 }
+cat > "$work/run-in-view.sh" <<'SH'
+#!/usr/bin/env bash
+set -Eeuo pipefail
+trap 'printf "UKE_NAMESPACE_SETUP_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
+view=$1 selector=$2 mode=$3
+# All mounts stay in this child namespace. No pivot_root or custom seccomp.
+mount --make-rprivate /
+mount --bind "$view/sys" /sys
+mount -o remount,bind,ro,nosuid,nodev /sys
+mount --bind "$view/dev" /dev
+# Only the owned loop and null/zero exist here. Keep device access for it.
+mount -o remount,bind,ro,nosuid,dev /dev
+mount -t tmpfs -o size=64M,nosuid,nodev,mode=1777 uke-selection-test /tmp
+mount -t tmpfs -o size=16M,nosuid,nodev,mode=0755 uke-selection-run /run
+# Read variables only in the post-setpriv child.
+# shellcheck disable=SC2016
+exec env -i PATH=/usr/sbin:/usr/bin:/sbin:/bin LC_ALL=C \
+    setpriv --bounding-set=-all --inh-caps=-all --ambient-caps=-all --no-new-privs \
+    /usr/bin/bash -Eeuo pipefail -c '
+        count=0 nnp=0
+        while read -r key value _; do
+            case $key in CapInh:|CapPrm:|CapEff:|CapBnd:|CapAmb:)
+                [[ $value == 0000000000000000 ]]
+                count=$((count+1));;
+            NoNewPrivs:) [[ $value == 1 ]]; nnp=1;;
+            esac
+        done < "/proc/$$/status"
+        [[ $count == 5 && $nnp == 1 ]]
+        exec /usr/bin/bash "$1" "$2"
+    ' capability-free-selector "$selector" "$mode"
+SH
 run_selector() {
-    bwrap --ro-bind / / --ro-bind "$view/sys" /sys --ro-bind "$view/dev" /dev \
-        --dev-bind /dev/null /dev/null --dev-bind /dev/zero /dev/zero \
-        --ro-bind /proc /proc --tmpfs /run --tmpfs /tmp --cap-drop ALL \
-        --setenv PATH /usr/sbin:/usr/bin:/sbin:/bin \
-        /usr/bin/bash "$repo/src/image/select-uke-super.sh" "$1" > "$work/result.json" 2> "$work/result.log"
+    unshare --mount --fork /usr/bin/bash "$work/run-in-view.sh" "$view" \
+        "$repo/src/image/select-uke-super.sh" "$1" > "$work/result.json" 2> "$work/result.log"
 }
 reject() {
     if run_selector --inspect-ready; then echo 'Unsafe physical selection admitted' >&2; exit 1; fi
@@ -123,6 +151,7 @@ after=$(sha256sum "$device" | cut -d ' ' -f1)
 jq -M -n --arg hash "$after" --argjson refused "$refused" \
     '{schema_version:1,owned_loop_only:true,synthetic_sysfs_and_device_tree:true,
       identity_only_and_three_slot_ready_inspection:true,two_device_names_and_partition_numbers:true,
+      child_all_capability_sets_empty:true,docker_syscall_filter_relaxed:false,
       unsafe_selection_cases_refused:$refused,whole_backing_sha256:$hash,whole_backing_unchanged:true,
       physical_ufs_tested:false,metadata_authenticity_tested:false,operating_system_booted:false,
       encryption_or_resume_tested:false}' > "$report"

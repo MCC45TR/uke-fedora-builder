@@ -31,12 +31,18 @@ actual256-GB geometry, Linux rescue mapping, OS boot or encryption acceptance.
 Private identity receipts omit captured unit identifiers and credentials.
 
 CI also exercises both modes over the existing owned4KiB growth loop using a
-synthetic read-only sysfs/device-tree namespace and a capability-free child.
+synthetic read-only sysfs/device-tree mount namespace and a capability-free child.
 Two names/partition numbers are accepted;19 malformed, duplicate, foreign,
 virtual, mismatched-link/device/capacity and sector-size cases must refuse.
 The complete loop hash must equal the prior ready no-op hash. No additional
 full image is made. A successful synthetic view is not physical hardware proof;
 the uploaded fixture receipt explicitly records that distinction.
+
+The host fixture uses original util-linux unshare, mount and setpriv. Mounts
+remain private; sysfs/device views are read-only, and temporary space is bounded
+to64MiB plus16MiB for `/run`. The selector child must have all five capability
+sets empty and no-new-privileges enabled. Docker's default syscall filter is
+retained; no pivot_root, custom seccomp profile or privileged container is needed.
 
 The explicit dracut tools module includes this script but installs no boot
 hook. It remains absent from the current cumulative kernel. Trusted role and
