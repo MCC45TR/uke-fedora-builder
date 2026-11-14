@@ -127,7 +127,9 @@ public_root_transaction "$root" "$work/install.log" offline_dnf rpms selection
 umount "$root/proc"
 mounted=false
 bash "$repo/src/image/configure-fedora-rescue.sh" "$root"
-systemd-analyze --root="$root" verify rescue.target > "$out/units-audit.txt" 2>&1
+# Documentation is deliberately omitted; required units and executable paths
+# remain a strict recursive admission check.
+systemd-analyze --root="$root" --man=no --recursive-errors=yes verify rescue.target > "$out/units-audit.txt" 2>&1
 bash "$repo/src/audit/check-target-payload.sh" "$root" > "$out/python-audit.txt"
 [[ $(find "$root/usr/lib/modules" -mindepth 1 -maxdepth 1 -printf '%f\n') == "$release" ]]
 (cd "$root/usr/lib/modules/$release"; sha256sum -c "/job/artifacts/kernel/payload.sha256") > "$out/kernel-payload-audit.txt"

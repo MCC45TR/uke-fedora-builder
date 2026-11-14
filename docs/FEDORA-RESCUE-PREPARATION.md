@@ -37,7 +37,9 @@ The image size follows the measured root plus margin, aligned to 64 MiB and
 bounded to 512 MiB–1 GiB. Original mke2fs populates a regular EXT4 file. The
 signed COPR ext4-labels helper applies and verifies original Fedora SELinux
 labels; original e2fsck and independent debugfs readback check the filesystem,
-fstab and systemd executable. Matching kernel/modules/DT bytes are compared
+fstab and systemd executable. Unit verification omits man-page existence checks
+because documentation is deliberately not installed, while strict recursive
+unit/dependency/executable checks remain enabled. Matching kernel/modules/DT bytes are compared
 with the producer inventory, and normal RPM ownership remains in the image.
 
 The worker is a native AArch64 hosted Actions runner with the pinned Fedora
@@ -70,6 +72,7 @@ Primary references:
 - [DNF installroot and configuration](https://dnf5.readthedocs.io/en/latest/dnf5.8.html).
 - [Original systemd volatile-root behavior](https://www.freedesktop.org/software/systemd/man/latest/systemd-volatile-root.service.html).
 - [Original systemd debug generator](https://www.freedesktop.org/software/systemd/man/latest/systemd-debug-generator.html).
+- [Original systemd unit verification options](https://www.freedesktop.org/software/systemd/man/latest/systemd-analyze.html).
 
 These are original Fedora/systemd components, not Uke forks. Future native
 repair and session integration belongs in existing Control and the coordinated
