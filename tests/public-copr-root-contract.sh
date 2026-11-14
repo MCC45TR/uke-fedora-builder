@@ -87,7 +87,7 @@ for invalid_request in invalid:1024 ext4:65537; do
     # All other inputs satisfy admission. Even a regressed guard cannot start a VM.
     (
         # The validator invokes this refusal stub indirectly.
-        # shellcheck disable=SC2317
+        # shellcheck disable=SC2317,SC2329
         mkdir() { : > "$work/forbidden-operation"; return 97; }
         if UKE_COPR_WORKER_AUDIT=1 public_copr_filesystem "$work/mock-disk" "$work/mock-disk" "$filesystem" "$size" \
             "$work/refused-filesystem" /builder/build-tools "$work/mock-tools"; then exit 1; fi
