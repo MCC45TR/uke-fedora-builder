@@ -31,6 +31,7 @@ jobs:
           export PATH="$guard:$PATH"
           shellcheck src/image/fastboot-singleboot-layout.sh src/image/plan-fastboot-update.sh src/image/build-fastboot-super.sh scripts/check-fastboot-super-layout.sh scripts/probe-inlinecrypt-readonly.sh scripts/probe-ext4-reencrypt-scratch.sh tests/fastboot-singleboot-layout.sh tests/fastboot-super-composition.sh
           shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
+          shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
@@ -90,10 +91,12 @@ jobs:
             trap - EXIT
             if [[ -n $loop ]]; then
               devno=$(lsblk -dnro MAJ:MIN "$loop")
-              for name in uke-rescue uke-rescue-test-payload; do
+              for name in uke-rescue uke-rescue-test-payload uke-super-grow-rescue uke-super-grow-swap uke-super-grow-oldswap uke-super-test-busy; do
                 uuid=$(sudo dmsetup info -c --noheadings -o uuid "$name" 2>/dev/null | tr -d '[:space:]') || uuid=''
                 case $uuid in
                   "UKE-RESCUE-v1-${devno/:/-}"|"UKE-FIXTURE-RESCUE-occupied-${devno/:/-}"|"UKE-FIXTURE-RESCUE-payload-${devno/:/-}")
+                    sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
+                  "UKE-GROW-v1-${devno/:/-}-rescue"|"UKE-GROW-v1-${devno/:/-}-swap"|"UKE-GROW-v1-${devno/:/-}-oldswap"|"UKE-GROW-TEST-v1-${devno/:/-}")
                     sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
                 esac
               done
@@ -111,10 +114,12 @@ jobs:
               mkdir -m700 /fixture/result
               rpm -q android-tools e2fsprogs util-linux jq coreutils > /fixture/result/original-tools.txt
               bash /source/tests/fastboot-super-inspection.sh
+              bash /source/tests/fastboot-super-provision-plan.sh
               bash /source/tests/fastboot-super-composition.sh /fixture/reports
               cp /fixture/reports/* /fixture/result/
               bash /source/tests/fastboot-rescue-map.sh prepare /fixture/rescue-map
-              sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map}.sh > /fixture/result/source-sha256.txt
+              bash /source/tests/fastboot-super-grow.sh prepare /fixture/super-grow
+              sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow}.sh > /fixture/result/source-sha256.txt
             '
           # The host lends only this owned loop device and the DM control node.
           # No tablet, physical disk, host root mount or privileged container.
@@ -135,9 +140,23 @@ jobs:
               bash /source/tests/fastboot-rescue-map.sh run "$1" /fixture/rescue-map /fixture/result/rescue-mapper-fixture.json
               cp /fixture/rescue-map/mapping-result.json /fixture/result/
             ' bash "$loop"
+          sudo losetup -d "$loop"
+          loop=''
+          loop=$(sudo losetup --sector-size 4096 --find --show "$fixture/super-grow/super.raw")
+          [[ $loop =~ ^/dev/loop[0-9]+$ ]]
+          docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
+            --cap-add=SYS_ADMIN --device="$loop" --device=/dev/mapper/control \
+            --device-cgroup-rule="b $dm_major:* rwm" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
+              bash /source/tests/fastboot-super-grow.sh run "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json
+              cp /fixture/super-grow/provision-{result,noop}.json /fixture/result/
+            ' bash "$loop"
           sudo cp -a "$fixture/result" "$RUNNER_TEMP/uke-super-reports"
           sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-super-reports"
-          echo 'Synthetic liblp composition, actual owned-loop read-only rescue mapping, EXT4 readback, write refusal and error cleanup passed. No physical UFS, OS boot, secure boot or encryption acceptance.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Synthetic liblp composition, real read-only rescue mapping and seed-to-larger-device provisioning/restart tests passed. No physical UFS, OS boot, real power-loss, secure boot or encryption acceptance.' >> "$GITHUB_STEP_SUMMARY"
       - name: Retain small validation receipts only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:

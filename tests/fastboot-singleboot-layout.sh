@@ -20,12 +20,23 @@ for capacity in 4294967296 8321499136 8589934592 9126805504 11274289152 12884901
       (.partitions | length) == 2 and
       .partitions[0].name == "system_a" and .partitions[0].label == "linux_swap" and
       .partitions[1].name == "system_b" and .partitions[1].format == "ext4" and
+      .allocation_order == ["system_b","system_a"] and .rescue_relocation_required == false and
+      .partitions[1].start_byte == .first_logical_byte and
+      .partitions[0].start_byte == (.first_logical_byte + .partitions[1].bytes) and
       all(.partitions[]; .bytes % 1048576 == 0) and
       .first_logical_byte + .usable_payload_bytes <= $size and
       (.partitions[0].bytes / .usable_payload_bytes) <= 0.8 and
       (.partitions[0].bytes / .usable_payload_bytes) > 0.799 and
       .metadata_reserved_bytes + .alignment_padding_bytes + .usable_payload_bytes == $size' "$work/layout.json" >/dev/null
 done
+for raw in 67108864 805306368 1073741824 1409286144; do
+    fastboot_seed_layout "$raw" 8321499136 > "$work/seed.json"
+    jq -e --argjson raw "$raw" '.phase == "seed" and .group.name == "uke_seed" and
+      .super_bytes <= 8321499136 and .partitions[1].bytes >= $raw and
+      .partitions[1].start_byte == 1048576' "$work/seed.json" >/dev/null
+done
+if fastboot_seed_layout 2147483648 8321499136 >/dev/null 2>&1; then exit 1; fi
+if fastboot_super_layout 8321499136 unknown >/dev/null 2>&1; then exit 1; fi
 for capacity in 0 -1 abc 1000 1000000000 2199023255553 999999999999999999; do
     if fastboot_super_layout "$capacity" >/dev/null 2>&1; then printf 'Invalid capacity accepted: %s\n' "$capacity" >&2; exit 1; fi
 done

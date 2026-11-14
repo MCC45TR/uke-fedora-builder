@@ -26,7 +26,7 @@ case ${1:-} in
         resize2fs "$work/rescue.raw" >/dev/null 2>&1
         lpmake --device-size 4294967296 --super-name super --alignment 1048576 \
             --metadata-size 65536 --metadata-slots 3 --group "uke_linux:$usable" \
-            --partition "system_a:none:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux" \
+            --partition "system_b:none:$rescue:uke_linux" --partition "system_a:none:$swap:uke_linux" \
             --image "system_b=$work/rescue.raw" --sparse --output "$work/super.sparse"
         simg2img "$work/super.sparse" "$output/super.raw"
         [[ $(stat -c %s "$output/super.raw") == 4294967296 ]]
@@ -88,7 +88,7 @@ case ${1:-} in
         dmsetup --noudevsync remove uke-rescue
         # Change only this owned loop fixture, then exercise post-create failure
         # cleanup: a valid liblp layout must not admit the wrong filesystem label.
-        start=$(jq -er '.partitions[0].bytes / 512 + 2048' "$fixture/layout.json")
+        start=$(jq -er '.partitions[1].start_byte / 512' "$fixture/layout.json")
         sectors=$(jq -er '.partitions[1].bytes / 512' "$fixture/layout.json")
         printf '0 %s linear %s %s\n' "$sectors" "$devno" "$start" |
             dmsetup --noudevsync create --uuid "$payload_uuid" uke-rescue-test-payload

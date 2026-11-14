@@ -20,7 +20,9 @@ for tool in lpmake lpdump lpunpack simg2img mkswap blkid e2fsck resize2fs e2labe
     command -v "$tool" >/dev/null
 done
 capacity=$(jq -er .super_bytes "$layout_file")
-layout=$(fastboot_super_layout "$capacity")
+phase=$(jq -er .phase "$layout_file")
+layout=$(fastboot_super_layout "$capacity" "$phase")
+group=$(jq -er .group.name <<< "$layout")
 ((capacity % 4096 == 0)) || {
     printf 'Super capacity must be aligned to the 4096-byte sparse block.\n' >&2
     exit 1
@@ -90,15 +92,15 @@ rescue_block_size=$(awk '/^Block size:/ {print $3}' "$output/rescue-superblock.t
 swap_hash=$(sha256sum "$work/swap.raw" | cut -d ' ' -f1)
 rescue_hash=$(sha256sum "$work/rescue.raw" | cut -d ' ' -f1)
 lpmake --device-size "$capacity" --super-name super --alignment 1048576 \
-    --metadata-size 65536 --metadata-slots 3 --group "uke_linux:$usable" \
-    --partition "system_a:none:$swap_bytes:uke_linux" \
-    --partition "system_b:none:$rescue_bytes:uke_linux" \
+    --metadata-size 65536 --metadata-slots 3 --group "$group:$usable" \
+    --partition "system_b:none:$rescue_bytes:$group" \
+    --partition "system_a:none:$swap_bytes:$group" \
     --image "system_a=$work/swap.raw" --image "system_b=$work/rescue.raw" \
     --sparse --output "$output/super.img"
 [[ -f $output/super.img && ! -L $output/super.img ]]
 simg2img "$output/super.img" "$work/readback.raw"
 [[ $(stat -c %s "$work/readback.raw") == "$capacity" ]]
-bash "$root/src/image/inspect-fastboot-super.sh" --image "$capacity" "$work/readback.raw" > "$output/super-topology.json"
+bash "$root/src/image/inspect-fastboot-super.sh" --image "$capacity" "$work/readback.raw" "$phase" > "$output/super-topology.json"
 for slot in 0 1 2; do
     lpdump --json --slot="$slot" "$work/readback.raw" > "$output/lp-slot-$slot.json"
     jq -e --argjson capacity "$capacity" --argjson swap "$swap_bytes" --argjson rescue "$rescue_bytes" \

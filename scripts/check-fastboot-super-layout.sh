@@ -19,8 +19,8 @@ usable=$(jq -er .usable_payload_bytes <<< "$layout")
 # metadata fixture. Never produce an empty-but-flashable super image here.
 lpmake --device-size "$1" --super-name super --alignment 1048576 \
     --metadata-size 65536 --metadata-slots 3 --group "uke_linux:$usable" \
-    --partition "system_a:none:$swap:uke_linux" \
-    --partition "system_b:none:$rescue:uke_linux" --output "$work/metadata.img"
+    --partition "system_b:none:$rescue:uke_linux" \
+    --partition "system_a:none:$swap:uke_linux" --output "$work/metadata.img"
 [[ $(stat -c %s "$work/metadata.img") -le 1048576 ]]
 # Compact metadata files contain one serialized description. Original lpdump
 # ignores --slot for that file format; independent slot copies require a full

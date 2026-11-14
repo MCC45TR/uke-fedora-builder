@@ -33,11 +33,11 @@ for capacity in 4294967296 8321499136 8589934592 9126805504 11274289152 12884901
     rescue=$(jq -er '.partitions[1].bytes' <<< "$plan")
     usable=$(jq -er .usable_payload_bytes <<< "$plan")
     fixture "$capacity" "$work/good.img" --group "uke_linux:$usable" \
-        --partition "system_a:none:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux"
+        --partition "system_b:none:$rescue:uke_linux" --partition "system_a:none:$swap:uke_linux"
     TMPDIR="$work" bash "$inspector" --image "$capacity" "$work/good.img" > "$work/result.json"
     jq -e --argjson size "$capacity" '.three_slot_topology_verified and .layout.super_bytes == $size and
-      .mappings[0].start_sector == 2048 and
-      .mappings[0].start_sector + .mappings[0].sectors == .mappings[1].start_sector and
+      .mappings[1].start_sector == 2048 and
+      .mappings[1].start_sector + .mappings[1].sectors == .mappings[0].start_sector and
       ([.mappings[].sectors] | add) * 512 == .layout.usable_payload_bytes and
       (.metadata_authenticity_verified | not) and (.block_mapping_created | not)' "$work/result.json" >/dev/null
     reject "$((capacity + 1048576))" "$work/good.img"
@@ -45,7 +45,7 @@ done
 # Same names and sizes with reversed allocation order must NOT map the expected
 # offsets. A JSON-only verifier cannot detect this case.
 fixture "$capacity" "$work/reversed.img" --group "uke_linux:$usable" \
-    --partition "system_b:none:$rescue:uke_linux" --partition "system_a:none:$swap:uke_linux"
+    --partition "system_a:none:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux"
 reject "$capacity" "$work/reversed.img"
 # Keep valid original-tool checksums while replacing only slot 2 with the
 # reversed layout. Slots 0/1 must not hide a conflicting third metadata view.
@@ -67,23 +67,32 @@ reject "$capacity" "$work/two-damaged-copies.img"
 # single view pass as three independent slots.
 lpmake --device-size "$capacity" --super-name super --alignment 1048576 \
     --metadata-size 65536 --metadata-slots 3 --group "uke_linux:$usable" \
-    --partition "system_a:none:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux" \
+    --partition "system_b:none:$rescue:uke_linux" --partition "system_a:none:$swap:uke_linux" \
     --output "$work/padded-compact.img" >/dev/null 2> "$work/lpmake.log"
 truncate -s "$capacity" "$work/padded-compact.img"
 reject "$capacity" "$work/padded-compact.img"
 grep -q 'reserved prefix' "$work/refusal.log"
 fixture "$capacity" "$work/readonly.img" --group "uke_linux:$usable" \
-    --partition "system_a:readonly:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux"
+    --partition "system_b:none:$rescue:uke_linux" --partition "system_a:readonly:$swap:uke_linux"
 reject "$capacity" "$work/readonly.img"
 fixture "$capacity" "$work/foreign.img" --group "android:$usable" \
-    --partition "system_a:none:$swap:android" --partition "system_b:none:$rescue:android"
+    --partition "system_b:none:$rescue:android" --partition "system_a:none:$swap:android"
 reject "$capacity" "$work/foreign.img"
 fixture "$capacity" "$work/virtual-ab.img" --virtual-ab --group "uke_linux:$usable" \
-    --partition "system_a:none:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux"
+    --partition "system_b:none:$rescue:uke_linux" --partition "system_a:none:$swap:uke_linux"
 reject "$capacity" "$work/virtual-ab.img"
 ln -s good.img "$work/link.img"
 reject "$capacity" "$work/link.img"
 printf 'not liblp\n' > "$work/garbage.img"
 reject "$capacity" "$work/garbage.img"
 if bash "$inspector" --block "$work/good.img" >/dev/null 2>&1; then exit 1; fi
+for phase in seed growing; do
+    group=$(fastboot_super_layout "$capacity" "$phase" | jq -er .group.name)
+    fixture "$capacity" "$work/phase.img" --group "$group:$usable" \
+        --partition "system_b:none:$rescue:$group" --partition "system_a:none:$swap:$group"
+    TMPDIR="$work" bash "$inspector" --image "$capacity" "$work/phase.img" "$phase" 2 > "$work/single.json"
+    jq -e --arg phase "$phase" '.layout.phase == $phase and .verified_metadata_slots == [2] and
+        (.three_slot_topology_verified | not)' "$work/single.json" >/dev/null
+    reject "$capacity" "$work/phase.img"
+done
 printf 'Original liblp topology, multiple capacities, reversed/cross-slot extents, redundancy recovery, attributes, groups, virtual A/B and wrong-input refusals passed.\n'

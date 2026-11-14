@@ -28,6 +28,9 @@ GPT storage. The three current Android metadata slots describe different
 historical layouts and overlapping storage; their reported sizes cannot be
 added together. The new installation creates one consistent two-role layout.
 It must not put a raw EXT4 filesystem over the outer super container.
+Schema 3 places rescue first at a fixed logical start and swap after it;
+names and percentages stay the same. [Seed provisioning](FASTBOOT-SUPER-PROVISIONING.md)
+uses that order to grow across capacities without relocating rescue files.
 
 Both 256-GB and 512-GB storage models are required. Measure actual geometry;
 marketed storage/RAM size and another donor's BoardConfig are not capacity

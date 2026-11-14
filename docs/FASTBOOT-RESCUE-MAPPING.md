@@ -38,6 +38,13 @@ partition, formats a volume, activates swap, changes firmware or repairs root.
 It deliberately supports owned loop devices for actual mapping fixtures, so
 this helper alone is not the physical-UFS root-admission boundary.
 
+Layout schema 3 puts rescue first to permit growth without relocation. The
+normal block mapper accepts ready metadata. Host snapshot inspection can select
+a provisioning phase and single slot; that result sets
+`three_slot_topology_verified` false. The
+[fresh-install provisioner](FASTBOOT-SUPER-PROVISIONING.md) uses these views to
+distinguish interrupted growth from a completed installation.
+
 The image producer now requires this topology check after decoding super.img.
 The small original-tool metadata suite tests different capacities, reversed
 extents with unchanged names/sizes, conflicting third-slot metadata, recovery

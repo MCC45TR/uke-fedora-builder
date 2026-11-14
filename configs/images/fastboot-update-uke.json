@@ -28,7 +28,10 @@
     "rescue_logical_partition": "system_b",
     "opt_partition": false,
     "gpt_unchanged": true,
-    "all_usable_extents_assigned": true
+    "all_usable_extents_assigned": true,
+    "allocation_order": ["system_b", "system_a"],
+    "rescue_starts_at_fixed_first_logical_extent": true,
+    "rescue_payload_relocation_required_for_growth": false
   },
   "payloads": [
     {"partition": "super", "file": "super.img", "role": "logical swap and independent rescue", "slotted": false},
