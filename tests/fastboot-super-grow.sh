@@ -76,6 +76,9 @@ case ${1:-} in
         work=$(mktemp -d "$fixture/run.XXXXXXXX")
         real_lpflash=$(command -v lpflash)
         real_mkswap=$(command -v mkswap)
+        real_dmsetup=$(command -v dmsetup)
+        alias_node=$work/owned-loop-alias
+        mknod "$alias_node" b "${devno%:*}" "${devno#*:}"
         cleanup() {
             local status=$? name uuid
             trap - EXIT
@@ -104,6 +107,10 @@ case ${1:-} in
         printf '0 8 linear %s 0\n' "$devno" | dmsetup --noudevsync create --readonly --uuid "UKE-GROW-TEST-v1-$tag" uke-super-test-busy
         expect_failure
         grep -q 'active holder' "$work/refused.log"
+        if bash "$helper" --fresh-install "$alias_node" "$fixture/seed.json" > "$work/alias-refused.json" 2> "$work/alias-refused.log"; then
+            echo 'Alternate block node bypassed the active-holder check' >&2; exit 1
+        fi
+        grep -q 'active holder' "$work/alias-refused.log"
         prefix "$work/after-refusal"
         cmp "$work/seed-prefix" "$work/after-refusal"
         dmsetup --noudevsync remove uke-super-test-busy
@@ -140,7 +147,22 @@ SH
         # The retry really grows EXT4 and initializes the final swap, then stops
         # before the ready commit. There are no production test switches.
         PATH="$work/stop-after-payload:$PATH" expect_failure
-        invoke > "$work/completed.json"
+        # Replace only the private alias after the last read-only preflight
+        # mapping is removed. The writer must still use the checked inode.
+        mkdir "$work/replace-alias"
+        cat > "$work/replace-alias/dmsetup" <<SH
+#!/usr/bin/env bash
+set -Eeuo pipefail
+'$real_dmsetup' "\$@"
+if [[ \$* == '--noudevsync remove --retry uke-super-grow-swap' && ! -e '$work/alias-replaced' ]]; then
+    unlink '$alias_node'
+    ln -s /dev/null '$alias_node'
+    : > '$work/alias-replaced'
+fi
+SH
+        chmod +x "$work/replace-alias/dmsetup"
+        PATH="$work/replace-alias:$PATH" bash "$helper" --fresh-install "$alias_node" "$fixture/seed.json" > "$work/completed.json"
+        [[ -f $work/alias-replaced && -L $alias_node && $(readlink "$alias_node") == /dev/null ]]
         jq -e '.prior_action=="grow-fresh-seed" and .all_metadata_views_ready and
             .rescue_full_capacity_and_swap_initialized_this_boot and
             (.rescue_payload_relocated|not) and (.userdata_modified|not)' "$work/completed.json" >/dev/null
@@ -190,6 +212,7 @@ SH
               actual_fedora_root_readback_tested:$fedora,extra_fixture_files_in_actual_rescue:false,
               original_tools_used:true,real_ext4_growth_and_swap_initialization:true,
               rescue_file_preserved_without_relocation:true,active_holder_refused_before_write:true,
+              alternate_node_holder_refused_before_write:true,writer_pinned_across_path_replacement:true,
               old_saved_image_signature_refused_before_write:true,
               restarted_after_growing_metadata:true,restarted_after_payload_initialization:true,
               torn_final_commit_completed_without_payload_mutation:true,

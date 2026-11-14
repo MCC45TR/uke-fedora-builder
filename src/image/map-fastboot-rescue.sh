@@ -12,9 +12,12 @@ here=$(cd -- "$(dirname -- "$0")" && pwd)
 device=$(readlink -e -- "$1")
 [[ -b $device ]] || fail 'input is not a block device'
 exec 3< "$device"
+[[ -b /proc/self/fd/3 ]] || fail 'opened input is not a block device'
+read -r major minor < <(stat -Lc '%t %T' /proc/self/fd/3)
+[[ $major =~ ^[0-9a-f]{1,8}$ && $minor =~ ^[0-9a-f]{1,8}$ ]] || fail 'ambiguous opened block device identity'
+devno=$((16#$major)):$((16#$minor))
+[[ -r /sys/dev/block/$devno/dev && $(< "/sys/dev/block/$devno/dev") == "$devno" ]] || fail 'opened device has no matching sysfs identity'
 capacity=$(blockdev --getsize64 /proc/self/fd/3)
-devno=$(lsblk -dnro MAJ:MIN "$device")
-[[ $devno =~ ^[0-9]+:[0-9]+$ ]] || fail 'ambiguous block device identity'
 runtime=/run/uke-rescue-mapper
 [[ ! -L $runtime ]] || fail 'runtime directory is a symlink'
 if [[ ! -d $runtime ]]; then mkdir -m700 "$runtime"; fi

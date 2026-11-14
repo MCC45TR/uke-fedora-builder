@@ -33,6 +33,15 @@ source record and compares each with its original seed bytes. The systemd
 SELinux context must remain init_exec_t. These extend the earlier tiny synthetic
 filesystem checks without replacing their corruption/refusal cases.
 
+Both block helpers derive major/minor from the opened descriptor and match it
+to `/sys/dev/block`. The provisioner checks holders through that identity and
+reopens its write descriptor through the pinned read descriptor. The owned-loop
+suite also refuses an active holder through an alternate block node, then
+replaces that private node with `/dev/null` during preflight. The read-only
+mapper and provisioner must still operate on the original checked loop inode.
+These checks do not supply the protected caller's physical UFS selection or
+authenticate on-disk metadata.
+
 The worker remains native AArch64 with two CPUs and2GiB RAM. A24-GiB initial
 free-space gate covers root assembly, the producer's conservative peak, loop
 fixtures and reserve. Only the owned loop and device-mapper control are lent

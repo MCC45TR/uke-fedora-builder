@@ -49,6 +49,7 @@ case ${1:-} in
         occupied_uuid=UKE-FIXTURE-RESCUE-occupied-$tag
         payload_uuid=UKE-FIXTURE-RESCUE-payload-$tag
         work=$(mktemp -d "$fixture/run.XXXXXXXX")
+        real_blockdev=$(command -v blockdev)
         cleanup() {
             local result=$? name actual
             trap - EXIT
@@ -72,7 +73,24 @@ case ${1:-} in
         grep -q 'already occupied' "$work/refused.log"
         [[ $(dmsetup info -c --noheadings -o uuid uke-rescue | tr -d '[:space:]') == "$occupied_uuid" ]]
         dmsetup --noudevsync remove uke-rescue
-        bash "$helper" "$device" > "$work/mapping.json"
+        # Change a private alternate node only after the helper has opened it.
+        # Mapping identity must follow that descriptor, not a second path lookup.
+        alias_node=$work/owned-loop-alias
+        mknod "$alias_node" b "${devno%:*}" "${devno#*:}"
+        mkdir "$work/replace-alias"
+        cat > "$work/replace-alias/blockdev" <<SH
+#!/usr/bin/env bash
+set -Eeuo pipefail
+'$real_blockdev' "\$@"
+if [[ \$* == '--getsize64 /proc/self/fd/3' && ! -e '$work/alias-replaced' ]]; then
+    unlink '$alias_node'
+    ln -s /dev/null '$alias_node'
+    : > '$work/alias-replaced'
+fi
+SH
+        chmod +x "$work/replace-alias/blockdev"
+        PATH="$work/replace-alias:$PATH" bash "$helper" "$alias_node" > "$work/mapping.json"
+        [[ -f $work/alias-replaced && -L $alias_node && $(readlink "$alias_node") == /dev/null ]]
         jq -e '.readonly_linear_mapping and .three_slot_topology_verified and
             .ext4_label_and_full_capacity_verified and .rescue_bytes == 858783744 and
             (.root_switch_executed | not) and (.metadata_authenticity_verified | not)' "$work/mapping.json" >/dev/null
@@ -103,6 +121,7 @@ case ${1:-} in
               independent_ext4_file_readback:true,write_to_readonly_mapping_refused:true,
               backing_sha256_before:$before,backing_sha256_after:$after,
               occupied_mapping_preserved:true,wrong_label_refused_and_own_mapper_removed:true,
+              mapping_identity_pinned_across_path_replacement:true,
               userdata_dependency:false,physical_ufs_tested:false,rescue_os_boot_tested:false,
               secure_boot_tested:false,encryption_tested:false}' > "$report"
         ;;

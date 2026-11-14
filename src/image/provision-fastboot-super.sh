@@ -15,10 +15,14 @@ device=$(readlink -e -- "$2")
 [[ -b $device ]] || fail 'not a block device'
 seed_file=$(realpath "$3")
 exec 3< "$device"
+[[ -b /proc/self/fd/3 ]] || fail 'opened input is not a block device'
+read -r major minor < <(stat -Lc '%t %T' /proc/self/fd/3)
+[[ $major =~ ^[0-9a-f]{1,8}$ && $minor =~ ^[0-9a-f]{1,8}$ ]] || fail 'ambiguous opened device identity'
+devno=$((16#$major)):$((16#$minor))
+sysfs=/sys/dev/block/$devno
+[[ -r $sysfs/dev && $(< "$sysfs/dev") == "$devno" ]] || fail 'opened device has no matching sysfs identity'
 capacity=$(blockdev --getsize64 /proc/self/fd/3)
 [[ $(blockdev --getss /proc/self/fd/3) == 4096 ]] || fail 'the profile requires a 4096-byte logical block device'
-devno=$(lsblk -dnro MAJ:MIN "$device")
-[[ $devno =~ ^[0-9]+:[0-9]+$ ]] || fail 'ambiguous device identity'
 tag=${devno/:/-}
 runtime=/run/uke-super-provision
 [[ ! -L $runtime ]] || fail 'runtime path is a symlink'
@@ -70,6 +74,7 @@ write_metadata() {
         --partition "system_b:none:$rescue:$group" --partition "system_a:none:$swap:$group" \
         --output "$work/metadata-$phase.img" > "$work/lpmake.log" 2>&1
     [[ $(stat -c %s "$work/metadata-$phase.img") -le 1048576 ]]
+    [[ $(blockdev --getro /proc/self/fd/4) == 0 ]] || fail 'super became read-only before the metadata commit'
     lpflash /proc/self/fd/4 "$work/metadata-$phase.img" > "$work/lpflash.log" 2>&1
 }
 create_map() {
@@ -104,8 +109,7 @@ payload_checked=false
 metadata_written=false
 if [[ $action != verify-ready ]]; then
     [[ $(blockdev --getro /proc/self/fd/3) == 0 ]] || fail 'super is read-only'
-    node=${device##*/}
-    for holder in /sys/class/block/"$node"/holders/*; do
+    for holder in "$sysfs"/holders/*; do
         [[ ! -e $holder ]] || fail 'super has an active holder; no provisioning while a mapped volume is in use'
     done
     if awk -v dev="$devno" '$3==dev {found=1} END {exit !found}' /proc/self/mountinfo; then fail 'super is mounted'; fi
@@ -133,8 +137,13 @@ if [[ $action != verify-ready ]]; then
         fi
         remove_maps
     fi
-    exec 4<> "$device"
-    [[ $(blockdev --getsize64 /proc/self/fd/4) == "$capacity" ]]
+    # Reopen the pinned block inode, not a pathname that may have changed
+    # during preflight. DM tables and both descriptors use the same dev_t.
+    exec 4<> /proc/self/fd/3
+    [[ -b /proc/self/fd/4 && $(stat -Lc '%t %T' /proc/self/fd/4) == "$major $minor" &&
+       $(blockdev --getsize64 /proc/self/fd/4) == "$capacity" &&
+       $(blockdev --getss /proc/self/fd/4) == 4096 &&
+       $(blockdev --getro /proc/self/fd/4) == 0 ]] || fail 'write descriptor differs from the checked block device'
     if [[ $action == grow-fresh-seed ]]; then
         write_metadata growing
         snapshot
