@@ -7,7 +7,7 @@ install() {
     local script
     inst_multiple bash env awk blkid blockdev cat cmp cp cut date dd dirname \
         dmsetup dumpe2fs e2fsck find flock grep id jq lpdump lpmake lpflash \
-        lsblk mkdir mktemp mkswap mv od readlink realpath resize2fs sed \
+        ln lsblk mkdir mktemp mkswap mv od readlink realpath resize2fs sed \
         sha256sum simg2img stat tail timeout tr truncate uname
     for script in fastboot-singleboot-layout inspect-fastboot-super \
         plan-super-provision provision-fastboot-super map-fastboot-rescue; do

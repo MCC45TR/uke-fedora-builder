@@ -2,7 +2,20 @@
 # Host-only, native ARM64 original-Fedora tool closure; no source compilation.
 # This is a nonbootable userspace archive, not a kernel/initramfs release.
 set -Eeuo pipefail
-trap 'printf "UKE_SUPER_RUNTIME_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
+report_error() {
+    local status=$? line=$1 log
+    printf 'UKE_SUPER_RUNTIME_FAILED: line=%s status=%s\n' "$line" "$status" >&2
+    if [[ -n ${output:-} && -d ${output:-} ]]; then
+        for log in dracut.log native-execution.txt missing-library.txt; do
+            if [[ -f $output/$log ]]; then
+                printf 'UKE_SUPER_RUNTIME_LOG: %s\n' "$log" >&2
+                tail -n24 "$output/$log" >&2
+            fi
+        done
+    fi
+    exit "$status"
+}
+trap 'report_error "$LINENO"' ERR
 export LC_ALL=C
 umask 077
 [[ $# == 2 && $(id -u) == 0 && $(uname -m) == aarch64 && -f /.uke-super-runtime-worker ]]
