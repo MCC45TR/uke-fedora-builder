@@ -8,6 +8,14 @@ on:
         description: Assemble an unqualified native AArch64 Fedora rescue filesystem
         type: boolean
         default: false
+      build_super_seed:
+        description: Compose the real Fedora rescue into super and test growth on an owned loop
+        type: boolean
+        default: false
+      minimum_super_bytes:
+        description: Supplied minimum super capacity; default is measured 512-GB Uke only, not 256-GB evidence
+        type: string
+        default: '11274289152'
       rescue_kernel_evr:
         description: Exact coordinator-qualified cumulative unstable RPM version-release
         type: string
@@ -23,7 +31,7 @@ concurrency:
   cancel-in-progress: false
 jobs:
   rescue-root:
-    if: github.event_name == 'workflow_dispatch' && inputs.build_rescue
+    if: github.event_name == 'workflow_dispatch' && (inputs.build_rescue || inputs.build_super_seed)
     needs: source
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
@@ -33,25 +41,45 @@ jobs:
         env:
           RESCUE_EVR: ${{ inputs.rescue_kernel_evr }}
           RESCUE_SOURCE: ${{ inputs.rescue_kernel_source }}
+          SUPER_SEED: ${{ inputs.build_super_seed }}
+          MINIMUM_SUPER: ${{ inputs.minimum_super_bytes }}
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ $(uname -m) == aarch64 && $RESCUE_EVR =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ && $RESCUE_SOURCE =~ ^[a-f0-9]{40}$ ]]
+          [[ $SUPER_SEED == true || $SUPER_SEED == false ]]
+          [[ $MINIMUM_SUPER =~ ^[1-9][0-9]{0,12}$ ]]
           image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
           [[ $image =~ ^registry\.fedoraproject\.org/fedora@sha256:[a-f0-9]{64}$ ]]
           job="$RUNNER_TEMP/uke-rescue-job"
           cache="$RUNNER_TEMP/uke-rescue-cache"
           mkdir -m700 "$job" "$cache"
+          loop=''
           cleanup() {
             status=$?
             trap - EXIT
+            if [[ -n $loop ]]; then
+              devno=$(lsblk -dnro MAJ:MIN "$loop")
+              for name in uke-rescue uke-super-grow-rescue uke-super-grow-swap uke-super-grow-oldswap uke-super-test-busy; do
+                uuid=$(sudo dmsetup info -c --noheadings -o uuid "$name" 2>/dev/null | tr -d '[:space:]') || uuid=''
+                case $uuid in
+                  "UKE-GROW-v1-${devno/:/-}-rescue"|"UKE-GROW-v1-${devno/:/-}-swap"|"UKE-GROW-v1-${devno/:/-}-oldswap"|"UKE-GROW-TEST-v1-${devno/:/-}"|"UKE-RESCUE-v1-${devno/:/-}")
+                    sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
+                esac
+              done
+              sudo losetup -d "$loop" || status=1
+            fi
             sudo find "$job" "$cache" -depth -delete
             exit "$status"
           }
           trap cleanup EXIT
+          if [[ $SUPER_SEED == true ]]; then
+            (( $(df -Pk "$job" | awk 'NR==2{print $4}') >= 24*1024*1024 )) || { echo 'Need 24GiB free for owned seed/provision fixtures and reserve' >&2; exit 1; }
+          fi
           jq -n --arg evr "$RESCUE_EVR" --arg source "$RESCUE_SOURCE" \
             '{channel:"unstable",fedora_release:"rawhide",kernel_profile:"unstable",kernel_rpm_request:$evr,kernel_commit:$source}' > "$job/request.json"
           docker run --rm --cpus=2 --memory=2g --pids-limit=512 \
+            --env "UKE_BUILD_SUPER_SEED=$SUPER_SEED" --env "UKE_MINIMUM_SUPER=$MINIMUM_SUPER" \
             --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
             --mount "type=bind,source=$job,target=/job" \
@@ -65,15 +93,56 @@ jobs:
               for tool in cc c++ gcc g++ clang clang++ as ld rpmbuild; do ln -s refuse /run/refuse-native-build/$tool; done
               export PATH=/run/refuse-native-build:$PATH
               bash /builder/src/image/compose-fedora-rescue.sh
+              if [[ $UKE_BUILD_SUPER_SEED == true ]]; then
+                dnf5 -y --setopt=install_weak_deps=False install android-tools
+                bash /builder/src/image/compose-fastboot-super-seed.sh /job/artifacts/rescue "$UKE_MINIMUM_SUPER" /job/artifacts/super-seed
+                bash /builder/tests/fastboot-super-grow.sh prepare-seed /job/artifacts/super-seed /job/super-grow
+              fi
             '
-          sudo cp -a "$job/artifacts/rescue" "$RUNNER_TEMP/uke-rescue-result"
-          sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-rescue-result"
+          if [[ $SUPER_SEED == true ]]; then
+            sudo modprobe -a loop dm_mod
+            loop=$(sudo losetup --sector-size 4096 --find --show "$job/super-grow/super.raw")
+            [[ $loop =~ ^/dev/loop[0-9]+$ ]]
+            dm_major=$(awk '$2=="device-mapper" {print $1}' /proc/devices)
+            [[ $dm_major =~ ^[0-9]+$ ]]
+            docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
+              --cap-add=SYS_ADMIN --device="$loop" --device=/dev/mapper/control \
+              --device-cgroup-rule="b $dm_major:* rwm" \
+              --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+              --mount "type=bind,source=$job,target=/job" \
+              "$image" bash -Eeuo pipefail -c '
+                dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
+                mkdir /job/artifacts/super-seed/growth
+                bash /builder/tests/fastboot-super-grow.sh run "$1" /job/super-grow /job/artifacts/super-seed/growth/real-fedora-growth.json
+                cp /job/super-grow/provision-{result,noop}.json /job/artifacts/super-seed/growth/
+                cd /job/artifacts/super-seed
+                find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > /job/seed-SHA256SUMS
+                mv /job/seed-SHA256SUMS SHA256SUMS
+              ' bash "$loop"
+            sudo losetup -d "$loop"
+            loop=''
+            sudo cp -a "$job/artifacts/super-seed" "$RUNNER_TEMP/uke-super-seed-result"
+            sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-super-seed-result"
+          else
+            sudo cp -a "$job/artifacts/rescue" "$RUNNER_TEMP/uke-rescue-result"
+            sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-rescue-result"
+          fi
           echo 'Signed original Fedora rescue filesystem assembled; protected boot, authenticated repair and physical UFS acceptance remain open. No release or tablet write.' >> "$GITHUB_STEP_SUMMARY"
       - name: Retain rescue input and bounded receipts
+        if: ${{ !inputs.build_super_seed }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: unqualified-fedora-rescue
           path: ${{ runner.temp }}/uke-rescue-result
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
+      - name: Retain actual super seed and growth receipts
+        if: inputs.build_super_seed
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: unqualified-fastboot-super-seed
+          path: ${{ runner.temp }}/uke-super-seed-result
           if-no-files-found: error
           retention-days: 7
           compression-level: 6
@@ -102,6 +171,7 @@ jobs:
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
           shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
           shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh
+          shellcheck src/image/compose-fastboot-super-seed.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
