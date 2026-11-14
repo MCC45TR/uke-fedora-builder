@@ -53,11 +53,13 @@ public_root_packages() {
 
 public_root_exclusions() {
     local profile=$1 component
-    case $profile in normal|el2-require) ;; *) return 1;; esac
-    local excluded='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,uke-video-firmware-local,senemos-uke-linux-kernel-mainline-unstable*'
-    if [[ $profile == normal ]]; then
+    case $profile in normal|unstable|el2-require) ;; *) return 1;; esac
+    local excluded='kernel,kernel-core,kernel-modules*,*-debuginfo,*-debugsource,uke-local-touch-data,uke-video-firmware-local'
+    [[ $profile == unstable ]] || excluded+=',senemos-uke-linux-kernel-mainline-unstable*'
+    if [[ $profile != el2-require ]]; then
         excluded+=',senemos-uke-linux-kernel-mainline-kvm*'
-    else
+    fi
+    if [[ $profile != normal ]]; then
         for component in '' -core -modules -dtbs -boot -singleboot; do
             excluded+=",senemos-uke-linux-kernel-mainline$component"
         done

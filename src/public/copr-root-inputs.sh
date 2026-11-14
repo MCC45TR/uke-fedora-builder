@@ -3,7 +3,7 @@
 public_copr_root_request() {
     jq -e '.device=="uke" and .architecture=="aarch64" and .distribution=="fedora" and
         .fedora_release=="rawhide" and .channel=="unstable" and .target=="image" and
-        .kernel_profile=="normal" and (.desktop=="kde" or .desktop=="gnome") and
+        (.kernel_profile=="normal" or .kernel_profile=="unstable") and (.desktop=="kde" or .desktop=="gnome") and
         (.default_shell=="bash" or .default_shell=="fish" or .default_shell=="zsh") and
         ((.mode=="multiboot" and .partition=="linux") or (.mode=="singleboot" and .partition=="userdata")) and
         (.filesystem=="ext4" or .filesystem=="f2fs" or .filesystem=="btrfs" or .filesystem=="xfs") and

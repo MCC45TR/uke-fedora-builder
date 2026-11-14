@@ -56,9 +56,26 @@ for choice in '43 unstable kde bash' 'rawhide invalid kde bash' 'rawhide unstabl
     if public_root_packages packages $choice; then exit 1; fi
     [[ ${packages[*]} == keep-previous-selection ]]
 done
-for profile in normal el2-require; do
+for profile in normal unstable el2-require; do
     excluded=$(public_root_exclusions "$profile")
     [[ $excluded == *uke-local-touch-data* && $excluded == *uke-video-firmware-local* ]]
+    IFS=, read -r -a patterns <<< "$excluded"
+    for component in '' -core -modules -dtbs -boot -singleboot; do
+        for family in senemos-uke-linux-kernel-mainline senemos-uke-linux-kernel-mainline-unstable senemos-uke-linux-kernel-mainline-kvm; do
+            blocked=0
+            for pattern in "${patterns[@]}"; do
+                # Intentional matching against the actual DNF exclude globs.
+                # shellcheck disable=SC2053
+                [[ $family$component != $pattern ]] || blocked=1
+            done
+            case $profile in
+                normal) selected_family=senemos-uke-linux-kernel-mainline;;
+                unstable) selected_family=senemos-uke-linux-kernel-mainline-unstable;;
+                el2-require) selected_family=senemos-uke-linux-kernel-mainline-kvm;;
+            esac
+            if [[ $family == "$selected_family" ]]; then ((blocked == 0)); else ((blocked == 1)); fi
+        done
+    done
 done
 if public_root_exclusions invalid; then exit 1; fi
 echo 'Original desktop, firmware, shell and channel selections retained; invalid inputs leave the selection unchanged.'

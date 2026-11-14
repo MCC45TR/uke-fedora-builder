@@ -9,7 +9,10 @@ fedora_release=$(jq -er .fedora_release /job/request.json)
 [[ $fedora_release == rawhide ]]
 dist=$(rpm --eval '%{?dist}')
 [[ $dist =~ ^[.]fc[0-9]+$ ]]
-base=senemos-uke-linux-kernel-mainline
+profile=$(jq -er .kernel_profile /job/request.json)
+case $profile in normal|unstable) ;; *) exit 1;; esac
+[[ $profile != unstable || $channel == unstable ]]
+base=$(jq -er --arg profile "$profile" '.kernel.profiles[$profile].family' /builder/configs/public-build.json)
 project=$(jq -er --arg channel "$channel" '.channels[$channel].project' /builder/configs/public-build.json)
 # shellcheck source=channel.sh
 # shellcheck disable=SC1091
@@ -63,8 +66,8 @@ for archive in "${archives[@]}"; do
 done
 rpm_evr=$release
 rpm_release=${release%"$dist"}
-release=$(cohort_repository_release /job/kernel-payload "$rpm_release")
-version=${release%-*}
+release=$(cohort_repository_release /job/kernel-payload "$rpm_release" "$profile")
+version=${release%%-*}
 source_commit=$(cat "/job/kernel-payload/usr/share/senemos/uke/$release/source-commit")
 [[ $source_commit =~ ^[0-9a-f]{40}$ ]]
 if [[ -n ${UKE_COPR_ROOT_INPUTS:-} ]]; then
@@ -95,8 +98,8 @@ for profile in linux userdata; do
 done
 rpm -qp --qf '%{NEVRA}\t%{SOURCERPM}\n' "${archives[@]}" | LC_ALL=C sort > /job/artifacts/kernel/packages.tsv
 (cd /job/artifacts/kernel; sha256sum -- *.rpm) > /job/artifacts/kernel/RPM-SHA256SUMS
-jq -n --arg release "$release" --arg version "$version" --arg project "$project" --arg dist "$dist" --arg family "$base" --arg source "$source_commit" --arg fingerprint "$expected" --arg rpm "$rpm_release" --arg payload "$payload_sha256" \
-    '{payload_sha256:$payload,rpm_dist:$dist,kernel_profile:"normal",kernel_family:$family,rpm_version_release:$rpm,kernel_commit:$source,kernel_source_commit:$source,kernel_version:$version,kernel_release:$release,kernel_rpms_locally_built:false,kernel_repository:("mcc45tr/"+$project),
+jq -n --arg release "$release" --arg version "$version" --arg project "$project" --arg dist "$dist" --arg family "$base" --arg source "$source_commit" --arg fingerprint "$expected" --arg rpm "$rpm_release" --arg payload "$payload_sha256" --arg profile "$profile" \
+    '{payload_sha256:$payload,rpm_dist:$dist,kernel_profile:$profile,kernel_family:$family,rpm_version_release:$rpm,kernel_commit:$source,kernel_source_commit:$source,kernel_version:$version,kernel_release:$release,kernel_rpms_locally_built:false,kernel_repository:("mcc45tr/"+$project),
       kernel_rpm_signature:"verified COPR signature",kernel_key_fingerprint:$fingerprint,
       physical_boot_tested:false,hardware_tested:false,automatic_kernel_activation:false}' > /job/artifacts/kernel/kernel-info.json
 jq --slurpfile info /job/artifacts/kernel/kernel-info.json '. + $info[0]' /job/request.json > /job/request.tmp

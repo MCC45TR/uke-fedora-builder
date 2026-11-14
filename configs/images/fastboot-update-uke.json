@@ -11,6 +11,7 @@
   "partition_table_changes": false,
   "slot_policy": "both boot/vendor_boot/dtbo/vbmeta slots share the initial qualified cohort",
   "kernel_family": "senemos-uke-linux-kernel-mainline-unstable",
+  "kernel_profile": "unstable",
   "normal_updates": "signed DNF packages with automatic inactive-slot seamless staging",
   "super_layout": {
     "kind": "liblp",

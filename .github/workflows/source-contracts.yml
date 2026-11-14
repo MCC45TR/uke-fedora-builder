@@ -50,6 +50,9 @@ jobs:
           bash tests/repository-kernel-plan.sh
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
           bash tests/repository-kernel-identity.sh
+          shellcheck tests/public-root-packages.sh tests/public-copr-root-contract.sh
+          bash tests/public-root-packages.sh
+          bash tests/public-copr-root-contract.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
           bash tests/payload-traversal.sh

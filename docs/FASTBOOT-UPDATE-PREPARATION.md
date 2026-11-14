@@ -153,6 +153,14 @@ delivery and actual fastboot parser/artifact validation. Build compilation in
 COPR and compose through existing workers. Download the final Actions artifact
 for inspection. **Do not publish a GitHub Release; the user performs flashing.**
 
+The public image entry now accepts explicit `--kernel-profile unstable` with
+`--channel unstable` on Rawhide repository images. This selects the cumulative
+`senemos-uke-linux-kernel-mainline-unstable` family, verifies all six signed RPMs
+and requires its signed source composition to bind RPM EVR to the `-unstable`
+ABI. Normal and EL2 families cannot substitute for it. Source-build options
+are refused for this profile; full cumulative compilation remains in COPR.
+This image selection does not itself qualify rescue, encryption or secure boot.
+
 ## Primary references
 
 - [AOSP dynamic partitions](https://source.android.com/docs/core/ota/dynamic_partitions/implement)

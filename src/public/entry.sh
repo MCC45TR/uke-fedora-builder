@@ -21,7 +21,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --kernel-rpm EVR|latest           Verified testing/unstable RPMs; unstable defaults to latest
   --kernel VERSION|latest|lastest   Linux version to build; latest is kernel.org's newest stable
                                     release and needs a reviewed Uke profile (default: policy version)
-  --kernel-profile normal|el2-require|el2-exit-experimental
+  --kernel-profile normal|unstable|el2-require|el2-exit-experimental
                                     Explicit kernel family; firmware exit is not admitted
   --skip-tests                     Defer kernel tests; keep source/payload integrity checks
   --out DIRECTORY                   Default: ./out in the invoking directory
@@ -176,11 +176,15 @@ public_main() {
     fi
     case $channel in stable|testing|unstable) :;; *) die 'Unknown package channel';; esac
     case $KERNEL_PROFILE in
-        normal|el2-require) ;;
+        normal|unstable|el2-require) ;;
         el2-exit-experimental) die 'Firmware exit is not admitted: exact Uke firmware/ownership contract is unverified';;
         *) die 'Unknown kernel profile';;
     esac
-    [[ $KERNEL_PROFILE == normal || $channel == testing ]] || die 'EL2 candidates require --channel testing'
+    [[ $KERNEL_PROFILE != el2-require || $channel == testing ]] || die 'EL2 candidates require --channel testing'
+    if [[ $KERNEL_PROFILE == unstable ]]; then
+        [[ $channel == unstable && $fedora_release == rawhide && $target == image && $build_from_source == 0 ]] ||
+            die 'Unstable kernel profile requires a signed repository Rawhide unstable image; cumulative compilation belongs in COPR'
+    fi
     [[ -z $kernel_request || $kernel_request =~ ^(latest|lastest|[0-9]+\.[0-9]+(\.[0-9]+)?)$ ]] ||
         die 'Kernel must be an explicit version such as 7.2.12, latest or lastest'
     if [[ ( $target == image || $channel == unstable ) && $build_from_source == 0 ]]; then
@@ -190,7 +194,8 @@ public_main() {
     [[ $build_from_source == 0 || -z $kernel_rpm ]] || die '--build-from-source conflicts with --kernel-rpm'
     if [[ -n $kernel_rpm ]]; then
         [[ $kernel_rpm == latest || $kernel_rpm =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?[.]fc46$ ]] || die 'Kernel RPM must be latest or an exact 7.3.x-N[.revision].fc46 release'
-        [[ ( $target == image || $channel == unstable ) && $fedora_release == rawhide && $KERNEL_PROFILE == normal && $REUSE_KERNEL == 0 && -z $kernel_request ]] || die 'Repository kernel requires a normal Rawhide image or unstable kernel without source/reuse options'
+        [[ ( $target == image || $channel == unstable ) && $fedora_release == rawhide &&
+           ( $KERNEL_PROFILE == normal || $KERNEL_PROFILE == unstable ) && $REUSE_KERNEL == 0 && -z $kernel_request ]] || die 'Repository kernel requires an admitted Rawhide profile without source/reuse options'
         [[ -z ${UKE_KERNEL_REPO:-} || $UKE_KERNEL_REPO == none ]] || die 'Repository kernel cannot use a local kernel source'
     fi
     [[ $REUSE_KERNEL == 0 || $target == image ]] || die '--reuse-kernel applies to image builds only'
@@ -230,7 +235,7 @@ public_main() {
     case $core_phase in none|export|import) ;; *) die 'Invalid shared core phase';; esac
     if [[ $core_phase != none ]]; then
         [[ $target == image && $channel == unstable && $fedora_release == rawhide && $mode == singleboot && $filesystem == ext4 &&
-           $KERNEL_PROFILE == normal && $build_from_source == 0 && -z $reference ]] || die 'Shared core requires the public Rawhide unstable EXT4 singleboot package profile'
+           ( $KERNEL_PROFILE == normal || $KERNEL_PROFILE == unstable ) && $build_from_source == 0 && -z $reference ]] || die 'Shared core requires the public Rawhide unstable EXT4 singleboot package profile'
         [[ $core_phase != import || ( -f $core_input && ! -L $core_input ) ]] || die 'Missing regular shared core archive'
     fi
     bootstrap

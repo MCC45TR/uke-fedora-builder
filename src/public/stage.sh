@@ -53,7 +53,12 @@ KERNEL_PROFILE=$(jq -r '.kernel_profile // "normal"' "$request")
 KERNEL_CONFIG_SHA=$(jq -r '.kernel_native_config_sha256 // empty' "$request")
 export KERNEL_CONFIG_SHA
 RUN_TESTS=$(jq -r 'if .run_kernel_tests == false then 0 else 1 end' "$request")
-case $KERNEL_PROFILE in normal|el2-require) ;; *) die 'Unadmitted kernel profile';; esac
+case $KERNEL_PROFILE in normal|unstable|el2-require) ;; *) die 'Unadmitted kernel profile';; esac
+if [[ $KERNEL_PROFILE == unstable ]]; then
+    [[ $channel == unstable && -n $(jq -er .kernel_rpm_request "$request") &&
+       ( $stage == repository-kernel || $stage == root || $stage == filesystem ) ]] ||
+        die 'Cumulative unstable profile accepts signed repository assembly only'
+fi
 kernel_family=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].family' "$policy")
 [[ $source_commit =~ ^[0-9a-f]{40}$ && $kernel_version =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]
 cache_flags=()

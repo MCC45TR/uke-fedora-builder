@@ -18,6 +18,14 @@ cohort_identity() {
         ($k.kernel_release == $k.rpm_version_release or
          (($k.rpm_version_release | startswith($k.kernel_release + ".")) and
           ($k.rpm_version_release | ltrimstr($k.kernel_release + ".") | test("^[1-9][0-9]*$"))))) or
+       (($k.kernel_release | rtrimstr("-unstable")) as $abi |
+        $k.kernel_profile == "unstable" and $r.channel == "unstable" and
+        $r.fedora_release == "rawhide" and
+        $k.kernel_family == "senemos-uke-linux-kernel-mainline-unstable" and
+        ($k.kernel_release | test("^[0-9]+[.][0-9]+[.][0-9]+-[1-9][0-9]*-unstable$")) and
+        ($k.rpm_version_release == $abi or
+         (($k.rpm_version_release | startswith($abi + ".")) and
+          ($k.rpm_version_release | ltrimstr($abi + ".") | test("^[1-9][0-9]*$"))))) or
        ($k.kernel_profile == "el2-require" and
         $k.kernel_family == "senemos-uke-linux-kernel-mainline-kvm" and
         $k.kernel_release == ($k.rpm_version_release + "-kvm"))) and
@@ -43,16 +51,22 @@ cohort_identity() {
 # that exact relationship; never infer an ABI by dropping arbitrary suffixes.
 cohort_repository_release() (
     set -Eeuo pipefail
-    local root=$1 rpm_release=$2 abi source composition bundle
+    local root=$1 rpm_release=$2 profile=${3:-normal} abi base_abi source composition bundle
     [[ $rpm_release =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?$ ]] || return 1
     abi=$(find "$root/usr/lib/modules" -mindepth 1 -maxdepth 1 -printf '%f\n') || return 1
-    [[ $abi =~ ^7[.]3[.][0-9]+-[1-9][0-9]*$ &&
-       -d $root/usr/lib/modules/$abi && ! -L $root/usr/lib/modules/$abi ]] || return 1
+    case $profile in
+        normal) [[ $abi =~ ^7[.]3[.][0-9]+-[1-9][0-9]*$ ]] || return 1; base_abi=$abi;;
+        unstable) [[ $abi =~ ^7[.]3[.][0-9]+-[1-9][0-9]*-unstable$ ]] || return 1; base_abi=${abi%-unstable};;
+        *) return 1;;
+    esac
+    [[ -d $root/usr/lib/modules/$abi && ! -L $root/usr/lib/modules/$abi ]] || return 1
     bundle=$root/usr/lib/senemos/kernel-updates/$abi
     [[ -d $bundle && ! -L $bundle && -f $bundle/manifest && ! -L $bundle/manifest ]] || return 1
     [[ $(awk -F= '$1=="kernel_release" {print $2}' "$bundle/manifest") == "$abi" ]] || return 1
-    if [[ $rpm_release != "$abi" ]]; then
-        [[ $rpm_release == "$abi".* && ${rpm_release#"$abi".} =~ ^[1-9][0-9]*$ ]] || return 1
+    if [[ $rpm_release != "$base_abi" ]]; then
+        [[ $rpm_release == "$base_abi".* && ${rpm_release#"$base_abi".} =~ ^[1-9][0-9]*$ ]] || return 1
+    fi
+    if [[ $profile == unstable || $rpm_release != "$base_abi" ]]; then
         source=$root/usr/share/senemos/uke/$abi/source-commit
         composition=$root/usr/share/senemos/uke/$abi/source-composition.json
         [[ -f $source && ! -L $source && -f $composition && ! -L $composition ]] || return 1
@@ -123,13 +137,14 @@ cohort_root_check_main() (
     local request=$1 artifacts=$2 root=$3 codec=$4 expected_packages=$5 installed_packages=$6
     local info=$artifacts/kernel/kernel-info.json manifest=$artifacts/manifest.json
     cohort_identity "$request" "$info" "$manifest"
-    local release partition filesystem modules bundle scratch hash component nevra expected actual releases family rpm_release dist
+    local release partition filesystem modules bundle scratch hash component nevra expected actual releases family rpm_release dist profile
     release=$(jq -er .kernel_release "$info")
     family=$(jq -er .kernel_family "$info")
     rpm_release=$(jq -er .rpm_version_release "$info")
     dist=$(jq -er .rpm_dist "$info")
-    if [[ $(jq -er .kernel_profile "$info") == normal && $rpm_release != "$release" ]]; then
-        [[ $(cohort_repository_release "$root" "$rpm_release") == "$release" ]]
+    profile=$(jq -er .kernel_profile "$info")
+    if [[ $profile == unstable || ( $profile == normal && $rpm_release != "$release" ) ]]; then
+        [[ $(cohort_repository_release "$root" "$rpm_release" "$profile") == "$release" ]]
         [[ $(< "$root/usr/share/senemos/uke/$release/source-commit") == "$(jq -er .kernel_source_commit "$info")" ]]
     fi
     partition=$(jq -er .partition "$request")
