@@ -22,10 +22,10 @@ crypto=/sys/class/block/$parent/queue/crypto
     exit 1
 }
 mask=$(< "$crypto/modes/AES-256-XTS")
-[[ $mask =~ ^0x[0-9a-fA-F]+$ ]] && (( (mask & 4096) != 0 )) || {
+if [[ ! $mask =~ ^0x[0-9a-fA-F]+$ ]] || (( (mask & 4096) == 0 )); then
     printf 'Hardware does not advertise 4096-byte AES-256-XTS data units.\n' >&2
     exit 1
-}
+fi
 name=uke-inlinecrypt-read-$BASHPID
 created=0
 module_owned=0

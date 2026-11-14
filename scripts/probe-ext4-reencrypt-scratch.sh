@@ -9,10 +9,10 @@ umask 077
 [[ $# == 0 && $(id -u) == 0 ]] || { printf 'Run as root without device arguments.\n' >&2; exit 2; }
 for tool in cryptsetup losetup mke2fs e2fsck mount umount timeout jq; do command -v "$tool" >/dev/null; done
 free_kib=$(df -Pk /var/tmp | awk 'NR==2 {print $4}')
-[[ $free_kib =~ ^[0-9]+$ ]] && ((free_kib >= 196608)) || {
+if [[ ! $free_kib =~ ^[0-9]+$ ]] || ((free_kib < 196608)); then
     printf 'Need 64 MiB peak plus at least 128 MiB free reserve.\n' >&2
     exit 1
-}
+fi
 work=$(mktemp -d /var/tmp/uke-ext4-conversion.XXXXXXXX)
 key_file=$(mktemp /run/uke-ext4-conversion-key.XXXXXXXX)
 loop=''

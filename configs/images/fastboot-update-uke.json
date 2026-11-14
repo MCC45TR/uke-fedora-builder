@@ -64,6 +64,9 @@
   },
   "secure_boot": {
     "required": true,
+    "required_scope": "OEM hardware root through Linux; downstream-only verification is insufficient",
+    "stock_bootloader_modification_permitted": false,
+    "speculative_lock_or_key_enrollment_permitted": false,
     "signing_is_not_enforcement": true,
     "root_of_trust_qualified": false,
     "key_enrollment_qualified": false,

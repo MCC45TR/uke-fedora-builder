@@ -88,6 +88,11 @@ to empty directories. Preserve both the block- and file-encryption open scope.
 
 ## Secure boot, DT and recovery
 
+The user explicitly requires the complete OEM-to-Linux trust chain, with no
+risky stock bootloader modification. Downstream-only U-Boot verification is
+insufficient. The live early-firmware secureboot flag is 1 but Android's boot
+state is orange; this does not establish authenticated custom-OS boot.
+
 The requested secure boot requires a protected trust anchor, signed boot
 payloads, an enforced verification path and rejection of a tampered payload.
 RPM signatures, module signatures, FIT signatures and an enforced device root
@@ -116,6 +121,21 @@ and must not displace essential recovery functionality or resource reserves.
 `scripts/check-fastboot-super-layout.sh` tests original liblp using a metadata-
 only file smaller than 1 MiB, without images or block writes.
 
+`src/image/build-fastboot-super.sh` is the host-only container producer. It
+accepts a calculated layout and an independent raw EXT4 rescue input, then
+formats full-size swap, grows the copied rescue filesystem and builds sparse
+super with original lpmake. Original simg2img/lpunpack decode both payloads;
+checksums, all three metadata slots, swap last_page and EXT4 block counts must
+match. Inputs and outputs must be regular files, the destination must be new,
+and a conservative four-container peak plus 2 GiB and free inodes are required.
+This producer does not supply or qualify the rescue OS or its boot path.
+
+The `logical-container` source-contract job runs a synthetic 4-GiB fixture
+using original Fedora tools in the pinned container, with 2 CPUs/2 GiB RAM.
+It independently reads the original files back through EXT4 tools, checks
+failure paths and keeps only small receipts. It compiles no source and writes
+no block device. This is separate from the final OS image/ZIP build.
+
 ```text
 src/image/plan-fastboot-update.sh SOURCE_COMPOSITION GEOMETRY_JSON NEW_OUTPUT [DDMMYY]
 ```
@@ -139,6 +159,8 @@ for inspection. **Do not publish a GitHub Release; the user performs flashing.**
 - [Original fastboot task format](https://android.googlesource.com/platform/system/core/+/refs/heads/main/fastboot/README.md)
 - [DTBO partition tables](https://source.android.com/docs/core/architecture/dto/partitions)
 - [U-Boot verified boot](https://docs.u-boot.org/en/latest/usage/fit/verified-boot.html)
+- [Android device state and optional user trust](https://source.android.com/docs/security/features/verifiedboot/device-state)
+- [Xiaomi bootloader FAQ](https://www.mi.com/global/support/faq/details/KA-07238/)
 - [U-Boot FIT verification](https://docs.u-boot.org/en/latest/usage/fit/signature.html)
 - [dm-inlinecrypt](https://docs.kernel.org/admin-guide/device-mapper/dm-inlinecrypt.html)
 - [Inline encryption](https://docs.kernel.org/block/inline-encryption.html)

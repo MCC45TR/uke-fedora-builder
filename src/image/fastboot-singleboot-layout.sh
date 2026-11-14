@@ -23,7 +23,11 @@ fastboot_super_layout() {
     last_byte=$((capacity / alignment * alignment))
     usable=$((last_byte - first_byte))
     ((usable > 0)) || return 2
-    swap=$((usable / alignment * 80 / 100 * alignment))
+    # Round the percentage DOWN to whole allocation units, leaving every
+    # remaining unit to rescue. Do not combine these integer divisions.
+    swap=$((usable / alignment))
+    swap=$((swap * 80 / 100))
+    swap=$((swap * alignment))
     rescue=$((usable - swap))
     ((swap >= 1048576 && rescue >= 805306368)) || return 2
     unallocated=$((capacity - metadata_bytes - swap - rescue))
