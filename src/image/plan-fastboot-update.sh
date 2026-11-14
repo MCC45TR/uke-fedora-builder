@@ -13,6 +13,9 @@ repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 # shellcheck source=fastboot-singleboot-layout.sh
 # shellcheck disable=SC1091
 source "$repo/src/image/fastboot-singleboot-layout.sh"
+# shellcheck source=fastboot-requirements.sh
+# shellcheck disable=SC1091
+source "$repo/src/image/fastboot-requirements.sh"
 archive=$(fastboot_install_name "$day")
 [[ -f $composition && ! -L $composition && -f $geometry && ! -L $geometry && ! -e $output && ! -L $output ]]
 jq -e '.kernel_release|test("^[0-9]+[.][0-9]+[.][0-9]+-[1-9][0-9]*-unstable$")' "$composition" >/dev/null
@@ -36,7 +39,7 @@ jq --slurpfile source "$composition" \
      payloads_available:false,archive_created:false,
      kernel_encryption_in_full_candidate:($source[0].storage_encryption_enabled_in_full_candidate==true)}' \
    "$repo/configs/images/fastboot-update-uke.json" > "$output/release-plan.json"
-printf 'require product=uke\n' > "$output/android-info.txt"
+fastboot_requirements "$geometry" > "$output/android-info.txt"
 {
  printf 'version 1\n'
  jq -r '.payloads[]|"flash "+.partition+" "+.file' "$repo/configs/images/fastboot-update-uke.json"

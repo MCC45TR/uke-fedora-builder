@@ -32,6 +32,7 @@ jobs:
           shellcheck src/image/fastboot-singleboot-layout.sh src/image/plan-fastboot-update.sh src/image/build-fastboot-super.sh scripts/check-fastboot-super-layout.sh scripts/probe-inlinecrypt-readonly.sh scripts/probe-ext4-reencrypt-scratch.sh tests/fastboot-singleboot-layout.sh tests/fastboot-super-composition.sh
           shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
+          shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
@@ -110,16 +111,17 @@ jobs:
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$fixture,target=/fixture" \
             "$image" bash -Eeuo pipefail -c '
-              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils
+              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils socat zip
               mkdir -m700 /fixture/result
               rpm -q android-tools e2fsprogs util-linux jq coreutils > /fixture/result/original-tools.txt
+              bash /source/tests/fastboot-update-parser.sh /fixture/result/fastboot-parser.json
               bash /source/tests/fastboot-super-inspection.sh
               bash /source/tests/fastboot-super-provision-plan.sh
               bash /source/tests/fastboot-super-composition.sh /fixture/reports
               cp /fixture/reports/* /fixture/result/
               bash /source/tests/fastboot-rescue-map.sh prepare /fixture/rescue-map
               bash /source/tests/fastboot-super-grow.sh prepare /fixture/super-grow
-              sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow}.sh > /fixture/result/source-sha256.txt
+              sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super,fastboot-requirements,plan-fastboot-update}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow,update-parser,tcp-peer}.sh > /fixture/result/source-sha256.txt
             '
           # The host lends only this owned loop device and the DM control node.
           # No tablet, physical disk, host root mount or privileged container.

@@ -56,6 +56,10 @@ jq -e '.archive_created == false and .payloads_available == false and
 [[ $(grep -c '^flash boot_[ab] boot.img$' "$work/plan/fastboot-info.txt") == 2 ]]
 [[ $(grep -c '^flash vendor_boot_[ab] vendor_boot.img$' "$work/plan/fastboot-info.txt") == 2 ]]
 [[ $(grep -c '^flash dtbo_[ab] dtbo.img$' "$work/plan/fastboot-info.txt") == 2 ]]
+[[ $(grep -c '^require partition-size:' "$work/plan/android-info.txt") == 10 ]]
+grep -qx 'require is-userspace=no' "$work/plan/android-info.txt"
+grep -qx 'require slot-count=2' "$work/plan/android-info.txt"
+if grep -F '*' "$work/plan/android-info.txt"; then exit 1; fi
 if grep -E 'erase|format|reboot|unlock|lock|disable|update-super' "$work/plan/fastboot-info.txt"; then exit 1; fi
 if bash "$root/src/image/plan-fastboot-update.sh" "$work/composition.json" "$work/geometry.json" "$work/plan" 141126 >/dev/null 2>&1; then exit 1; fi
 jq '.product = "foreign"' "$work/geometry.json" > "$work/foreign.json"
@@ -64,4 +68,12 @@ if bash "$root/src/image/plan-fastboot-update.sh" "$work/composition.json" "$wor
 jq 'del(.partitions.dtbo_b)' "$work/geometry.json" > "$work/incomplete.json"
 if bash "$root/src/image/plan-fastboot-update.sh" "$work/composition.json" "$work/incomplete.json" "$work/incomplete-plan" 141126 >/dev/null 2>&1; then exit 1; fi
 [[ ! -e $work/incomplete-plan ]]
+# Invalid variant input must never produce a partly permissive requirement file.
+# shellcheck source=../src/image/fastboot-requirements.sh
+# shellcheck disable=SC1091
+source "$root/src/image/fastboot-requirements.sh"
+for invalid in foreign incomplete; do
+    if fastboot_requirements "$work/geometry.json" "$work/$invalid.json" > "$work/invalid-info.txt" 2>/dev/null; then exit 1; fi
+    [[ ! -s $work/invalid-info.txt ]]
+done
 printf 'Capacity-derived layout, date, explicit slots and incomplete/foreign geometry refusal passed; no device operations.\n'

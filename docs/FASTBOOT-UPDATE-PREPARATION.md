@@ -181,8 +181,10 @@ src/image/plan-fastboot-update.sh SOURCE_COMPOSITION GEOMETRY_JSON NEW_OUTPUT [D
 
 The geometry JSON has `product: "uke"` and a `partitions` object containing
 positive byte capacities for super, userdata and both boot/vendor_boot/DTBO/
-vbmeta slots. Plans record the supplied evidence; actual fastboot-side capacity
-and trust checks still precede an installer artifact. The planner emits only
+vbmeta slots. Plans record the supplied evidence and emit exact android-info
+capacity requirements. [Original parser qualification](FASTBOOT-PARSER-QUALIFICATION.md)
+checks pre-mutation refusal on loopback; real OEM getvar behavior, expanded
+payload audit and trust checks still precede an installer artifact. The planner emits only
 data/task proposals, never a ZIP, flash command execution or encryption action.
 
 The remaining producer work includes full swap/rescue/userdata composition,
