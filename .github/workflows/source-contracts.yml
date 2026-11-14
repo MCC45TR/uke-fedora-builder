@@ -29,6 +29,8 @@ jobs:
           chmod +x "$guard/refuse-build"
           for tool in gcc g++ cc c++ clang clang++ as ld rpmbuild; do ln -s refuse-build "$guard/$tool"; done
           export PATH="$guard:$PATH"
+          shellcheck src/image/fastboot-singleboot-layout.sh src/image/plan-fastboot-update.sh scripts/check-fastboot-super-layout.sh scripts/probe-inlinecrypt-readonly.sh scripts/probe-ext4-reencrypt-scratch.sh tests/fastboot-singleboot-layout.sh
+          bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
           bash tests/public-build-contract.sh

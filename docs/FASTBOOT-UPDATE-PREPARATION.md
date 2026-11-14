@@ -1,89 +1,148 @@
-# Uke fastboot update preparation
+# Singleboot fastboot delivery
 
-11 November 2026. Preparation only; no installable ZIP or new physical flash
-acceptance. Charging reliability remains the immediate device priority.
+14 November 2026. Implementation in progress. This supersedes the 11 November
+draft that assigned all of super to rescue and wrote only one boot slot.
+No installable ZIP or physical acceptance is asserted by plan generation.
 
-The next fresh-image delivery is intended for `fastboot update update.zip`.
-Use original Android platform-tools and its `fastboot-info.txt` version1
-tasks. The plan writes the Fedora Live Recovery image to the existing physical
-`super` partition, the fresh system to `userdata`, then matching `vendor_boot`,
-source-built `dtbo` and `boot`. It does not resize GPT partitions. The plan's
-capacities were read from Uke sysfs; fastboot-side capacities still require
-verification. No early firmware or private calibration region is a target.
+The requested delivery is:
 
-Plain fastboot update uses the selected slot. The draft flashes one matched
-boot/vendor_boot/dtbo cohort and retains the other cohort. An initial userdata
-installation replaces shared root data; the other boot slot alone cannot
-undo that. Preserve matching rollback modules and the independent rescue
-path. Ordinary installed-system updates continue through DNF and existing
-automatic inactive-slot staging. Do not pass `-w`: the package supplies the
-prepared root image. No flashing command is executed by the planner.
+```text
+fastboot update fedora-rawhide-linux-kde-plasma-uke-senemos-sbfb-141126.zip
+```
 
-`super` is currently a physical partition of11,274,289,152 bytes with no active
-holder observed. Raw EXT4 Live Recovery is the candidate layout, not an accepted
-bootloader contract. Confirm original fastboot handling and rescue root
-selection before replacing existing dynamic metadata. Do not include
-`super_empty.img`, `update-super` or logical-resize tasks in a raw-super plan.
-If the fitted bootloader requires a logical container, design that layout
-explicitly and qualify the corresponding native recovery mapper instead.
+`sbfb` denotes the requested secure-boot/fastboot profile. The suffix is
+**DDMMYY**, explicitly confirmed for this profile. A filename cannot establish
+that secure boot is enforced; the completed artifact must pass that separate
+admission before it can be offered as the requested installable profile.
 
-Live Recovery must be reachable both automatically and by a volume-button
-request. Define bounded escalation after the existing accepted A/B fallback
-policy,including root-unlock failure. Confirm the fitted ABL key/boot-reason
-path before selecting Volume Up. If early Linux input is needed,use a bounded
-event-driven existing-initramfs helper,not an idle polling daemon. Preserve the
-current recovery entry; later add its shortcut to Live Recovery. The Live
-root must work without a mountable userdata filesystem and default to
-non-destructive inspection. No automatic format,unlimited reboot loop or
-new recovery partition size is authorized by this plan. Physical key entry
-and automatic fallback remain untested.
+## Storage contract
 
-A bounded read of both slots found DTBO table version0 with one entry and
-592,014 declared bytes,and vendor_boot version4 with37,136,921 vendor-ramdisk
-bytes. Only fixed headers/table metadata were read;this does not establish
-whole-image equality or acceptance of rebuilt payloads. The new signed cohort
-also needs an explicit AVB/vbmeta chain;do not use blanket verification-disable
-flags as a secure-boot implementation.
+Keep the physical GPT and every physical partition size unchanged. Use the
+existing super partition as a **liblp container**, allocating its usable,
+aligned extents 80% to swap (`system_a`, label `linux_swap`) and 20% to an
+independent Fedora rescue (`system_b`, EXT4, label `FEDORA_RESCUE`). There is
+no separate `/opt` partition. The main Fedora EXT4 root stays in userdata.
 
-Build the DTBO table from the current cumulative native sources and exact
-OEM selection metadata. Preserve both O82 suppliers, entry IDs/revisions,
-ABL selection, memory reservations and runtime firmware information. A raw
-compiled overlay is not a DTBO partition image. Derive vendor_boot from the
-qualified header/DT/bootconfig contract; do not publish a copied private
-tablet image or silently use an old template. Kernel, modules, boot DT,
-overlays and initramfs must share one pinned cumulative source cohort.
+The names system_a/system_b are logical partitions inside super, not separate
+GPT storage. The three current Android metadata slots describe different
+historical layouts and overlapping storage; their reported sizes cannot be
+added together. The new installation creates one consistent two-role layout.
+It must not put a raw EXT4 filesystem over the outer super container.
 
-The encrypted EXT4 image must support both FDE and optional per-file FBE.
-Use original Fedora cryptsetup/systemd for LUKS2 unlock. The running full18
-has UFS crypto/Qualcomm ICE, but disables dm-crypt and fscrypt. Native source56
-qualified prerequisites separately; that configuration is not delivered in
-full18. Integrate and qualify it before composing an encrypted boot image.
-Ordinary LUKS/dm-crypt does not establish UFS ICE use. A separate dm-inlinecrypt
-test must prove hardware I/O, key lifecycle and power-loss recovery. The
-upstream7.3 interface currently lacks cryptsetup/LUKS integration. Do not
-fork cryptsetup or embed shared encryption keys in the archive. TEE/HWKM
-wrapped-key boot and recovery remain separate unaccepted work.
+Calculate sizes from the actual device capacity, reserving liblp geometry,
+primary/backup metadata and alignment. The measured 512-GB tablet has
+11,274,289,152 super bytes. The current calculator assigns 9,017,753,600 bytes
+(8600 MiB) to swap and 2,255,486,976 bytes (2151 MiB) to rescue, with the
+remaining 1 MiB reserved for aligned metadata. This is an example, not a
+capacity constant for other variants. Original lpmake/lpdump round-tripped all
+three metadata slots of a tiny metadata-only fixture with these sizes.
 
-Current root-selector-v2 and the boot-image creator accept only linux/userdata.
-The initramfs root guard also requires the selected physical filesystem and
-rejects mapper roots. Live Recovery on super and encrypted root therefore need
-a versioned selector extension,mapper-aware admission and a corresponding boot
-image. Preserve the old two-root ABI and its accepted rollback path. Use standard
-udev/device events for new discovery and key handling;no healthy idle poller.
+Initial delivery writes matching boot, vendor_boot, DTBO and vbmeta to both
+slots. Existing early firmware, persist, modem identity/calibration and GPT
+remain outside the write set. Returning to Android requires the correct stock
+super and matching stock boot/vendor_boot/DTBO/vbmeta cohort; unchanged GPT
+geometry avoids a repartitioning requirement. This is a restore path to
+qualify, not a claim that retaining Android's old data is possible.
 
-`src/image/plan-fastboot-update.sh SOURCE_COMPOSITION OUTPUT` emits the
-release plan and proposed original-fastboot task files. It creates no ZIP,
-filesystem, payload or device change. Next implement the matched DTBO and
-vendor_boot producer, fresh generic rescue/root composition, original unlock
-initramfs and checked ZIP export in the existing image tooling package.
-Publish only after real artifact, parser, capacity, recovery and boot checks.
+After mapping the logical partitions, grow rescue EXT4 to its allocated
+capacity and initialize/use the complete allocated swap device. Grow userdata
+EXT4 to its physical capacity, retaining the independent capacity gate. Do not
+grow an inner filesystem across a logical-partition boundary. Swap must not
+expose decrypted user data after encryption is selected; its key lifecycle
+needs an independently qualified inline-crypto path.
 
-Primary references reviewed:
+## Encryption and key release
 
-- AOSP system/core `a3b721a32242006b59cb12bd62c9133632af3a2d`,
-  [fastboot README](https://android.googlesource.com/platform/system/core/+/a3b721a32242006b59cb12bd62c9133632af3a2d/fastboot/README.md),
-  `fastboot.cpp` (BSD license) and `task.cpp` (Apache-2.0). Interface research
-  only; no implementation copied. Original Fedora fastboot37.0.0p1 is present.
-- [AOSP DTBO table format](https://source.android.com/docs/core/architecture/dto/partitions).
-- [Linux7.3 dm-inlinecrypt](https://www.kernel.org/doc/html/v7.3/admin-guide/device-mapper/dm-inlinecrypt.html)
-  and the existing kernel storage-encryption source manifest/donor review.
+Offer encryption once after the first human desktop login. Declining closes
+the dialog. The user permits rebooting to independent rescue for operations
+on the mounted root; conversion must preserve existing files and be recoverable.
+The primary key goal is hardware-bound automatic release tied to an accepted
+verified boot, with the chosen password available for recovery. If that cannot
+be supplied, unlocking at user login is the explicitly permitted fallback.
+Never put a shared/plaintext unlock key in a generic image.
+
+Two separate native checks ran on 7.3.3-26-unstable:
+
+- A read-only dm-inlinecrypt mapping read one 4096-byte data unit. The UFS
+  queue advertised AES-256-XTS/4096, 64 keyslots and raw-key support; a private
+  function trace observed one Qualcomm ICE key-programming call. No partition
+  was written. Software-fallback exclusion, encrypted writes and key recovery
+  were not established by this read test.
+- Original Fedora cryptsetup 2.8.8 converted an owned 64-MiB loop file containing
+  a 48-MiB EXT4 filesystem to LUKS2. Sentinel and random-file checksums survived
+  read-only reopen. This establishes the bounded offline conversion path,
+  **not** UFS hardware encryption. Scratch mappings, files and keys were removed.
+
+The running queue does not advertise hardware-wrapped keys and TRUSTED_KEYS is
+disabled. This is the current configuration, not proof that the silicon lacks
+HWKM. The upstream ICE driver has a wrapped-key mode requiring qualified
+initialization/key lifecycle; do not toggle storage ownership/mode on a live
+mounted root. A TEE device node alone is not a sealing service.
+
+Upstream dm-inlinecrypt currently lacks original cryptsetup/LUKS integration.
+Ordinary cryptsetup/dm-crypt conversion does not satisfy hardware-only bulk
+crypto. The native mapper/key/reencryption integration, wrapped-key provisioning,
+recovery, power-loss behavior and hardware write/read path remain required.
+fscrypt alone cannot encrypt an existing EXT4 root in place; it applies policies
+to empty directories. Preserve both the block- and file-encryption open scope.
+
+## Secure boot, DT and recovery
+
+The requested secure boot requires a protected trust anchor, signed boot
+payloads, an enforced verification path and rejection of a tampered payload.
+RPM signatures, module signatures, FIT signatures and an enforced device root
+of trust are distinct. U-Boot verified-boot source explicitly requires its key
+and first-stage verifier to be protected. A signed but replaceable U-Boot does
+not close that chain. Do not relock stock ABL without an accepted custom-key
+contract, or pass blanket AVB verification-disable flags.
+
+Build DTBO and vendor_boot from the qualified cumulative source/board selection,
+including fitted suppliers, table IDs, reservations, bootconfig and handoff.
+Do not publish a private tablet dump or treat a compiled overlay as a complete
+DTBO partition image. Preserve all cumulative kernel features and admitted
+firmware ownership refusals. Current root guard/selector and early mapper need
+the independent logical rescue and encryption contracts before delivery.
+
+Enable seamless inactive-slot updates by default in the new image. The initial
+kernel is an automatically accepted baseline on successful root entry; critical
+boot/root failure must still enter rescue. Bound failure escalation and keep
+rescue usable without userdata. Recovery defaults to diagnosis, with explicit
+review before repair/destructive operations. A small local model is optional
+and must not displace essential recovery functionality or resource reserves.
+
+## Source tools and next admission
+
+`src/image/fastboot-singleboot-layout.sh` calculates layout and validates names.
+`scripts/check-fastboot-super-layout.sh` tests original liblp using a metadata-
+only file smaller than 1 MiB, without images or block writes.
+
+```text
+src/image/plan-fastboot-update.sh SOURCE_COMPOSITION GEOMETRY_JSON NEW_OUTPUT [DDMMYY]
+```
+
+The geometry JSON has `product: "uke"` and a `partitions` object containing
+positive byte capacities for super, userdata and both boot/vendor_boot/DTBO/
+vbmeta slots. Plans record the supplied evidence; actual fastboot-side capacity
+and trust checks still precede an installer artifact. The planner emits only
+data/task proposals, never a ZIP, flash command execution or encryption action.
+
+The remaining producer work includes full swap/rescue/userdata composition,
+the native early logical mapper and key path, source-built DTBO/vendor_boot,
+enforced boot verification, first-login UI, guarded conversion, matching kernel
+delivery and actual fastboot parser/artifact validation. Build compilation in
+COPR and compose through existing workers. Download the final Actions artifact
+for inspection. **Do not publish a GitHub Release; the user performs flashing.**
+
+## Primary references
+
+- [AOSP dynamic partitions](https://source.android.com/docs/core/ota/dynamic_partitions/implement)
+- [Original fastboot task format](https://android.googlesource.com/platform/system/core/+/refs/heads/main/fastboot/README.md)
+- [DTBO partition tables](https://source.android.com/docs/core/architecture/dto/partitions)
+- [U-Boot verified boot](https://docs.u-boot.org/en/latest/usage/fit/verified-boot.html)
+- [U-Boot FIT verification](https://docs.u-boot.org/en/latest/usage/fit/signature.html)
+- [dm-inlinecrypt](https://docs.kernel.org/admin-guide/device-mapper/dm-inlinecrypt.html)
+- [Inline encryption](https://docs.kernel.org/block/inline-encryption.html)
+- [fscrypt](https://docs.kernel.org/filesystems/fscrypt.html)
+- [Trusted keys](https://docs.kernel.org/security/keys/trusted-encrypted.html)
+- [Hardware-wrapped keys](https://source.android.com/docs/security/features/encryption/hw-wrapped-keys)
+- [cryptsetup reencryption](https://man7.org/linux/man-pages/man8/cryptsetup-reencrypt.8.html)

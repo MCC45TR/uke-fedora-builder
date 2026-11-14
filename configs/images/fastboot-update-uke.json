@@ -1,109 +1,89 @@
 {
-  "schema_version": 1,
+  "schema_version": 2,
   "device": "uke",
-  "status": "preparation-only",
-  "installation_command": "fastboot update update.zip",
+  "status": "implementation-in-progress",
+  "mode": "singleboot-fresh-install",
+  "filesystem": "ext4",
+  "installation_command": "fastboot update ARCHIVE.zip",
+  "archive_pattern": "fedora-rawhide-linux-kde-plasma-uke-senemos-sbfb-DDMMYY.zip",
+  "date_format": "%d%m%y",
   "fastboot_info_version": 1,
   "partition_table_changes": false,
-  "mode": "fresh-install",
-  "slot_policy": "fastboot-selected-slot; other boot/vendor_boot/dtbo cohort retained",
-  "normal_updates": "DNF with existing automatic inactive-slot staging",
+  "slot_policy": "both boot/vendor_boot/dtbo/vbmeta slots share the initial qualified cohort",
+  "kernel_family": "senemos-uke-linux-kernel-mainline-unstable",
+  "normal_updates": "signed DNF packages with automatic inactive-slot seamless staging",
+  "super_layout": {
+    "kind": "liblp",
+    "capacity": "measured per device, never copied from another storage variant",
+    "swap_percentage": 80,
+    "rescue_percentage": 20,
+    "swap_logical_partition": "system_a",
+    "rescue_logical_partition": "system_b",
+    "opt_partition": false,
+    "gpt_unchanged": true,
+    "all_usable_extents_assigned": true
+  },
   "payloads": [
-    {
-      "partition": "super",
-      "file": "super.img",
-      "role": "Fedora Live Recovery",
-      "slotted": false,
-      "observed_partition_bytes": 11274289152,
-      "format": "raw-ext4-candidate"
-    },
-    {
-      "partition": "userdata",
-      "file": "userdata.img",
-      "role": "Fedora system",
-      "slotted": false,
-      "observed_partition_bytes": 497535680512,
-      "format": "encrypted-ext4-candidate",
-      "replaces_existing_data": true
-    },
-    {
-      "partition": "vendor_boot",
-      "file": "vendor_boot.img",
-      "role": "matching boot DT and vendor ramdisk",
-      "slotted": true,
-      "observed_partition_bytes": 100663296
-    },
-    {
-      "partition": "dtbo",
-      "file": "dtbo.img",
-      "role": "source-built matched overlay table",
-      "slotted": true,
-      "observed_partition_bytes": 25165824
-    },
-    {
-      "partition": "boot",
-      "file": "boot.img",
-      "role": "matching cumulative kernel and root unlock initramfs",
-      "slotted": true,
-      "observed_partition_bytes": 100663296
-    }
+    {"partition": "super", "file": "super.img", "role": "logical swap and independent rescue", "slotted": false},
+    {"partition": "userdata", "file": "userdata.img", "role": "Fedora EXT4 system", "slotted": false, "replaces_existing_data": true},
+    {"partition": "vendor_boot_a", "file": "vendor_boot.img", "role": "source-built matching vendor boot"},
+    {"partition": "vendor_boot_b", "file": "vendor_boot.img", "role": "source-built matching vendor boot"},
+    {"partition": "dtbo_a", "file": "dtbo.img", "role": "source-built matching overlay table"},
+    {"partition": "dtbo_b", "file": "dtbo.img", "role": "source-built matching overlay table"},
+    {"partition": "boot_a", "file": "boot.img", "role": "latest qualified cumulative Senemos kernel"},
+    {"partition": "boot_b", "file": "boot.img", "role": "latest qualified cumulative Senemos kernel"},
+    {"partition": "vbmeta_a", "file": "vbmeta.img", "role": "verified boot chain"},
+    {"partition": "vbmeta_b", "file": "vbmeta.img", "role": "verified boot chain"}
   ],
-  "preserved": [
-    "GPT",
-    "partition sizes",
-    "persist",
-    "modemst1",
-    "modemst2",
-    "fsg",
-    "fsc",
-    "keystore",
-    "stock early firmware"
-  ],
+  "preserved": ["GPT", "partition sizes", "persist", "modemst1", "modemst2", "fsg", "fsc", "keystore", "stock early firmware"],
   "encryption": {
-    "full_system": "original Fedora cryptsetup/LUKS2 + dm-crypt",
-    "file_based": "EXT4 fscrypt, optional inlinecrypt mount support",
-    "ufs_hardware_test": "separate dm-inlinecrypt/blk-crypto/Qualcomm ICE qualification",
-    "hardware_wrapped_keys": "QTEE/HWKM provisioning and recovery not yet qualified",
-    "shared_keys_in_archive": false,
+    "offer": "once after first human desktop login; decline closes the dialog",
+    "existing_ext4_conversion": "offline from independent rescue, preserving user data",
+    "bulk_crypto": "UFS inline hardware only; ordinary dm-crypt is not equivalent",
+    "preferred_key_release": "hardware-bound, verified-boot-bound automatic release",
+    "permitted_fallback": "unlock at user login if hardware-bound release cannot be provided",
+    "passphrase_role": "user-selected recovery credential for hardware automatic release",
+    "plaintext_key_in_archive": false,
+    "hardware_key_acceptance": false,
     "hardware_encrypted_io_accepted": false
   },
-  "required_acceptance": [
-    "same cumulative kernel,modules,DT,firmware and payload source identities",
-    "source-built DTBO table retains fitted board/supplier entry selection",
-    "vendor_boot header,DT layout,bootconfig and bootloader handoff",
-    "physical super raw filesystem compatibility; otherwise reviewed logical layout",
-    "original fastboot task parsing and exact expanded payload capacities",
-    "mapper-aware initramfs unlock plus rescue without userdata dependency",
-    "encrypted I/O,key recovery and accepted rollback kernel compatibility",
-    "fresh image excludes device-private identities and calibration",
-    "no automatic publication from plan generation",
-    "Matched AVB/vbmeta chain for new boot/vendor_boot/dtbo; no blanket verification-disable policy"
-  ],
-  "physical_flash_tested": false,
-  "physical_boot_tested": false,
+  "first_boot": {
+    "seamless_update_enabled": true,
+    "initial_kernel_confirmation": "automatic baseline acceptance on successful root entry",
+    "critical_failure_rescue_retained": true,
+    "userdata_growth": "full physical partition capacity",
+    "rescue_growth": "full allocated logical partition capacity",
+    "swap_growth": "full allocated logical partition capacity"
+  },
   "recovery_entry": {
-    "automatic": "bounded critical boot/unlock failure escalation after accepted A/B fallback policy",
-    "manual": "volume-button request during qualified early boot",
-    "volume_key": "candidate-volume-up; fitted bootloader/input path not yet qualified",
-    "future": "existing recovery shortcut",
+    "automatic": "bounded escalation on boot, root, unlock or critical health failure",
     "independent_of_userdata": true,
     "non_destructive_by_default": true,
+    "optional_local_language_model": "only after the base recovery meets its resource budget",
     "physical_entry_tested": false
   },
-  "current_boot_blockers": [
-    "The current root-selector-v2 admits linux/userdata only; add a versioned Live Recovery root contract.",
-    "Current root-guard requires a physical supported filesystem; add reviewed mapper-aware unlock and super root admission.",
-    "The current boot-image creator accepts linux/userdata only; produce a matched Live Recovery boot path.",
-    "Current18 disables dm-crypt/fscrypt; integrate the already separately qualified native prerequisites."
+  "secure_boot": {
+    "required": true,
+    "signing_is_not_enforcement": true,
+    "root_of_trust_qualified": false,
+    "key_enrollment_qualified": false,
+    "do_not_relock_without_accepted_custom_trust": true,
+    "verification_disable_flags": false
+  },
+  "delivery": {"github_actions_artifact": true, "publish_release": false, "installer_runs_device_writes": false},
+  "required_acceptance": [
+    "measured capacity and fastboot-side validation for the exact device",
+    "liblp primary,backup and slot metadata map both logical roles correctly",
+    "matching cumulative kernel,modules,DT,firmware,boot and secure boot identities",
+    "source-built DTBO and vendor_boot preserve fitted-board handoff contracts",
+    "enforced trust chain and tampered-payload rejection, not signatures alone",
+    "mapper-aware initramfs,independent rescue and seamless update health transitions",
+    "full filesystem capacity and swap ownership without overlapping extents",
+    "hardware encrypted I/O,key recovery and accepted rollback compatibility",
+    "first-login offer,decline path and recoverable encrypted conversion",
+    "original fastboot parses the ZIP with both boot slots and no wipe/relock task",
+    "Actions artifact download,full content validation and no public release"
   ],
-  "observed_fixed_boot_headers": {
-    "scope": "fixed header fields and DTBO table metadata only; no complete image identity",
-    "both_slots": {
-      "dtbo_table_version": 0,
-      "dtbo_entries": 1,
-      "dtbo_declared_bytes": 592014,
-      "vendor_boot_version": 4,
-      "vendor_ramdisk_bytes": 37136921
-    }
-  }
+  "physical_flash_tested": false,
+  "physical_boot_tested": false
 }
