@@ -3,12 +3,80 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      build_rescue:
+        description: Assemble an unqualified native AArch64 Fedora rescue filesystem
+        type: boolean
+        default: false
+      rescue_kernel_evr:
+        description: Exact coordinator-qualified cumulative unstable RPM version-release
+        type: string
+        default: 7.3.3-26.fc46
+      rescue_kernel_source:
+        description: Exact qualified kernel source commit for the selected RPM cohort
+        type: string
+        default: c7adc996350e3692b4492ab007cad63070dde6c2
 permissions:
   contents: read
 concurrency:
   group: image-source-contracts-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  rescue-root:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_rescue
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Assemble original Fedora rescue root without compilation
+        env:
+          RESCUE_EVR: ${{ inputs.rescue_kernel_evr }}
+          RESCUE_SOURCE: ${{ inputs.rescue_kernel_source }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 && $RESCUE_EVR =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ && $RESCUE_SOURCE =~ ^[a-f0-9]{40}$ ]]
+          image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
+          [[ $image =~ ^registry\.fedoraproject\.org/fedora@sha256:[a-f0-9]{64}$ ]]
+          job="$RUNNER_TEMP/uke-rescue-job"
+          cache="$RUNNER_TEMP/uke-rescue-cache"
+          mkdir -m700 "$job" "$cache"
+          cleanup() {
+            status=$?
+            trap - EXIT
+            sudo find "$job" "$cache" -depth -delete
+            exit "$status"
+          }
+          trap cleanup EXIT
+          jq -n --arg evr "$RESCUE_EVR" --arg source "$RESCUE_SOURCE" \
+            '{channel:"unstable",fedora_release:"rawhide",kernel_profile:"unstable",kernel_rpm_request:$evr,kernel_commit:$source}' > "$job/request.json"
+          docker run --rm --cpus=2 --memory=2g --pids-limit=512 \
+            --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$job,target=/job" \
+            --mount "type=bind,source=$cache,target=/cache" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf5 -y --setopt=install_weak_deps=False install jq gnupg2 curl cpio e2fsprogs util-linux coreutils findutils diffutils grep sed gawk binutils systemd systemd-libs libselinux
+              : > /.uke-rescue-worker
+              mkdir /run/refuse-native-build
+              printf "%s\n" "#!/bin/sh" "echo Native compilation belongs in COPR >&2" "exit 97" > /run/refuse-native-build/refuse
+              chmod +x /run/refuse-native-build/refuse
+              for tool in cc c++ gcc g++ clang clang++ as ld rpmbuild; do ln -s refuse /run/refuse-native-build/$tool; done
+              export PATH=/run/refuse-native-build:$PATH
+              bash /builder/src/image/compose-fedora-rescue.sh
+            '
+          sudo cp -a "$job/artifacts/rescue" "$RUNNER_TEMP/uke-rescue-result"
+          sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-rescue-result"
+          echo 'Signed original Fedora rescue filesystem assembled; protected boot, authenticated repair and physical UFS acceptance remain open. No release or tablet write.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain rescue input and bounded receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: unqualified-fedora-rescue
+          path: ${{ runner.temp }}/uke-rescue-result
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
   source:
     runs-on: ubuntu-24.04
     steps:
@@ -33,6 +101,7 @@ jobs:
           shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
           shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
+          shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh

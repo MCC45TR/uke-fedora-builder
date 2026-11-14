@@ -89,12 +89,12 @@ if [[ $channel == unstable ]]; then
 else
     c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot/boot-image.cpp -o /job/boot-image
 fi
-for profile in linux userdata; do
-    cohort_boot_root_check "$bundle/$profile.img" "$profile" /job/boot-image
-    /job/boot-image inspect "$bundle/$profile.img" > "/job/artifacts/kernel/boot-$profile.json"
-    /job/boot-image extract "$bundle/$profile.img" "/job/$profile.Image"
-    cmp "$modules/vmlinuz" "/job/$profile.Image"
-    cp "$bundle/$profile.img" "/job/artifacts/boot-$profile.img"
+for root_profile in linux userdata; do
+    cohort_boot_root_check "$bundle/$root_profile.img" "$root_profile" /job/boot-image
+    /job/boot-image inspect "$bundle/$root_profile.img" > "/job/artifacts/kernel/boot-$root_profile.json"
+    /job/boot-image extract "$bundle/$root_profile.img" "/job/$root_profile.Image"
+    cmp "$modules/vmlinuz" "/job/$root_profile.Image"
+    cp "$bundle/$root_profile.img" "/job/artifacts/boot-$root_profile.img"
 done
 rpm -qp --qf '%{NEVRA}\t%{SOURCERPM}\n' "${archives[@]}" | LC_ALL=C sort > /job/artifacts/kernel/packages.tsv
 (cd /job/artifacts/kernel; sha256sum -- *.rpm) > /job/artifacts/kernel/RPM-SHA256SUMS

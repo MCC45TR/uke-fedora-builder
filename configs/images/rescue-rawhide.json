@@ -1,0 +1,31 @@
+{
+  "schema_version": 1,
+  "device": "uke",
+  "architecture": "aarch64",
+  "distribution": "fedora",
+  "release": "rawhide",
+  "filesystem": "ext4",
+  "label": "FEDORA_RESCUE",
+  "minimum_image_mib": 512,
+  "maximum_image_mib": 1024,
+  "image_alignment_mib": 64,
+  "root_read_only": true,
+  "userdata_automount": false,
+  "network_enabled_by_default": false,
+  "root_password_locked": true,
+  "python_permitted": false,
+  "automatic_repair": false,
+  "packages": [
+    "fedora-release", "bash", "coreutils", "glibc-minimal-langpack",
+    "systemd", "systemd-udev", "dbus-broker", "util-linux",
+    "e2fsprogs", "device-mapper", "cryptsetup", "keyutils", "kmod",
+    "findutils", "grep", "sed", "gawk", "less", "procps-ng",
+    "iproute", "iputils", "openssh-server", "shadow-utils",
+    "selinux-policy-targeted", "policycoreutils", "file"
+  ],
+  "kernel_packages": ["core", "modules", "dtbs"],
+  "kernel_source": "exact signed cumulative unstable RPM cohort; never a rescue-only kernel",
+  "llm_included": false,
+  "operating_system_boot_qualified": false,
+  "physical_ufs_qualified": false
+}
