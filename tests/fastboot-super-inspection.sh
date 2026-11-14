@@ -63,6 +63,15 @@ TMPDIR="$work" bash "$inspector" --image "$capacity" "$work/one-damaged-copy.img
 cp "$work/one-damaged-copy.img" "$work/two-damaged-copies.img"
 printf '\000' | dd of="$work/two-damaged-copies.img" bs=1 seek=339968 conv=notrunc status=none
 reject "$capacity" "$work/two-damaged-copies.img"
+# Padding a compact serialized description to device size must not make its
+# single view pass as three independent slots.
+lpmake --device-size "$capacity" --super-name super --alignment 1048576 \
+    --metadata-size 65536 --metadata-slots 3 --group "uke_linux:$usable" \
+    --partition "system_a:none:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux" \
+    --output "$work/padded-compact.img" >/dev/null 2> "$work/lpmake.log"
+truncate -s "$capacity" "$work/padded-compact.img"
+reject "$capacity" "$work/padded-compact.img"
+grep -q 'reserved prefix' "$work/refusal.log"
 fixture "$capacity" "$work/readonly.img" --group "uke_linux:$usable" \
     --partition "system_a:readonly:$swap:uke_linux" --partition "system_b:none:$rescue:uke_linux"
 reject "$capacity" "$work/readonly.img"

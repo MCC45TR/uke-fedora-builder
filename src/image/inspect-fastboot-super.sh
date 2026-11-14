@@ -31,7 +31,10 @@ layout=$(fastboot_super_layout "$capacity") || fail 'unsupported capacity'
 ((capacity % 4096 == 0)) || fail 'capacity is not 4096-byte aligned'
 if [[ $1 == --image ]]; then
     [[ $(stat -c %s "$device") == "$capacity" ]] || fail 'full raw image required; compact metadata files do not contain independent slot copies'
+    exec 3< "$device"
+    device=/proc/self/fd/3
 fi
+cmp -s -n 4096 /dev/zero "$device" || fail 'raw super reserved prefix is not zero; compact/sparse input is not a physical layout'
 swap=$(jq -er '.partitions[0].bytes' <<< "$layout")
 rescue=$(jq -er '.partitions[1].bytes' <<< "$layout")
 usable=$(jq -er .usable_payload_bytes <<< "$layout")
@@ -42,11 +45,20 @@ swap_start=$((first / 512))
 rescue_start=$((swap_start + swap_sectors))
 end=$((rescue_start + rescue_sectors))
 ((end * 512 <= capacity)) || fail 'logical extent exceeds the device'
-work=$(mktemp -d "${TMPDIR:-/run}/uke-super-inspect.XXXXXXXX")
+work=$(mktemp -d "${TMPDIR:-/tmp}/uke-super-inspect.XXXXXXXX")
 cleanup() { find "$work" -depth -delete; }
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
+if [[ $1 == --image ]]; then
+    # Host lpdump may import/scan an entire regular raw file before reading its
+    # liblp tables. Copy the exact bounded metadata prefix, retaining real slot
+    # offsets and logical capacity as sparse holes. Payload bytes are checked
+    # separately by the producer; this verifier makes no payload-auth claim.
+    truncate -s "$capacity" "$work/topology.raw"
+    dd if="$device" of="$work/topology.raw" bs=1048576 count=1 iflag=fullblock conv=notrunc status=none
+    device=$work/topology.raw
+fi
 # Keep parsing and output bounded even for malformed foreign geometry.
 dump() (
     ulimit -v 262144
@@ -97,7 +109,11 @@ Group table:
 ------------------------
 TEXT
 for slot in 0 1 2; do
-    dump --json --slot="$slot" > "$work/slot.json" 2> "$work/diagnostic" || fail "cannot decode metadata slot $slot"
+    if dump --json --slot="$slot" > "$work/slot.json" 2> "$work/diagnostic"; then :; else
+        result=$?
+        tail -n 4 "$work/diagnostic" >&2
+        fail "cannot decode metadata slot $slot (parser exit $result)"
+    fi
     jq -e --argjson capacity "$capacity" --argjson swap "$swap" --argjson rescue "$rescue" --argjson usable "$usable" '
       (.block_devices | length) == 1 and .block_devices[0].name == "super" and
       (.block_devices[0].size | tonumber) == $capacity and

@@ -21,6 +21,11 @@ metadata-description files are refused because lpdump ignores --slot for that
 format. Sparse raw fixtures have full logical capacity with less than1MiB
 allocated data, allowing actual independent-copy fault tests. Checksums
 detect corruption; they do not authenticate a rescue operating system.
+For regular raw inputs, the host verifier copies only the exact1MiB metadata
+prefix into a sparse file with the original logical capacity. All primary and
+backup slot offsets remain intact. This avoids original lpdump scanning GiB of
+raw payload under CI resource limits; the producer independently decodes and
+byte-checks both complete logical payloads afterward.
 
 `src/image/map-fastboot-rescue.sh` is a demand-only early-boot helper. The
 protected caller must first resolve the **unique physical Uke UFS super**.
