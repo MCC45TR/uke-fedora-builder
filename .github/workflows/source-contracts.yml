@@ -12,6 +12,10 @@ on:
         description: Compose the real Fedora rescue into super and test growth on an owned loop
         type: boolean
         default: false
+      build_super_runtime:
+        description: Qualify the original Fedora ARM64 super tool closure without boot hooks
+        type: boolean
+        default: false
       minimum_super_bytes:
         description: Supplied minimum super capacity; default is measured 512-GB Uke only, not 256-GB evidence
         type: string
@@ -30,6 +34,54 @@ concurrency:
   group: image-source-contracts-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  super-runtime:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_super_runtime
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Qualify original native super tools in a nonbootable archive
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 ]]
+          image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
+          [[ $image =~ ^registry\.fedoraproject\.org/fedora@sha256:[a-f0-9]{64}$ ]]
+          job="$RUNNER_TEMP/uke-super-runtime-job"
+          mkdir -m700 "$job"
+          (( $(df -Pm "$job" | awk 'NR==2{print $4}') >= 12288 ))
+          cleanup() {
+            local status=$?
+            trap - EXIT
+            sudo find "$job" -depth -delete
+            exit "$status"
+          }
+          trap cleanup EXIT
+          docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
+            --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$job,target=/job" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf5 -y --setopt=gpgcheck=True --setopt=install_weak_deps=False install dracut android-tools device-mapper e2fsprogs util-linux jq bash coreutils findutils diffutils binutils cpio gzip
+              : > /.uke-super-runtime-worker
+              mkdir /run/refuse-native-build
+              printf "%s\n" "#!/bin/sh" "echo Native compilation belongs in COPR >&2" "exit 97" > /run/refuse-native-build/refuse
+              chmod +x /run/refuse-native-build/refuse
+              for tool in cc c++ gcc g++ clang clang++ as ld rpmbuild; do ln -s refuse /run/refuse-native-build/$tool; done
+              export PATH=/run/refuse-native-build:$PATH
+              bash /builder/src/image/qualify-super-runtime.sh /builder /job/result
+            '
+          sudo cp -a "$job/result" "$RUNNER_TEMP/uke-super-runtime-result"
+          sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-super-runtime-result"
+          echo 'Native original-Fedora userspace tool closure passed. No bootable archive, boot hooks, physical UFS, crypto, resume or tablet operation.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain small runtime closure receipts
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: unqualified-super-runtime-receipts
+          path: ${{ runner.temp }}/uke-super-runtime-result
+          if-no-files-found: error
+          retention-days: 14
   rescue-root:
     if: github.event_name == 'workflow_dispatch' && (inputs.build_rescue || inputs.build_super_seed)
     needs: source
@@ -172,6 +224,7 @@ jobs:
           shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
           shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh
           shellcheck src/image/compose-fastboot-super-seed.sh
+          shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
