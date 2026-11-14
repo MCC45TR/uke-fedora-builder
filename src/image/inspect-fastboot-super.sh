@@ -57,10 +57,10 @@ trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
 if [[ $1 == --image ]]; then
-    # Host lpdump may import/scan an entire regular raw file before reading its
-    # liblp tables. Copy the exact bounded metadata prefix, retaining real slot
-    # offsets and logical capacity as sparse holes. Payload bytes are checked
-    # separately by the producer; this verifier makes no payload-auth claim.
+    # Freeze the bounded metadata prefix, retaining real slot offsets and
+    # logical capacity as sparse holes. Original lpdump reads the liblp tables;
+    # payload bytes are checked separately by the producer. This snapshot does
+    # not authenticate payloads or relieve the producer's full-image cache use.
     truncate -s "$capacity" "$work/topology.raw"
     dd if="$device" of="$work/topology.raw" bs=1048576 count=1 iflag=fullblock conv=notrunc status=none
     device=$work/topology.raw
@@ -134,7 +134,11 @@ for slot in "${slots[@]}"; do
       ([.groups[] | select(.name == $group) | .maximum_size | tonumber] == [$usable]) and
       ([.groups[] | select(.name == "default") | (.maximum_size // 0) | tonumber] == [0])' \
       "$work/slot.json" >/dev/null || fail "slot $slot does not describe the two Linux roles"
-    dump --slot="$slot" > "$work/slot.txt" 2> "$work/diagnostic" || fail "cannot read extents in slot $slot"
+    if dump --slot="$slot" > "$work/slot.txt" 2> "$work/diagnostic"; then :; else
+        result=$?
+        tail -n 4 "$work/diagnostic" >&2
+        fail "cannot read extents in slot $slot (parser exit $result)"
+    fi
     # Original lpdump's JSON omits extents/attributes. Require the complete
     # producer format as well; any parser/version drift fails closed.
     sed -e '/^Slot [012]:$/d' -e 's/[[:blank:]]*$//' -e '/^$/d' "$work/slot.txt" > "$work/normalized.txt"

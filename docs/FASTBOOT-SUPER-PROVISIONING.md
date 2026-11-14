@@ -56,6 +56,16 @@ No super image is backed up or copied on the target. Temporary snapshots retain
 only the first 1 MiB with sparse logical tails. The helpers do not access
 userdata, alter firmware/GPT, activate swap, authenticate an OS or hibernate.
 
+Host composition hashes and decodes complete disposable images. It flushes its
+four owned image files and uses original util-linux fadvise to release their
+clean page cache before bounded metadata parsing. This is file-specific advice,
+not a global cache flush, and does not change parser time/memory limits. A
+metadata-prefix snapshot alone does not relieve the producer's previous
+full-image cache use. The host parser source reads metadata rather than scanning
+all raw payloads; earlier resource-failure attribution to such a scan was not
+established. Repeated CI timeouts and memory-limit pressure are recorded as
+failures until the corrected whole fixture passes.
+
 ## Qualification and remaining integration
 
 Original-tool metadata fixtures test a 4-GiB seed in an 8-GiB container, mixed
@@ -78,6 +88,7 @@ userdata is EXT4. The user flashes the final Actions artifact; no Release.
 - [AOSP lpflash](https://android.googlesource.com/platform/system/extras/+/refs/heads/main/partition_tools/lpflash.cc), blob `7ebc042b4007d6707a55e56481ba0f38fe2680f6`.
 - [AOSP liblp writer](https://android.googlesource.com/platform/system/core/+/refs/heads/main/fs_mgr/liblp/writer.cpp), blob `2708efa1564b582348ab25a1988b22cc58577f19`.
 - [AOSP liblp reader](https://android.googlesource.com/platform/system/core/+/refs/heads/main/fs_mgr/liblp/reader.cpp), blob `24ccc0f9de8e5e2f337ebddecabe95785b111f95`.
+- [Original util-linux fadvise](https://man7.org/linux/man-pages/man1/fadvise.1.html) and [POSIX advice semantics](https://man7.org/linux/man-pages/man2/posix_fadvise.2.html).
 
 The host lpflash writer omits some Android device-size checks, so the wrapper
 derives and verifies actual capacity. lpflash also attempts to clear block

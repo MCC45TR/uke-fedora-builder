@@ -16,7 +16,7 @@ source "$root/src/image/fastboot-singleboot-layout.sh"
 layout_file=$(realpath "$1")
 rescue_input=$(realpath "$2")
 output=$(realpath -m "$3")
-for tool in lpmake lpdump lpunpack simg2img mkswap blkid e2fsck resize2fs e2label dumpe2fs jq; do
+for tool in lpmake lpdump lpunpack simg2img mkswap blkid e2fsck resize2fs e2label dumpe2fs jq sync fadvise; do
     command -v "$tool" >/dev/null
 done
 capacity=$(jq -er .super_bytes "$layout_file")
@@ -100,6 +100,13 @@ lpmake --device-size "$capacity" --super-name super --alignment 1048576 \
 [[ -f $output/super.img && ! -L $output/super.img ]]
 simg2img "$output/super.img" "$work/readback.raw"
 [[ $(stat -c %s "$work/readback.raw") == "$capacity" ]]
+# Full-image hashing/decoding can fill a bounded worker's page cache. Flush
+# only these owned files, then release their clean cache before metadata work.
+# Never touch global drop_caches or another process's files.
+for image in "$work/swap.raw" "$work/rescue.raw" "$output/super.img" "$work/readback.raw"; do
+    sync "$image"
+    fadvise --advice dontneed "$image"
+done
 bash "$root/src/image/inspect-fastboot-super.sh" --image "$capacity" "$work/readback.raw" "$phase" > "$output/super-topology.json"
 for slot in 0 1 2; do
     lpdump --json --slot="$slot" "$work/readback.raw" > "$output/lp-slot-$slot.json"
