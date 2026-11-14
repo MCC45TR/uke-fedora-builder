@@ -83,6 +83,7 @@ cmp "$work/files/random.bin" "$work/random.bin"
 refuse occupied-output "$work/layout.json" "$work/input.ext4" "$work/composed"
 (cd "$work/composed"; sha256sum -c SHA256SUMS)
 cp -- "$work/composed/super-composition.json" "$work/composed/super-layout.json" \
+    "$work/composed/super-topology.json" \
     "$work/composed/"lp-slot-?.json "$work/composed/rescue-superblock.txt" \
     "$work/composed/rescue-filesystem-check.txt" "$reports/"
 jq -M -n --arg input "$input_hash" \

@@ -98,6 +98,7 @@ lpmake --device-size "$capacity" --super-name super --alignment 1048576 \
 [[ -f $output/super.img && ! -L $output/super.img ]]
 simg2img "$output/super.img" "$work/readback.raw"
 [[ $(stat -c %s "$work/readback.raw") == "$capacity" ]]
+bash "$root/src/image/inspect-fastboot-super.sh" --image "$capacity" "$work/readback.raw" > "$output/super-topology.json"
 for slot in 0 1 2; do
     lpdump --json --slot="$slot" "$work/readback.raw" > "$output/lp-slot-$slot.json"
     jq -e --argjson capacity "$capacity" --argjson swap "$swap_bytes" --argjson rescue "$rescue_bytes" \
@@ -123,5 +124,5 @@ jq -M -n --arg hash "$(sha256sum "$output/super.img" | cut -d ' ' -f1)" \
       both_logical_payloads_byte_matched:true,rescue_full_capacity:true,swap_full_capacity:true,
       container_assembled:true,installable_archive_created:false,
       rescue_os_qualified:false,secure_boot_qualified:false,device_write_executed:false}' > "$output/super-composition.json"
-(cd "$output"; sha256sum super.img super-layout.json super-composition.json lp-slot-?.json > SHA256SUMS)
+(cd "$output"; sha256sum super.img super-layout.json super-topology.json super-composition.json lp-slot-?.json > SHA256SUMS)
 printf 'Constructed and decoded %s with full-size swap/rescue payload byte checks; boot/OS/security admission remains separate.\n' "$output/super.img"

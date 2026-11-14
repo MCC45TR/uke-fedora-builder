@@ -22,16 +22,18 @@ lpmake --device-size "$1" --super-name super --alignment 1048576 \
     --partition "system_a:none:$swap:uke_linux" \
     --partition "system_b:none:$rescue:uke_linux" --output "$work/metadata.img"
 [[ $(stat -c %s "$work/metadata.img") -le 1048576 ]]
-for slot in 0 1 2; do
-    lpdump --json --slot="$slot" "$work/metadata.img" > "$work/readback-$slot.json"
-    jq -e --argjson capacity "$1" --argjson swap "$swap" --argjson rescue "$rescue" \
+# Compact metadata files contain one serialized description. Original lpdump
+# ignores --slot for that file format; independent slot copies require a full
+# raw container (tested separately by fastboot-super-inspection/composition).
+lpdump --json "$work/metadata.img" > "$work/readback.json"
+jq -e --argjson capacity "$1" --argjson swap "$swap" --argjson rescue "$rescue" \
         '(.block_devices | length) == 1 and .block_devices[0].name == "super" and
          (.block_devices[0].size | tonumber) == $capacity and
          (.partitions | length) == 2 and
          ([.partitions[] | select(.name == "system_a") | .size | tonumber] == [$swap]) and
          ([.partitions[] | select(.name == "system_b") | .size | tonumber] == [$rescue])' \
-        "$work/readback-$slot.json" >/dev/null
-done
+        "$work/readback.json" >/dev/null
 jq -M -n --argjson layout "$layout" \
-    '{schema_version:1,layout:$layout,original_liblp_three_slots_readback:true,
+    '{schema_version:2,layout:$layout,original_liblp_metadata_description_readback:true,
+      independent_slot_copies_verified:false,
       metadata_fixture_only:true,flashable_image_created:false,device_write_executed:false}'

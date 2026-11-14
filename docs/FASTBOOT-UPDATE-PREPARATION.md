@@ -34,8 +34,11 @@ primary/backup metadata and alignment. The measured 512-GB tablet has
 11,274,289,152 super bytes. The current calculator assigns 9,017,753,600 bytes
 (8600 MiB) to swap and 2,255,486,976 bytes (2151 MiB) to rescue, with the
 remaining 1 MiB reserved for aligned metadata. This is an example, not a
-capacity constant for other variants. Original lpmake/lpdump round-tripped all
-three metadata slots of a tiny metadata-only fixture with these sizes.
+capacity constant for other variants. Original lpmake/lpdump first round-tripped
+the compact metadata description with these sizes. That compact format contains
+one serialized view, so passing --slot does not prove independent slot copies.
+The later full-container and sparse raw-fixture tests check the actual three
+views, including deliberate disagreement and corrupted-copy recovery.
 
 Initial delivery writes matching boot, vendor_boot, DTBO and vbmeta to both
 slots. Existing early firmware, persist, modem identity/calibration and GPT
@@ -120,6 +123,11 @@ and must not displace essential recovery functionality or resource reserves.
 `src/image/fastboot-singleboot-layout.sh` calculates layout and validates names.
 `scripts/check-fastboot-super-layout.sh` tests original liblp using a metadata-
 only file smaller than 1 MiB, without images or block writes.
+It verifies the serialized description, not three independent physical copies.
+
+[Logical rescue mapping](FASTBOOT-RESCUE-MAPPING.md) describes strict all-slot
+topology validation and the demand-only read-only mapper. Original lpdump JSON
+alone omits extents, so equal partition names/sizes are insufficient admission.
 
 `src/image/build-fastboot-super.sh` is the host-only container producer. It
 accepts a calculated layout and an independent raw EXT4 rescue input, then

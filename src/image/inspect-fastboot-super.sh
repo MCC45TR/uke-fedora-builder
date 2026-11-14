@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# SPDX-License-Identifier: MIT
+# Read-only liblp admission for the image producer and early rescue mapper.
+# This checks metadata geometry, not cryptographic authenticity or an OS boot.
+set -Eeuo pipefail
+export LC_ALL=C
+umask 077
+here=$(cd -- "$(dirname -- "$0")" && pwd)
+# shellcheck source=fastboot-singleboot-layout.sh
+# shellcheck disable=SC1091
+source "$here/fastboot-singleboot-layout.sh"
+fail() { printf 'UKE_SUPER_REJECTED: %s\n' "$*" >&2; exit 1; }
+case ${1:-} in
+    --image)
+        [[ $# == 3 && -f $3 && ! -L $3 ]] || fail 'expected capacity and a regular metadata/image file'
+        capacity=$2
+        device=$(realpath "$3")
+        ;;
+    --block)
+        [[ $# == 2 ]] || fail 'expected one block device'
+        device=$(readlink -e -- "$2")
+        [[ -b $device ]] || fail 'input is not a block device'
+        # Keep a reference open while liblp validates this device.
+        exec 3< "$device"
+        capacity=$(blockdev --getsize64 /proc/self/fd/3)
+        device=/proc/self/fd/3
+        ;;
+    *) fail 'usage: inspect-fastboot-super.sh --image SUPER_BYTES FILE | --block DEVICE';;
+esac
+layout=$(fastboot_super_layout "$capacity") || fail 'unsupported capacity'
+((capacity % 4096 == 0)) || fail 'capacity is not 4096-byte aligned'
+if [[ $1 == --image ]]; then
+    [[ $(stat -c %s "$device") == "$capacity" ]] || fail 'full raw image required; compact metadata files do not contain independent slot copies'
+fi
+swap=$(jq -er '.partitions[0].bytes' <<< "$layout")
+rescue=$(jq -er '.partitions[1].bytes' <<< "$layout")
+usable=$(jq -er .usable_payload_bytes <<< "$layout")
+first=$(jq -er .first_logical_byte <<< "$layout")
+swap_sectors=$((swap / 512))
+rescue_sectors=$((rescue / 512))
+swap_start=$((first / 512))
+rescue_start=$((swap_start + swap_sectors))
+end=$((rescue_start + rescue_sectors))
+((end * 512 <= capacity)) || fail 'logical extent exceeds the device'
+work=$(mktemp -d "${TMPDIR:-/run}/uke-super-inspect.XXXXXXXX")
+cleanup() { find "$work" -depth -delete; }
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+# Keep parsing and output bounded even for malformed foreign geometry.
+dump() (
+    ulimit -v 262144
+    ulimit -f 128
+    timeout --signal=TERM --kill-after=1s 5s lpdump "$@" "$device"
+)
+cat > "$work/expected.txt" <<TEXT
+Metadata version: 10.0
+Metadata size: 440 bytes
+Metadata max size: 65536 bytes
+Metadata slot count: 3
+Header flags: none
+Partition table:
+------------------------
+  Name: system_a
+  Group: uke_linux
+  Attributes: none
+  Extents:
+    0 .. $((swap_sectors - 1)) linear super $swap_start
+------------------------
+  Name: system_b
+  Group: uke_linux
+  Attributes: none
+  Extents:
+    0 .. $((rescue_sectors - 1)) linear super $rescue_start
+------------------------
+Super partition layout:
+------------------------
+super: $swap_start .. $rescue_start: system_a ($swap_sectors sectors)
+super: $rescue_start .. $end: system_b ($rescue_sectors sectors)
+------------------------
+Block device table:
+------------------------
+  Partition name: super
+  First sector: $swap_start
+  Size: $capacity bytes
+  Flags: none
+------------------------
+Group table:
+------------------------
+  Name: default
+  Maximum size: 0 bytes
+  Flags: none
+------------------------
+  Name: uke_linux
+  Maximum size: $usable bytes
+  Flags: none
+------------------------
+TEXT
+for slot in 0 1 2; do
+    dump --json --slot="$slot" > "$work/slot.json" 2> "$work/diagnostic" || fail "cannot decode metadata slot $slot"
+    jq -e --argjson capacity "$capacity" --argjson swap "$swap" --argjson rescue "$rescue" --argjson usable "$usable" '
+      (.block_devices | length) == 1 and .block_devices[0].name == "super" and
+      (.block_devices[0].size | tonumber) == $capacity and
+      (.block_devices[0].block_size | tonumber) == 4096 and
+      (.block_devices[0].alignment | tonumber) == 1048576 and
+      (.partitions | length) == 2 and all(.partitions[]; .is_dynamic and .group_name == "uke_linux") and
+      ([.partitions[] | select(.name == "system_a") | .size | tonumber] == [$swap]) and
+      ([.partitions[] | select(.name == "system_b") | .size | tonumber] == [$rescue]) and
+      (.groups | length) == 2 and
+      ([.groups[] | select(.name == "uke_linux") | .maximum_size | tonumber] == [$usable]) and
+      ([.groups[] | select(.name == "default") | (.maximum_size // 0) | tonumber] == [0])' \
+      "$work/slot.json" >/dev/null || fail "slot $slot does not describe the two Linux roles"
+    dump --slot="$slot" > "$work/slot.txt" 2> "$work/diagnostic" || fail "cannot read extents in slot $slot"
+    # Original lpdump's JSON omits extents/attributes. Require the complete
+    # producer format as well; any parser/version drift fails closed.
+    sed -e '/^Slot [012]:$/d' -e 's/[[:blank:]]*$//' -e '/^$/d' "$work/slot.txt" > "$work/normalized.txt"
+    cmp -s "$work/expected.txt" "$work/normalized.txt" || fail "slot $slot has unexpected extents, attributes or geometry"
+done
+[[ $(dump --dump-metadata-size 2> "$work/diagnostic") == "$first" ]] || fail 'metadata reservation differs'
+jq -M -n --argjson layout "$layout" --argjson swap_start "$swap_start" --argjson rescue_start "$rescue_start" \
+    --argjson swap_sectors "$swap_sectors" --argjson rescue_sectors "$rescue_sectors" \
+    '{schema_version:1,layout:$layout,three_slot_topology_verified:true,
+      mappings:[{role:"swap",start_sector:$swap_start,sectors:$swap_sectors},
+                {role:"rescue",start_sector:$rescue_start,sectors:$rescue_sectors}],
+      metadata_authenticity_verified:false,operating_system_verified:false,
+      block_mapping_created:false,partition_write_executed:false}'

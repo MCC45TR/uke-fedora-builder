@@ -30,6 +30,7 @@ jobs:
           for tool in gcc g++ cc c++ clang clang++ as ld rpmbuild; do ln -s refuse-build "$guard/$tool"; done
           export PATH="$guard:$PATH"
           shellcheck src/image/fastboot-singleboot-layout.sh src/image/plan-fastboot-update.sh src/image/build-fastboot-super.sh scripts/check-fastboot-super-layout.sh scripts/probe-inlinecrypt-readonly.sh scripts/probe-ext4-reencrypt-scratch.sh tests/fastboot-singleboot-layout.sh tests/fastboot-super-composition.sh
+          shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
@@ -83,7 +84,25 @@ jobs:
           [[ $image =~ ^registry\.fedoraproject\.org/fedora@sha256:[0-9a-f]{64}$ ]]
           fixture="$RUNNER_TEMP/uke-super-check"
           mkdir -m700 "$fixture"
-          trap 'sudo rm -rf -- "$fixture"' EXIT
+          loop=''
+          cleanup() {
+            status=$?
+            trap - EXIT
+            if [[ -n $loop ]]; then
+              devno=$(lsblk -dnro MAJ:MIN "$loop")
+              for name in uke-rescue uke-rescue-test-payload; do
+                uuid=$(sudo dmsetup info -c --noheadings -o uuid "$name" 2>/dev/null | tr -d '[:space:]') || uuid=''
+                case $uuid in
+                  "UKE-RESCUE-v1-${devno/:/-}"|"UKE-FIXTURE-RESCUE-occupied-${devno/:/-}"|"UKE-FIXTURE-RESCUE-payload-${devno/:/-}")
+                    sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
+                esac
+              done
+              sudo losetup -d "$loop" || status=1
+            fi
+            sudo find "$fixture" -depth -delete
+            exit "$status"
+          }
+          trap cleanup EXIT
           docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$fixture,target=/fixture" \
@@ -91,13 +110,34 @@ jobs:
               dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils
               mkdir -m700 /fixture/result
               rpm -q android-tools e2fsprogs util-linux jq coreutils > /fixture/result/original-tools.txt
+              bash /source/tests/fastboot-super-inspection.sh
               bash /source/tests/fastboot-super-composition.sh /fixture/reports
               cp /fixture/reports/* /fixture/result/
-              sha256sum /source/src/image/build-fastboot-super.sh /source/tests/fastboot-super-composition.sh > /fixture/result/source-sha256.txt
+              bash /source/tests/fastboot-rescue-map.sh prepare /fixture/rescue-map
+              sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map}.sh > /fixture/result/source-sha256.txt
             '
+          # The host lends only this owned loop device and the DM control node.
+          # No tablet, physical disk, host root mount or privileged container.
+          sudo modprobe loop dm_mod
+          sudo dmsetup version
+          loop=$(sudo losetup --find --show "$fixture/rescue-map/super.raw")
+          [[ $loop =~ ^/dev/loop[0-9]+$ ]]
+          dm_major=$(awk '$2=="device-mapper" {print $1}' /proc/devices)
+          [[ $dm_major =~ ^[0-9]+$ ]]
+          docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
+            --cap-add=SYS_ADMIN --device="$loop" --device=/dev/mapper/control \
+            --device-cgroup-rule="b $dm_major:* rwm" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
+              rpm -q device-mapper > /fixture/result/mapper-tool.txt
+              bash /source/tests/fastboot-rescue-map.sh run "$1" /fixture/rescue-map /fixture/result/rescue-mapper-fixture.json
+              cp /fixture/rescue-map/mapping-result.json /fixture/result/
+            ' bash "$loop"
           sudo cp -a "$fixture/result" "$RUNNER_TEMP/uke-super-reports"
           sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-super-reports"
-          echo 'Synthetic original-tool liblp composition and EXT4 file recovery passed; no OS boot, device write, secure boot or encryption acceptance.' >> "$GITHUB_STEP_SUMMARY"
+          echo 'Synthetic liblp composition, actual owned-loop read-only rescue mapping, EXT4 readback, write refusal and error cleanup passed. No physical UFS, OS boot, secure boot or encryption acceptance.' >> "$GITHUB_STEP_SUMMARY"
       - name: Retain small validation receipts only
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
