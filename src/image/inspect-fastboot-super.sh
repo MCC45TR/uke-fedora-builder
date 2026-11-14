@@ -22,10 +22,11 @@ case ${1:-} in
         ;;
     --block)
         [[ $# == 2 ]] || fail 'expected one block device'
-        device=$(readlink -e -- "$2")
-        [[ -b $device ]] || fail 'input is not a block device'
+        [[ -b $2 ]] || fail 'input is not a block device'
         # Keep a reference open while liblp validates this device.
-        exec 3< "$device"
+        # Do not resolve /proc/self/fd back to a possibly unlinked node name.
+        exec 3< "$2"
+        [[ -b /proc/self/fd/3 ]] || fail 'opened input is not a block device'
         capacity=$(blockdev --getsize64 /proc/self/fd/3)
         device=/proc/self/fd/3
         ;;

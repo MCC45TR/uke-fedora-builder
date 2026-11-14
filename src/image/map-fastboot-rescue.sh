@@ -9,9 +9,8 @@ umask 077
 fail() { printf 'UKE_RESCUE_REJECTED: %s\n' "$*" >&2; exit 1; }
 [[ $# == 1 && $(id -u) == 0 ]] || fail 'run as root with one super block device'
 here=$(cd -- "$(dirname -- "$0")" && pwd)
-device=$(readlink -e -- "$1")
-[[ -b $device ]] || fail 'input is not a block device'
-exec 3< "$device"
+[[ -b $1 ]] || fail 'input is not a block device'
+exec 3< "$1"
 [[ -b /proc/self/fd/3 ]] || fail 'opened input is not a block device'
 read -r major minor < <(stat -Lc '%t %T' /proc/self/fd/3)
 [[ $major =~ ^[0-9a-f]{1,8}$ && $minor =~ ^[0-9a-f]{1,8}$ ]] || fail 'ambiguous opened block device identity'

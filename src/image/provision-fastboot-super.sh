@@ -11,10 +11,9 @@ here=$(cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck source=fastboot-singleboot-layout.sh
 # shellcheck disable=SC1091
 source "$here/fastboot-singleboot-layout.sh"
-device=$(readlink -e -- "$2")
-[[ -b $device ]] || fail 'not a block device'
+[[ -b $2 ]] || fail 'not a block device'
 seed_file=$(realpath "$3")
-exec 3< "$device"
+exec 3< "$2"
 [[ -b /proc/self/fd/3 ]] || fail 'opened input is not a block device'
 read -r major minor < <(stat -Lc '%t %T' /proc/self/fd/3)
 [[ $major =~ ^[0-9a-f]{1,8}$ && $minor =~ ^[0-9a-f]{1,8}$ ]] || fail 'ambiguous opened device identity'

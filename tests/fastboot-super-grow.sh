@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Real original-tool provisioning on one owned 4-KiB loop device in CI.
 set -Eeuo pipefail
+trap 'printf "UKE_GROW_FIXTURE_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 export LC_ALL=C
 umask 077
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)

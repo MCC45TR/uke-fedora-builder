@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT
 # Original-tool, owned-loop mapper fixture. Never point run at a real device.
 set -Eeuo pipefail
+trap 'printf "UKE_MAP_FIXTURE_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 export LC_ALL=C
 umask 077
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
