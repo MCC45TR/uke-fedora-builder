@@ -59,6 +59,7 @@ jq -n --slurpfile root "$composition" --argjson minimum "$minimum" --argjson lay
     > "$output/super-seed.json"
 sha256sum "$repo/src/image/"{compose-fastboot-super-seed,build-fastboot-super,fastboot-singleboot-layout,inspect-fastboot-super}.sh \
     "$repo/src/image/"{plan-super-provision,provision-fastboot-super,map-fastboot-rescue}.sh \
+    "$repo/src/image/select-uke-super.sh" "$repo/tests/fastboot-physical-super.sh" \
     "$repo/tests/fastboot-super-grow.sh" > "$output/seed-source-sha256.txt"
 (cd "$output"; find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum) > "$expected"
 mv "$expected" "$output/SHA256SUMS"

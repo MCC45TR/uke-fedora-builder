@@ -53,7 +53,7 @@ cp -a /usr/lib/dracut/. "$work/dracut/"
 module=$work/dracut/modules.d/95uke-super-tools
 mkdir "$module"
 cp "$repo/src/image/dracut/95uke-super-tools/module-setup.sh" "$module/"
-for script in fastboot-singleboot-layout inspect-fastboot-super plan-super-provision provision-fastboot-super map-fastboot-rescue; do
+for script in fastboot-singleboot-layout inspect-fastboot-super plan-super-provision provision-fastboot-super map-fastboot-rescue select-uke-super; do
     cp "$repo/src/image/$script.sh" "$module/"
 done
 chmod 755 "$module/"*.sh
@@ -66,7 +66,7 @@ dracutbasedir="$work/dracut" dracut --conf /dev/null --confdir "$work/config" \
 [[ $(stat -c %s "$work/tools.cpio.gz") -le 67108864 ]]
 (cd "$stage"; gzip -cd "$work/tools.cpio.gz" | cpio -idm --quiet --no-absolute-filenames)
 [[ ! -e $stage/init && ! -e $stage/usr/bin/python3 ]]
-for script in fastboot-singleboot-layout inspect-fastboot-super plan-super-provision provision-fastboot-super map-fastboot-rescue; do
+for script in fastboot-singleboot-layout inspect-fastboot-super plan-super-provision provision-fastboot-super map-fastboot-rescue select-uke-super; do
     cmp "$repo/src/image/$script.sh" "$stage/usr/libexec/uke-super/$script.sh"
 done
 bash "$repo/src/audit/check-target-payload.sh" "$stage" > "$output/python-audit.txt"
@@ -90,7 +90,7 @@ rpm -q dracut android-tools device-mapper e2fsprogs util-linux jq bash coreutils
 sha256sum "$repo/src/image/dracut/95uke-super-tools/module-setup.sh" "$repo/src/image/qualify-super-runtime.sh" \
     "$repo/tests/fastboot-super-runtime.sh" "$repo/tests/fastboot-super-inspection.sh" \
     "$repo/tests/fastboot-super-provision-plan.sh" "$repo/src/audit/check-target-payload.sh" \
-    "$repo/src/image/"{fastboot-singleboot-layout,inspect-fastboot-super,plan-super-provision,provision-fastboot-super,map-fastboot-rescue}.sh \
+    "$repo/src/image/"{fastboot-singleboot-layout,inspect-fastboot-super,plan-super-provision,provision-fastboot-super,map-fastboot-rescue,select-uke-super}.sh \
     > "$output/source-sha256.txt"
 mkdir -p "$stage/proc" "$stage/dev" "$stage/source" "$stage/work"
 [[ -e $stage/dev/null ]] || mknod -m666 "$stage/dev/null" c 1 3

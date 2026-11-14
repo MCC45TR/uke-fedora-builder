@@ -1,10 +1,10 @@
 # Original Fedora super tools in early userspace
 
 15 November 2026. `95uke-super-tools` is an explicit dracut tool module. It
-installs the existing five layout, inspection, planning, provisioning and
-read-only rescue-mapping scripts with original Fedora binaries and the dynamic
+installs the six layout, inspection, planning, provisioning, physical selection
+and read-only rescue-mapping scripts with original Fedora binaries and the dynamic
 libraries selected by dracut. It installs no boot hook, service, default root,
-physical selector, automatic format or kernel modules. It is not enabled in
+automatic physical selection, automatic format or kernel modules. It is not enabled in
 the current cumulative kernel.
 
 The manual source workflow's `build_super_runtime=true` job assembles this
@@ -27,6 +27,10 @@ liblp topology and phase/restart refusal tests run there, followed by actual
 device, kernel driver, tablet or physical disk is lent to this job. Withholding
 the copied protobuf library must make lpdump fail at the dynamic loader; the
 test cannot fall through to the worker's libraries.
+
+The tools-only chroot has no Uke device tree. The physical selector must refuse
+it. Separate namespace fixtures exercise the selector with synthetic sysfs and
+device-tree views over an owned loop; these are not physical UFS acceptance.
 
 The worker is limited to two CPUs and2GiB RAM, requires12GiB free before work
 and8GiB before assembly, and rejects an archive over64MiB compressed or256MiB

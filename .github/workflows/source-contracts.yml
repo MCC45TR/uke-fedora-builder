@@ -158,14 +158,15 @@ jobs:
             dm_major=$(awk '$2=="device-mapper" {print $1}' /proc/devices)
             [[ $dm_major =~ ^[0-9]+$ ]]
             docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
-              --cap-add=SYS_ADMIN --device="$loop" --device=/dev/mapper/control \
+              --cap-add=SYS_ADMIN --security-opt apparmor=unconfined --device="$loop" --device=/dev/mapper/control \
               --device-cgroup-rule="b $dm_major:* rwm" \
               --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
               --mount "type=bind,source=$job,target=/job" \
               "$image" bash -Eeuo pipefail -c '
-                dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
+                dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils bubblewrap
                 mkdir /job/artifacts/super-seed/growth
                 bash /builder/tests/fastboot-super-grow.sh run "$1" /job/super-grow /job/artifacts/super-seed/growth/real-fedora-growth.json
+                bash /builder/tests/fastboot-physical-super.sh "$1" /job/super-grow /job/artifacts/super-seed/growth/real-fedora-growth.json /job/artifacts/super-seed/growth/physical-selection-fixture.json
                 cp /job/super-grow/provision-{result,noop}.json /job/artifacts/super-seed/growth/
                 cd /job/artifacts/super-seed
                 find . -type f ! -name SHA256SUMS -print0 | LC_ALL=C sort -z | xargs -0 sha256sum > /job/seed-SHA256SUMS
@@ -225,6 +226,7 @@ jobs:
           shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh
           shellcheck src/image/compose-fastboot-super-seed.sh
           shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh
+          shellcheck src/image/select-uke-super.sh tests/fastboot-physical-super.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
@@ -320,7 +322,7 @@ jobs:
               cp /fixture/reports/* /fixture/result/
               bash /source/tests/fastboot-rescue-map.sh prepare /fixture/rescue-map
               bash /source/tests/fastboot-super-grow.sh prepare /fixture/super-grow
-              sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super,fastboot-requirements,plan-fastboot-update}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow,update-parser,tcp-peer}.sh > /fixture/result/source-sha256.txt
+              sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super,fastboot-requirements,plan-fastboot-update,select-uke-super}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow,update-parser,tcp-peer,physical-super}.sh > /fixture/result/source-sha256.txt
             '
           # The host lends only this owned loop device and the DM control node.
           # No tablet, physical disk, host root mount or privileged container.
@@ -346,13 +348,14 @@ jobs:
           loop=$(sudo losetup --sector-size 4096 --find --show "$fixture/super-grow/super.raw")
           [[ $loop =~ ^/dev/loop[0-9]+$ ]]
           docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
-            --cap-add=SYS_ADMIN --device="$loop" --device=/dev/mapper/control \
+            --cap-add=SYS_ADMIN --security-opt apparmor=unconfined --device="$loop" --device=/dev/mapper/control \
             --device-cgroup-rule="b $dm_major:* rwm" \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$fixture,target=/fixture" \
             "$image" bash -Eeuo pipefail -c '
-              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
+              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils bubblewrap
               bash /source/tests/fastboot-super-grow.sh run "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json
+              bash /source/tests/fastboot-physical-super.sh "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json /fixture/result/physical-selection-fixture.json
               cp /fixture/super-grow/provision-{result,noop}.json /fixture/result/
             ' bash "$loop"
           sudo cp -a "$fixture/result" "$RUNNER_TEMP/uke-super-reports"

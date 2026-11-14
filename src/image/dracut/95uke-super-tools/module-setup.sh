@@ -10,7 +10,7 @@ install() {
         ln lsblk mkdir mktemp mkswap mv od readlink realpath resize2fs sed \
         sha256sum simg2img stat tail timeout tr truncate uname
     for script in fastboot-singleboot-layout inspect-fastboot-super \
-        plan-super-provision provision-fastboot-super map-fastboot-rescue; do
+        plan-super-provision provision-fastboot-super map-fastboot-rescue select-uke-super; do
         inst_simple "$moddir/$script.sh" "/usr/libexec/uke-super/$script.sh"
         chmod 755 "$initdir/usr/libexec/uke-super/$script.sh"
     done

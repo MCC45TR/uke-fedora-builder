@@ -4,9 +4,13 @@ set -Eeuo pipefail
 trap 'printf "UKE_SUPER_CHROOT_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 export LC_ALL=C
 [[ $(uname -m) == aarch64 && -d /source/tests && -f /work/check.ext4 && ! -e /init ]]
-for script in fastboot-singleboot-layout inspect-fastboot-super plan-super-provision provision-fastboot-super map-fastboot-rescue; do
+for script in fastboot-singleboot-layout inspect-fastboot-super plan-super-provision provision-fastboot-super map-fastboot-rescue select-uke-super; do
     [[ -f /usr/libexec/uke-super/$script.sh ]]
 done
+if bash /usr/libexec/uke-super/select-uke-super.sh --identity-only > /work/physical-result.json 2> /work/physical-rejected.txt; then
+    echo 'Tools-only chroot without Uke device tree admitted physical storage' >&2; exit 1
+fi
+grep -F 'device tree is unavailable' /work/physical-rejected.txt >/dev/null
 bash /source/tests/fastboot-super-inspection.sh
 bash /source/tests/fastboot-super-provision-plan.sh
 e2fsck -fn /work/check.ext4
