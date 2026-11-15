@@ -125,6 +125,17 @@ the mechanism still requires the caller's prior hardware/boot admission.
 
 ### Physical and boot qualification
 
+`hwkm-probe --inspect` reports only bounded fitted UFS crypto capabilities.
+`--exercise-disposable-key` is a separate explicit diagnostic: it requires the
+existing real-Uke ten-role owner, revalidates the userdata descriptor and UFS
+disk sequence/geometry, requires a wrapped-only AES-256-XTS/4-KiB profile, then
+generates one disposable key, prepares its two locked copies and tests refusal
+of one damaged copy. No blob enters output, a file, a mapping or a volume. An
+unsupported current profile returns status 77 with zero key ioctls. Generation
+and two preparation successes do not establish ciphertext I/O or persistent
+reuse. Native build, signed package audit and physical execution of this new
+frontend are pending separately from the 1.0-11 mechanism results above.
+
 The kernel coordinator must qualify the cumulative kernel/initramfs opt-in
 before the first ICE probe, preserving existing features, hardening, recovery,
 staging and preferences. The initial root remains unencrypted EXT4. Writing

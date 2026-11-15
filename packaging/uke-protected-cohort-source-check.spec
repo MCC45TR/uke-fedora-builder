@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        11%{?dist}
+Release:        12%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -24,7 +24,9 @@ Requires:       bash jq coreutils findutils util-linux-core
 Temporary source-check receipts and a descriptor inspection executable from
 native AArch64 COPR compilation. Public disposable fixtures support a bounded
 owned-loop block-I/O test without a formatter or Python on the target. The
-executable grants no admission, key release, boot selection or runtime service.
+physical HWKM diagnostic can explicitly exercise a disposable generated key
+only on the fitted wrapped-only UFS profile. It never persists a key or grants
+production key release, boot admission, boot selection or a runtime service.
 No physical UFS or OEM trust qualification follows from these test fixtures.
 
 %prep
@@ -99,6 +101,10 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
     src/image/hwkm-wrapped-key.cpp tests/hwkm-wrapped-key.cpp \
     -o build/hwkm-wrapped-key-test $LDFLAGS \
     -Wl,--wrap=ioctl,--wrap=fstat,--wrap=mmap,--wrap=munmap,--wrap=mlock,--wrap=madvise
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    src/image/probe-hwkm.cpp src/image/hwkm-wrapped-key.cpp \
+    build/cohort-{auth,manifest,vbmeta,content}.o build/physical-cohort.o build/libavb.a \
+    -o build/hwkm-probe $LDFLAGS -lcrypto -lsystemd
 
 # Native tests produce the receipts that the install stage packages. RPM runs
 # %%install before %%check, so these must exist before entering %%install.
@@ -113,13 +119,18 @@ readelf -h build/cohort-physical | grep -E 'Machine:.*AArch64'
 build/cohort-physical-test > build/physical-result.json
 readelf -h build/hwkm-wrapped-key-test | grep -E 'Machine:.*AArch64'
 build/hwkm-wrapped-key-test > build/hwkm-result.json
+readelf -h build/hwkm-probe | grep -E 'Machine:.*AArch64'
+if build/hwkm-probe --inspect > build/hwkm-host-refusal.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_HWKM_PROBE_REJECTED' build/hwkm-host-refusal.txt
+if build/hwkm-probe --exercise-disposable-key > build/hwkm-host-refusal-exercise.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_HWKM_PROBE_REJECTED' build/hwkm-host-refusal-exercise.txt
 bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json" "$PWD/build/content-fixture" build/cohort-physical
 rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 systemd-devel systemd-libs kernel-headers > build/original-tools.txt
 sha256sum src/image/protected-cohort-{auth,manifest,vbmeta,content}.* tests/protected-cohort-{auth,manifest,vbmeta,content}.sh \
     src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh src/boot/boot-image.cpp \
     tests/protected-cohort-blocks.sh src/image/protected-physical-cohort.{cpp,hpp} \
     src/image/inspect-physical-cohort.cpp tests/protected-cohort-physical.cpp \
-    src/image/hwkm-wrapped-key.{cpp,hpp} tests/hwkm-wrapped-key.cpp > build/source-sha256.txt
+    src/image/hwkm-wrapped-key.{cpp,hpp} tests/hwkm-wrapped-key.cpp src/image/probe-hwkm.cpp > build/source-sha256.txt
 find build/upstream/libavb -type f -print0 | sort -z | xargs -0 sha256sum > build/upstream-sha256.txt
 
 %check
@@ -153,10 +164,12 @@ install -d %{buildroot}%{_datadir}/%{name}
 install -pm644 build/native-result.json build/original-tools.txt build/source-sha256.txt \
     build/manifest-result.json build/vbmeta-result.json build/content-result.json build/upstream-sha256.txt \
     build/third-party-license-sha256.txt build/physical-result.json build/hwkm-result.json \
+    build/hwkm-host-refusal.txt build/hwkm-host-refusal-exercise.txt \
     %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
 install -d %{buildroot}%{_libexecdir}/%{name} %{buildroot}%{_datadir}/%{name}/fixtures
 install -pm755 build/cohort-content %{buildroot}%{_libexecdir}/%{name}/cohort-content-inspect
 install -pm755 build/cohort-physical %{buildroot}%{_libexecdir}/%{name}/cohort-physical-inspect
+install -pm755 build/hwkm-probe %{buildroot}%{_libexecdir}/%{name}/hwkm-probe
 install -pm755 tests/protected-cohort-blocks.sh %{buildroot}%{_libexecdir}/%{name}/owned-block-fixture
 install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 
@@ -166,6 +179,9 @@ install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 %{_libexecdir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-12
+- Add a bounded physical HWKM capability and disposable-key diagnostic for signed DNF delivery.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-11
 - Verify HWKM v2 generate/prepare UAPI, locked key memory and failure cleanup without firmware calls.
 
