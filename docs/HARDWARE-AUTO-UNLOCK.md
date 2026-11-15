@@ -133,8 +133,30 @@ generates one disposable key, prepares its two locked copies and tests refusal
 of one damaged copy. No blob enters output, a file, a mapping or a volume. An
 unsupported current profile returns status 77 with zero key ioctls. Generation
 and two preparation successes do not establish ciphertext I/O or persistent
-reuse. Native build, signed package audit and physical execution of this new
-frontend are pending separately from the 1.0-11 mechanism results above.
+reuse.
+
+The [1.0-12 frontend qualification][probe-native] passed in 173 seconds on
+Rawhide AArch64, retaining all earlier native tests. Both frontend modes refused
+the non-Uke COPR worker before a key operation. The actual source worker,
+27 project pins, 24 native project hashes, 43 upstream hashes, source archives,
+published recipe and signed RPM were audited. The RPM contains 28 regular files
+totaling 1,061,489 bytes, including the temporary diagnostic; it has no package
+scripts or Python runtime dependency.
+
+On Uke running `7.3.3-26-unstable`, GPG-checked DNF installed only this diagnostic,
+without a dependency or kernel change. RPM verification and the installed
+frontend hash match the audited package. The real ten-role UFS owner and
+capability inspection passed: 64 keyslots, AES-256-XTS/4-KiB advertised, raw
+keys advertised and hardware-wrapped keys absent. Explicit exercise returned
+77 with **zero key ioctls**, correctly refusing that current profile. Peak RSS
+was 4,660/4,668 KiB for inspection/refusal; owned descriptors were released.
+This is a physical selector/capability/refusal result, not key-generation
+success. Kernel 26, module mode N, SELinux Enforcing, healthy system state and
+the two measured update-preference digests remained unchanged. No volume,
+mapping, firmware, bootloader or key was written, and no reboot was performed
+for this test. The small diagnostic remains installed for the next cumulative
+HWKM-enabled candidate; its full key-lifecycle, persistence and encrypted I/O
+acceptance are still open.
 
 The kernel coordinator must qualify the cumulative kernel/initramfs opt-in
 before the first ICE probe, preserving existing features, hardening, recovery,
@@ -179,3 +201,4 @@ be enabled. Source APIs and driver logs do not mark those behaviors complete.
 [block]: https://github.com/gregkh/linux/blob/v7.3.3/block/blk-crypto.c
 [ioctl]: https://github.com/gregkh/linux/blob/v7.3.3/block/ioctl.c
 [native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329719/
+[probe-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329763/
