@@ -1,0 +1,48 @@
+{
+  "repository": "https://github.com/qualcomm/minkipc",
+  "commit": "5e3c6951d13162a262ea65ea8e8351228f092b58",
+  "licenses": [
+    "BSD-3-Clause",
+    "BSD-2-Clause"
+  ],
+  "files": [
+    {
+      "sha256": "198b915b034db25930f3df54f144ce95ed286504dc58dbb477e4abbfb3bf7783",
+      "path": "LICENSE.txt"
+    },
+    {
+      "sha256": "98dc08ec9243e4e8384468e9098afc7419f2d2c77c5f78c10ab00302893099c4",
+      "path": "libminkadaptor/include/MinkCom.h"
+    },
+    {
+      "sha256": "285f5d0650cbdec7f35fd8bf9c6a7f72b5a4376b071522692d3d3814c18e2a6f",
+      "path": "libminkadaptor/include/object.h"
+    },
+    {
+      "sha256": "2223cae5c5b6d5d88a36307c642dd62660fc63e4297d33a935a8cabc1f479fd7",
+      "path": "libminkadaptor/src/mink_adaptor.c"
+    },
+    {
+      "sha256": "e5c9216b24d2559247781c3f1aa1472b1d9aeac3b946385ce2ae95a33afb1496",
+      "path": "libminkadaptor/src/mink_adaptor_priv.h"
+    },
+    {
+      "sha256": "0bc81f0af890c4497b05b731460faed96d01797922ce74403423430bfd615ae9",
+      "path": "libminkadaptor/src/supplicant.c"
+    },
+    {
+      "sha256": "98ab3b1fc604303b21ed5a07f1c0a3c54522f10d6b13668898801db4d34387a2",
+      "path": "libminkadaptor/src/supplicant.h"
+    },
+    {
+      "sha256": "f2b818a76c3d94712e9d26412d40a7541564069df245a9ba08b1d37f9ca672a9",
+      "path": "libminkadaptor/src/syscall.S"
+    },
+    {
+      "sha256": "d153798535c330f1f6a30ff7c0a0e540cb1cd1a4ac29530f3bc5eed9719946d3",
+      "path": "libminkadaptor/src/linux/tee.h"
+    }
+  ],
+  "scope": "Unmodified transient MINK adapter; links original Fedora libqcomtee, never privileged NULL credentials or a TCG command",
+  "physical_acceptance": false
+}

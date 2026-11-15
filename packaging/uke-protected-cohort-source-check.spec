@@ -1,19 +1,21 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        14%{?dist}
+Release:        15%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
-License:        MIT AND BSD-3-Clause
+License:        MIT AND BSD-2-Clause AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
 Source0:        %{name}-%{version}.tar.xz
 Source1:        source-identity.json
 Source2:        libavb-ba2dec4b.tar.xz
 Source3:        libavb-LICENSE
+Source4:        mink-adapter-5e3c6951.tar.xz
 ExclusiveArch:  aarch64
 %global debug_package %{nil}
 BuildRequires:  gcc gcc-c++ binutils openssl-devel openssl bash jq coreutils findutils diffutils util-linux
 BuildRequires:  json-devel = 3.12.0
 BuildRequires:  pkgconfig(libsystemd)
 BuildRequires:  kernel-headers
+BuildRequires:  pkgconfig(qcomtee) pkgconfig(libcbor)
 # Upstream Fedora avbtool formats/signs disposable COPR-host fixtures only.
 # Python and avbtool are never target payloads; the descriptor inspection
 # frontend is an explicit temporary diagnostic, never an admission policy.
@@ -30,6 +32,9 @@ persist one disposable wrapped key for a separate reboot test; this is never
 a production volume key. No production key release, boot admission, boot
 selection or runtime service is granted.
 No physical UFS or OEM trust qualification follows from these test fixtures.
+The bounded QTEE information diagnostic uses ordinary userspace credentials
+through original Fedora libqcomtee and an unmodified upstream MINK adapter.
+It exposes only the TPM TA version/type queries, never TCG startup or writes.
 
 %prep
 %autosetup
@@ -41,6 +46,22 @@ test "$(uname -m)" = aarch64
 %build
 %set_build_flags
 mkdir build
+mkdir -p build/upstream/mink
+tar -xJf %{SOURCE4} -C build/upstream/mink
+for source in mink_adaptor.c supplicant.c syscall.S; do
+    gcc $CFLAGS -std=gnu11 -pthread \
+        -Ibuild/upstream/mink/libminkadaptor/include \
+        -Ibuild/upstream/mink/libminkadaptor/src $(pkg-config --cflags qcomtee) \
+        -c "build/upstream/mink/libminkadaptor/src/$source" -o "build/mink-$source.o"
+done
+gcc $CFLAGS -std=gnu11 -Wall -Wextra -Werror -pthread \
+    -Ibuild/upstream/mink/libminkadaptor/include $(pkg-config --cflags qcomtee libcbor) \
+    tests/qtee-fedora-credentials.c build/mink-*.o \
+    -o build/qtee-fedora-credentials-test $LDFLAGS $(pkg-config --libs qcomtee libcbor)
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    -Ibuild/upstream/mink/libminkadaptor/include \
+    src/image/qtee-tpm-discovery.cpp tests/qtee-tpm-discovery.cpp \
+    -o build/qtee-tpm-test $LDFLAGS -Wl,--wrap=fstat,--wrap=lstat,--wrap=close,--wrap=ioctl
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_AUTH_CLI \
     src/image/protected-cohort-auth.cpp -o build/cohort-auth $LDFLAGS -lcrypto
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -c \
@@ -112,6 +133,11 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
     src/image/hwkm-disposable-record.cpp \
     build/cohort-{auth,manifest,vbmeta,content}.o build/physical-cohort.o build/libavb.a \
     -o build/hwkm-probe $LDFLAGS -lcrypto -lsystemd
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image -pthread \
+    -Ibuild/upstream/mink/libminkadaptor/include \
+    src/image/probe-qtee-tpm.cpp src/image/qtee-tpm-discovery.cpp build/mink-*.o \
+    build/cohort-{auth,manifest,vbmeta,content}.o build/physical-cohort.o build/libavb.a \
+    -o build/qtee-tpm-probe $LDFLAGS -lcrypto -lsystemd $(pkg-config --libs qcomtee)
 
 # Native tests produce the receipts that the install stage packages. RPM runs
 # %%install before %%check, so these must exist before entering %%install.
@@ -128,6 +154,13 @@ readelf -h build/hwkm-wrapped-key-test | grep -E 'Machine:.*AArch64'
 build/hwkm-wrapped-key-test > build/hwkm-result.json
 readelf -h build/hwkm-record-test | grep -E 'Machine:.*AArch64'
 build/hwkm-record-test > build/hwkm-record-result.json
+readelf -h build/qtee-tpm-test | grep -E 'Machine:.*AArch64'
+build/qtee-tpm-test > build/qtee-tpm-result.json
+readelf -h build/qtee-fedora-credentials-test | grep -E 'Machine:.*AArch64'
+build/qtee-fedora-credentials-test > build/qtee-credentials-result.json
+readelf -h build/qtee-tpm-probe | grep -E 'Machine:.*AArch64'
+if build/qtee-tpm-probe --inspect > build/qtee-host-refusal.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_QTEE_TPM_PROBE_REJECTED stage=physical-owner' build/qtee-host-refusal.txt
 readelf -h build/hwkm-probe | grep -E 'Machine:.*AArch64'
 if build/hwkm-probe --inspect > build/hwkm-host-refusal.txt 2>&1; then exit 1; fi
 grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal.txt
@@ -138,14 +171,17 @@ for mode in create prepare remove; do
     grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' "build/hwkm-host-refusal-$mode.txt"
 done
 bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json" "$PWD/build/content-fixture" build/cohort-physical
-rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 systemd-devel systemd-libs kernel-headers > build/original-tools.txt
+rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 systemd-devel systemd-libs kernel-headers quic-teec quic-teec-devel libcbor-devel > build/original-tools.txt
 sha256sum src/image/protected-cohort-{auth,manifest,vbmeta,content}.* tests/protected-cohort-{auth,manifest,vbmeta,content}.sh \
     src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh src/boot/boot-image.cpp \
     tests/protected-cohort-blocks.sh src/image/protected-physical-cohort.{cpp,hpp} \
     src/image/inspect-physical-cohort.cpp tests/protected-cohort-physical.cpp \
     src/image/hwkm-wrapped-key.{cpp,hpp} tests/hwkm-wrapped-key.cpp src/image/probe-hwkm.cpp \
-    src/image/hwkm-disposable-record.{cpp,hpp} tests/hwkm-disposable-record.cpp > build/source-sha256.txt
+    src/image/hwkm-disposable-record.{cpp,hpp} tests/hwkm-disposable-record.cpp \
+    src/image/qtee-tpm-discovery.{cpp,hpp} src/image/probe-qtee-tpm.cpp \
+    tests/qtee-tpm-discovery.cpp tests/qtee-fedora-credentials.c packaging/qtee-mink-source.json > build/source-sha256.txt
 find build/upstream/libavb -type f -print0 | sort -z | xargs -0 sha256sum > build/upstream-sha256.txt
+find build/upstream/mink -type f -print0 | sort -z | xargs -0 sha256sum > build/mink-upstream-sha256.txt
 
 %check
 jq -e '.openssl_interoperability and .refused_cases==27 and .exact_limit_passed and
@@ -175,6 +211,13 @@ jq -e '.real_private_file_transactions and .cross_process_readback and .atomic_n
     (.physical_key_generated|not) and (.cold_boot_reuse_proved|not) and
     (.boot_policy_admitted|not)' build/hwkm-record-result.json
 (cd build/content-fixture; sha256sum -c SHA256SUMS)
+jq -e '.production_parser_tested and .mink_api_and_provider_facts_doubled and
+    .three_tpm_types_checked and .fixed_queries_only and .no_handle_leak and
+    .refused_cases==31 and (.physical_tpm_found|not) and
+    (.credential_firmware_acceptance_proved|not) and (.sealed_release_proved|not)' build/qtee-tpm-result.json
+jq -e '.original_fedora_credentials_checked and .actual_mink_and_fedora_marshalling and
+    .ordinary_operation_2_nonnull_user_credential and .tee_output_flag_1 and
+    .exported_callback_released and (.firmware_called|not)' build/qtee-credentials-result.json
 test "$(find build/content-fixture -type f | wc -l)" = 6
 test ! -e build/content-fixture/key.pem
 
@@ -185,20 +228,28 @@ install -pm644 build/native-result.json build/original-tools.txt build/source-sh
     build/third-party-license-sha256.txt build/physical-result.json build/hwkm-result.json \
     build/hwkm-host-refusal.txt build/hwkm-host-refusal-exercise.txt \
     build/hwkm-record-result.json build/hwkm-host-refusal-{create,prepare,remove}.txt \
+    build/qtee-tpm-result.json build/qtee-credentials-result.json build/qtee-host-refusal.txt build/mink-upstream-sha256.txt \
     %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
 install -d %{buildroot}%{_libexecdir}/%{name} %{buildroot}%{_datadir}/%{name}/fixtures
 install -pm755 build/cohort-content %{buildroot}%{_libexecdir}/%{name}/cohort-content-inspect
 install -pm755 build/cohort-physical %{buildroot}%{_libexecdir}/%{name}/cohort-physical-inspect
 install -pm755 build/hwkm-probe %{buildroot}%{_libexecdir}/%{name}/hwkm-probe
+install -pm755 build/qtee-tpm-probe %{buildroot}%{_libexecdir}/%{name}/qtee-tpm-probe
 install -pm755 tests/protected-cohort-blocks.sh %{buildroot}%{_libexecdir}/%{name}/owned-block-fixture
 install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 
 %files
 %license LICENSE libavb-LICENSE nlohmann-json-LICENSE.MIT build/libavb-notices.tar.xz build/json-header-notices.tar.xz
+%license build/upstream/mink/LICENSE.txt
+# Retain every upstream source/header notice, including the BSD-2-Clause TEE header.
+%license build/upstream/mink/libminkadaptor
 %{_datadir}/%{name}/
 %{_libexecdir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-15
+- Query only QTEE TPM information through ordinary Fedora credentials; retain all HWKM guards.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-14
 - Report fixed diagnostic failure stages without keys, paths or weakened ownership checks.
 
