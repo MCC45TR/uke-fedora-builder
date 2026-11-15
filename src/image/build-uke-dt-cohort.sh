@@ -39,6 +39,7 @@ verify_sources() {
 }
 verify_sources
 mkdir -p "$output"/{preprocessed,compiled,base,applied,logs}
+source_pin_sha=$(sha256sum "$pins" | cut -d ' ' -f1)
 compile() {
  local owner=$1 path=$2 target=$3
  local -a includes=( -I "$source_root/kernel/include" )
@@ -57,9 +58,15 @@ while IFS=$'\t' read -r owner path target; do
  compile "$owner" "$path" "$target"
 done < <(jq -r '.roots[]|[.owner,.path,.target]|@tsv' "$pins")
 
+# An update receipt, not a trust anchor: it identifies the overlay that reached
+# Linux after boot. It carries no key authority or hardware configuration.
+printf '/dts-v1/;\n/plugin/;\n/ { fragment@0 { target-path = "/chosen"; __overlay__ { uke,dtbo-source = "%s"; }; }; };\n' \
+ "$source_pin_sha" > "$output/source-marker.dts"
+dtc -@ -I dts -O dtb -o "$output/compiled/source-marker.dtb" "$output/source-marker.dts"
+
 for repeat in dtbo-payload.dtbo dtbo-payload-repeat.dtbo; do
  (ulimit -Sv 262144; ulimit -Sf 16384; timeout 30s "$merger" -i "$output/compiled/uke-board.dtb" \
-  "$output/compiled/uke-camera.dtb" "$output/compiled/uke-display.dtb" -o "$output/$repeat")
+  "$output/compiled/uke-camera.dtb" "$output/compiled/uke-display.dtb" "$output/compiled/source-marker.dtb" -o "$output/$repeat")
 done
 cmp "$output/dtbo-payload.dtbo" "$output/dtbo-payload-repeat.dtbo"
 [[ $(fdtget -t s "$output/dtbo-payload.dtbo" / model) == 'Qualcomm Technologies, Inc. Uke based on SM8635' ]]
@@ -79,6 +86,7 @@ while IFS=$'\t' read -r target expected_msm; do
  [[ $(fdtget -t s "$base" / compatible) == "$(fdtget -t s "$raw" / compatible)" ]]
  [[ $(fdtget -t x "$base" /memory reg) == "$(fdtget -t x "$raw" /memory reg)" ]]
  fdtoverlay -i "$base" -o "$output/applied/$target.dtb" "$output/dtbo-payload.dtbo"
+ [[ $(fdtget -t s "$output/applied/$target.dtb" /chosen uke,dtbo-source) == "$source_pin_sha" ]]
  # The full selected graph must resolve against each supported base.
  dtc -q -I dtb -O dts -o /dev/null "$output/applied/$target.dtb"
  cat "$base" >> "$output/vendor-dtbs.img"
@@ -96,4 +104,4 @@ verify_sources
 jq -n --arg dtbo "$(sha256sum "$output/dtbo.img" | cut -d ' ' -f1)" \
  --arg bases "$(sha256sum "$output/vendor-dtbs.img" | cut -d ' ' -f1)" --arg pins "$(sha256sum "$pins" | cut -d ' ' -f1)" \
  --argjson dtbo_bytes "$(stat -c %s "$output/dtbo.img")" --argjson base_bytes "$(stat -c %s "$output/vendor-dtbs.img")" \
- '{schema_version:1,architecture:"aarch64",source_pins_sha256:$pins,dtbo_sha256:$dtbo,dtbo_bytes:$dtbo_bytes,vendor_dtb_section_sha256:$bases,vendor_dtb_section_bytes:$base_bytes,base_count:4,base_order:[614,632,643,642],source_inputs_unchanged:true,common_dtbo:true,board_camera_display_layers:true,overlay_applies_to_all_bases:true,repeat_merge_identical:true,missing_camera_platform_refused:true,original_base_memory_placeholder_preserved:true,original_base_identity_preserved:true,existing_kernel_transform_preapplied:false,vendor_boot_image_produced:false,bootloader_live_fixups_tested:false,kernel_source_compatibility_qualified:false,boot_qualified:false,hardware_qualified:false,role_or_key_admitted:false}' > "$output/source-cohort.json"
+ '{schema_version:1,architecture:"aarch64",source_pins_sha256:$pins,dtbo_sha256:$dtbo,dtbo_bytes:$dtbo_bytes,vendor_dtb_section_sha256:$bases,vendor_dtb_section_bytes:$base_bytes,base_count:4,base_order:[614,632,643,642],source_inputs_unchanged:true,common_dtbo:true,board_camera_display_layers:true,overlay_applies_to_all_bases:true,source_marker_preserved_in_all_bases:true,source_marker_is_not_a_trust_anchor:true,repeat_merge_identical:true,missing_camera_platform_refused:true,original_base_memory_placeholder_preserved:true,original_base_identity_preserved:true,existing_kernel_transform_preapplied:false,vendor_boot_image_produced:false,bootloader_live_fixups_tested:false,kernel_source_compatibility_qualified:false,boot_qualified:false,hardware_qualified:false,role_or_key_admitted:false}' > "$output/source-cohort.json"
