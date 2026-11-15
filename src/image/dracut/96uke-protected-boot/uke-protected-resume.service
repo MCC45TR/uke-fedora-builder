@@ -1,0 +1,15 @@
+[Unit]
+Description=Authorize a protected Uke hibernation image
+DefaultDependencies=no
+Requires=uke-protected-role.service
+After=uke-protected-role.service
+Before=systemd-hibernate-resume.service sysroot.mount
+ConditionPathExists=/run/uke-protected/normal
+OnFailure=emergency.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/uke-protected-boot-policy admit-resume
+TimeoutStartSec=60
+RemainAfterExit=yes
+UMask=0077

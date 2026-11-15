@@ -1,0 +1,16 @@
+[Unit]
+Description=Validate the protected Uke boot role and cohort
+DefaultDependencies=no
+After=systemd-udev-trigger.service
+AssertKernelCommandLine=noresume
+Before=uke-protected-resume.service systemd-hibernate-resume.service sysroot.mount
+OnFailure=emergency.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/uke-protected-boot-policy admit-role
+TimeoutStartSec=45
+RemainAfterExit=yes
+RuntimeDirectory=uke-protected
+RuntimeDirectoryMode=0700
+UMask=0077

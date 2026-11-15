@@ -44,6 +44,11 @@ kernel's selector-v2 and crypt omissions cannot qualify those capabilities.
 No change to lockdown, bootloader trust, firmware, GPT or the target follows
 from a successful tool-closure test.
 
+The separate, explicit-only [protected initrd barriers](PROTECTED-INITRD-BARRIERS.md)
+prepare service ordering before root mount and native resume. They are not
+part of this tools-only archive and require a native admission policy that
+the coordinator has yet to supply and qualify.
+
 The module uses dracut's documented `inst_multiple` and `inst_simple` interfaces;
 the former includes binary dependencies, while the latter copies the explicitly
 supplied project scripts. See the [upstream module interface](https://dracut-ng.github.io/dracut/man/dracut.modules.7.html)
