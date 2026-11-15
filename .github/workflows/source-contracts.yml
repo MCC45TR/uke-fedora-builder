@@ -259,6 +259,7 @@ jobs:
           shellcheck src/image/select-uke-super.sh tests/fastboot-physical-super.sh
           shellcheck src/image/dracut/96uke-protected-boot/module-setup.sh tests/protected-initrd-barriers.sh
           shellcheck src/image/rescue-verity-layout.sh src/image/build-rescue-verity.sh src/image/qualify-fedora-rescue-verity.sh tests/rescue-verity.sh
+          shellcheck tests/rescue-verity-map.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
@@ -318,12 +319,14 @@ jobs:
             trap - EXIT
             if [[ -n $loop ]]; then
               devno=$(lsblk -dnro MAJ:MIN "$loop")
-              for name in uke-rescue uke-rescue-test-payload uke-super-grow-rescue uke-super-grow-swap uke-super-grow-oldswap uke-super-test-busy; do
+              for name in uke-verity-fixture-root uke-verity-fixture-data uke-rescue uke-rescue-test-payload uke-super-grow-rescue uke-super-grow-swap uke-super-grow-oldswap uke-super-test-busy; do
                 uuid=$(sudo dmsetup info -c --noheadings -o uuid "$name" 2>/dev/null | tr -d '[:space:]') || uuid=''
                 case $uuid in
                   "UKE-RESCUE-v1-${devno/:/-}"|"UKE-FIXTURE-RESCUE-occupied-${devno/:/-}"|"UKE-FIXTURE-RESCUE-payload-${devno/:/-}")
                     sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
                   "UKE-GROW-v1-${devno/:/-}-rescue"|"UKE-GROW-v1-${devno/:/-}-swap"|"UKE-GROW-v1-${devno/:/-}-oldswap"|"UKE-GROW-TEST-v1-${devno/:/-}")
+                    sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
+                  "UKE-VERITY-FIXTURE-v1-${devno/:/-}-root"|"UKE-VERITY-FIXTURE-v1-${devno/:/-}-data")
                     sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
                 esac
               done
@@ -342,6 +345,7 @@ jobs:
               rpm -q android-tools e2fsprogs util-linux jq coreutils systemd systemd-udev > /fixture/result/original-tools.txt
               bash /source/tests/protected-initrd-barriers.sh /fixture/result/protected-initrd-barriers.json
               bash /source/tests/rescue-verity.sh /fixture/result/rescue-verity.json
+              bash /source/tests/rescue-verity-map.sh prepare /fixture/verity-map
               bash /source/tests/fastboot-update-parser.sh /fixture/result/fastboot-parser.json
               bash /source/tests/fastboot-super-inspection.sh
               bash /source/tests/fastboot-super-provision-plan.sh
@@ -359,10 +363,11 @@ jobs:
               sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super,fastboot-requirements,plan-fastboot-update,select-uke-super}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow,update-parser,tcp-peer,physical-super}.sh > /fixture/result/source-sha256.txt
               sha256sum /source/src/image/dracut/96uke-protected-boot/* /source/tests/protected-initrd-barriers.sh >> /fixture/result/source-sha256.txt
               sha256sum /source/src/image/rescue-verity-layout.sh /source/src/image/build-rescue-verity.sh /source/src/image/qualify-fedora-rescue-verity.sh /source/tests/rescue-verity.sh >> /fixture/result/source-sha256.txt
+              sha256sum /source/tests/rescue-verity-map.sh >> /fixture/result/source-sha256.txt
             '
           # The host lends only this owned loop device and the DM control node.
           # No tablet, physical disk, host root mount or privileged container.
-          sudo modprobe -a loop dm_mod
+          sudo modprobe -a loop dm_mod dm_verity
           sudo dmsetup version
           loop=$(sudo losetup --find --show "$fixture/rescue-map/super.raw")
           [[ $loop =~ ^/dev/loop[0-9]+$ ]]
@@ -393,6 +398,19 @@ jobs:
               bash /source/tests/fastboot-super-grow.sh run "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json
               bash /source/tests/fastboot-physical-super.sh "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json /fixture/result/physical-selection-fixture.json
               cp /fixture/super-grow/provision-{result,noop}.json /fixture/result/
+            ' bash "$loop"
+          sudo losetup -d "$loop"
+          loop=''
+          loop=$(sudo losetup --sector-size 4096 --find --show "$fixture/verity-map/carrier.raw")
+          [[ $loop =~ ^/dev/loop[0-9]+$ ]]
+          docker run --rm --cpus=2 --memory=2g --pids-limit=256 \
+            --cap-add=SYS_ADMIN --security-opt apparmor=unconfined --device="$loop" --device=/dev/mapper/control \
+            --device-cgroup-rule="b $dm_major:* rwm" \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
+            --mount "type=bind,source=$fixture,target=/fixture" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf -y --setopt=install_weak_deps=False install e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
+              bash /source/tests/rescue-verity-map.sh run "$1" /fixture/verity-map /fixture/result/rescue-verity-kernel.json
             ' bash "$loop"
           sudo cp -a "$fixture/result" "$RUNNER_TEMP/uke-super-reports"
           sudo chown -R "$(id -u):$(id -g)" "$RUNNER_TEMP/uke-super-reports"

@@ -42,6 +42,28 @@ receipts; the larger derived container is discarded after verification.
 The fixed input, recorded epoch/salt, tool versions and source hashes permit
 rebuilding the same candidate without retaining duplicate full images.
 
+On 15 November 2026, [Actions 43664178768][qualification] passed the native
+AArch64 qualification at source `bb4ce495e9f6e661c6ee96423882ccfb2d4b482a`.
+The downloaded 19-member artifact matched its published ZIP digest and all
+12 recorded source hashes. Original Fedora e2fsprogs 1.47.4 and veritysetup
+2.8.8 produced the measured-size candidate. Repeating the complete recipe
+on x86_64 with the same input, epoch and salt reproduced both the verity root
+and whole-container digest exactly. The raw duplicates were then removed;
+the compressed original input and small receipts retain the reproduction path.
+This qualifies file composition across those architectures, not kernel mapping,
+authenticated metadata, physical storage, a boot or an installable ZIP.
+
+`tests/rescue-verity-map.sh` adds a separate host-kernel fixture. Its run mode
+requires an exact owned loop backing inode, filesystem, capacity, 4-KiB sector
+size and initial digest. It layers read-only dm-linear and dm-verity mappings,
+reads the complete exposed data and an EXT4 file, refuses writes and prevents
+the hash tree from appearing as filesystem data. Each wrong-root, changed-data
+and changed-hash test creates fresh mappings and requires an I/O error plus
+the kernel's corruption status. The fixture restores and rehashes its backing
+file. No physical disk or tablet is exposed to the container. This tests the
+runner kernel's verification path; it does not authenticate the recipe or
+qualify the Uke kernel, rescue startup or hardware.
+
 ## Remaining protected seed integration
 
 The current schema-3 physical provisioner grows plain EXT4 and initializes
@@ -74,3 +96,4 @@ physical acceptance are not qualified by these host artifacts.
 
 [verity]: https://docs.kernel.org/admin-guide/device-mapper/verity.html
 [avb]: https://android.googlesource.com/platform/external/avb/+/refs/heads/main/README.md
+[qualification]: https://github.com/MCC45TR/uke-fedora-builder/actions/runs/43664178768
