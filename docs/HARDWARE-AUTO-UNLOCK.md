@@ -75,6 +75,49 @@ or frontend preference grants storage/key authority.
 
 ## Next acceptance
 
+### Native key mechanism
+
+`src/image/hwkm-wrapped-key.cpp` implements the existing Fedora kernel-header
+UAPI rather than a private Qualcomm ioctl. `generate_v2` requests a new
+hardware-generated long-term wrapped key. `prepare_v2` consumes its long-term
+input and returns a distinct per-boot key object. The deliberately narrow
+format is the fitted HWKM v2 100-byte blob; other sizes fail. Loading a stored
+blob is parsing only and does not authenticate it.
+
+Each operation duplicates an already selected read-only block descriptor with
+CLOEXEC, requires 4-KiB logical blocks and uses zeroed reserved UAPI fields.
+The native functions neither select a device nor grant boot/role authority.
+There is no raw-key import, software fallback or automatic ioctl retry, even
+after EINTR: blindly retrying generation could create a different key after an
+uncertain outcome. The enclosing transaction must durably preserve the correct
+long-term blob before any data conversion or preparation that consumes it.
+
+Move-only key objects use distinct anonymous pages, locked before receiving
+bytes, excluded from core dumps and wiped in a forked child. Access from the
+child is also refused. The complete page is explicitly zeroed before unmapping
+on ordinary completion, response validation failure and syscall failure. This
+prevents accidental page sharing between separate locked allocations. There is
+no CLI, key serialization, mapping, filesystem conversion or runtime service.
+
+The native COPR fixture links the production implementation with syscall doubles
+for block identity, logical geometry and firmware ioctls. Real Linux mapping,
+locking, dump/fork flags and fork behavior are exercised. It checks generation
+and preparation, consumed inputs, replacement cleanup, five errno paths without
+retries, malformed returned sizes/pointers/reserved fields, protection failures,
+invalid descriptors and zeroed pages at every intercepted unmap. Synthetic
+100-byte values are public fixtures, not hardware-generated keys. Native build
+and test qualification are pending; this fixture cannot establish physical
+HWKM operation, persistent reuse or boot binding.
+
+The ABI is pinned to [v7.3.3 UAPI][uapi] blob
+`97302c6eb6afec00b454422ee808e6f7e17a4f83`, [block implementation][block]
+`bc3a9f59574b12318a7eb0a44610bc55af8f4194`, [ioctl dispatch][ioctl]
+`64b4e6c0f696513b8c75bfe49c530dc9cf38eadb` and ICE source above. The block
+dispatch does not require a write-open descriptor for these key operations;
+the mechanism still requires the caller's prior hardware/boot admission.
+
+### Physical and boot qualification
+
 The kernel coordinator must qualify the cumulative kernel/initramfs opt-in
 before the first ICE probe, preserving existing features, hardening, recovery,
 staging and preferences. The initial root remains unencrypted EXT4. Writing
@@ -98,3 +141,5 @@ be enabled. Source APIs and driver logs do not mark those behaviors complete.
 [inline]: https://github.com/gregkh/linux/blob/v7.3.3/Documentation/block/inline-encryption.rst
 [tee]: https://github.com/gregkh/linux/blob/v7.3.3/security/keys/trusted-keys/trusted_tee.c
 [aosp]: https://source.android.com/docs/security/features/encryption/hw-wrapped-keys
+[block]: https://github.com/gregkh/linux/blob/v7.3.3/block/blk-crypto.c
+[ioctl]: https://github.com/gregkh/linux/blob/v7.3.3/block/ioctl.c

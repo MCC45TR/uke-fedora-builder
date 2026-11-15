@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        10%{?dist}
+Release:        11%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -13,6 +13,7 @@ ExclusiveArch:  aarch64
 BuildRequires:  gcc gcc-c++ binutils openssl-devel openssl bash jq coreutils findutils diffutils util-linux
 BuildRequires:  json-devel = 3.12.0
 BuildRequires:  pkgconfig(libsystemd)
+BuildRequires:  kernel-headers
 # Upstream Fedora avbtool formats/signs disposable COPR-host fixtures only.
 # Python and avbtool are never target payloads; the descriptor inspection
 # frontend is an explicit temporary diagnostic, never an admission policy.
@@ -94,6 +95,10 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
     build/physical-cohort.o build/libavb.a -o build/cohort-physical-test $LDFLAGS -lcrypto -lsystemd
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/boot/boot-image.cpp \
     -o build/boot-image $LDFLAGS
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    src/image/hwkm-wrapped-key.cpp tests/hwkm-wrapped-key.cpp \
+    -o build/hwkm-wrapped-key-test $LDFLAGS \
+    -Wl,--wrap=ioctl,--wrap=fstat,--wrap=mmap,--wrap=munmap,--wrap=mlock,--wrap=madvise
 
 # Native tests produce the receipts that the install stage packages. RPM runs
 # %%install before %%check, so these must exist before entering %%install.
@@ -106,12 +111,15 @@ bash tests/protected-cohort-vbmeta.sh build/cohort-vbmeta "$PWD/build/vbmeta-res
 readelf -h build/cohort-content | grep -E 'Machine:.*AArch64'
 readelf -h build/cohort-physical | grep -E 'Machine:.*AArch64'
 build/cohort-physical-test > build/physical-result.json
+readelf -h build/hwkm-wrapped-key-test | grep -E 'Machine:.*AArch64'
+build/hwkm-wrapped-key-test > build/hwkm-result.json
 bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json" "$PWD/build/content-fixture" build/cohort-physical
-rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 systemd-devel systemd-libs > build/original-tools.txt
+rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 systemd-devel systemd-libs kernel-headers > build/original-tools.txt
 sha256sum src/image/protected-cohort-{auth,manifest,vbmeta,content}.* tests/protected-cohort-{auth,manifest,vbmeta,content}.sh \
     src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh src/boot/boot-image.cpp \
     tests/protected-cohort-blocks.sh src/image/protected-physical-cohort.{cpp,hpp} \
-    src/image/inspect-physical-cohort.cpp tests/protected-cohort-physical.cpp > build/source-sha256.txt
+    src/image/inspect-physical-cohort.cpp tests/protected-cohort-physical.cpp \
+    src/image/hwkm-wrapped-key.{cpp,hpp} tests/hwkm-wrapped-key.cpp > build/source-sha256.txt
 find build/upstream/libavb -type f -print0 | sort -z | xargs -0 sha256sum > build/upstream-sha256.txt
 
 %check
@@ -131,6 +139,11 @@ jq -e '.real_signed_metadata_then_fd_content_verification and .refused_cases==31
 jq -e '.topology_cases_refused==40 and .board_cases_refused==8 and .positive_layouts==4 and
     .non_target_owner_refused and .private_owner_not_constructible_from_facts and
     (.physical_ufs_qualified|not) and (.role_admitted|not)' build/physical-result.json
+jq -e '.production_implementation_tested and .syscall_doubles_for_firmware_and_block_facts and
+    .real_locked_nondumpable_fork_wiped_memory and .all_unmapped_key_pages_zero and
+    .consumed_input_on_failure and .no_automatic_ioctl_retry and .no_descriptor_or_memory_leak and
+    .maximum_live_key_pages<=3 and .refused_cases==49 and .zeroed_unmaps>40 and
+    (.physical_key_generated|not) and (.boot_policy_admitted|not)' build/hwkm-result.json
 (cd build/content-fixture; sha256sum -c SHA256SUMS)
 test "$(find build/content-fixture -type f | wc -l)" = 6
 test ! -e build/content-fixture/key.pem
@@ -139,7 +152,7 @@ test ! -e build/content-fixture/key.pem
 install -d %{buildroot}%{_datadir}/%{name}
 install -pm644 build/native-result.json build/original-tools.txt build/source-sha256.txt \
     build/manifest-result.json build/vbmeta-result.json build/content-result.json build/upstream-sha256.txt \
-    build/third-party-license-sha256.txt build/physical-result.json \
+    build/third-party-license-sha256.txt build/physical-result.json build/hwkm-result.json \
     %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
 install -d %{buildroot}%{_libexecdir}/%{name} %{buildroot}%{_datadir}/%{name}/fixtures
 install -pm755 build/cohort-content %{buildroot}%{_libexecdir}/%{name}/cohort-content-inspect
@@ -153,6 +166,9 @@ install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 %{_libexecdir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-11
+- Verify HWKM v2 generate/prepare UAPI, locked key memory and failure cleanup without firmware calls.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-10
 - Pin physical cohort devices through original sd-device and verify bounded VBMeta descriptor snapshots.
 
