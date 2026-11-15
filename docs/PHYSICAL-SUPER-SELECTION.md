@@ -38,6 +38,8 @@ selector inputs. A future complete-cohort owner must validate each physical
 partition independently and permit different logical units of that same
 verified controller; requiring every role to share the super disk would reject
 this tablet. The current super selector does not open those other roles.
+Follow the kernel's [sysfs access rules][sysfs]: resolve classification links
+to device paths and read parent attributes on the relevant parent device.
 
 The running kernel remains `7.3.3-26-unstable` with integrity lockdown. The
 filtered command line/bootconfig/chosen data supplied no explicit slot hint;
@@ -64,3 +66,5 @@ The explicit dracut tools module includes this script but installs no boot
 hook. It remains absent from the current cumulative kernel. Trusted role and
 key/resume ordering, authenticated rescue inputs and the matching kernel/driver
 closure remain required before boot integration or a final installer.
+
+[sysfs]: https://docs.kernel.org/admin-guide/sysfs-rules.html

@@ -92,12 +92,12 @@ dependency is packaged or installed on either PC or tablet.
 
 ## Owned-loop diagnostic
 
-The next `1.0-8` source-check package is an AArch64 diagnostic package rather
+The `1.0-8` source-check package is an AArch64 diagnostic package rather
 than a text-only receipt. It includes the same inspection frontend, the
 `owned-block-fixture` test and six public disposable fixture files. No private
 signing key, formatter, Python, service or boot hook is included. It is a
-temporary test dependency and must be removed after the block-I/O evidence is
-preserved; it is not the protected admission policy or a production dependency.
+temporary test dependency and was removed after the block-I/O evidence was
+preserved. It is not the protected admission policy or a production dependency.
 
 The test accepts no device argument. It creates three sparse owned files under
 a private `/var/tmp` directory, then attaches them read-only with original
@@ -109,13 +109,42 @@ initial allocated backing limit below 1 MiB. The three loops have 216 MiB of
 combined apparent capacity, without copying a physical image. Whole backing
 hashes must match after the test, and owned cache pages are discarded afterward.
 
-The planned checks exercise exact block capacity and 4-KiB ioctls, both
+The checks exercise exact block capacity and 4-KiB ioctls, both
 requested slot values, and eight refusals: 512-byte sectors, two wrong
 capacities, an alias, a closed descriptor and each of three changed prefixes.
-Slot values and signing keys remain fixture inputs. Passing on the Uke kernel
-would qualify this block-I/O path, not physical UFS ownership, the selected boot
-slot, the running Image, OEM trust, a boot role or key release.
+Slot values and signing keys remain fixture inputs. The package passed
+[COPR 11329076][blocks-qualification] on native Rawhide AArch64 in 149 seconds,
+including all prior 27/64/35/31 refusal cases and fixture export. Its pinned
+signature, 19 project and 43 upstream source pins, 16 native project and 43
+native upstream hashes, published recipe, licenses and archive identities
+matched. The signed RPM is 111,056 bytes; its 18 regular files total 368,654
+bytes, including one AArch64 ELF and one Bash diagnostic, with no RPM scriptlet,
+Python dependency or private signing key.
+
+The test then passed on the actual Uke `7.3.3-26-unstable` kernel through a
+GPG-checked DNF installation. That transaction installed only this diagnostic;
+original Fedora dependencies already satisfied the complete transaction. All
+eight block refusals passed, with three read-only 4-KiB loop inputs, 81,920
+verified prefix bytes and 8,388 KiB process peak RSS. The backing files initially
+allocated 16,384 bytes; their whole hashes remained identical. A separate
+post-test check found zero owned loops and zero owned work directories. DNF
+then removed only the diagnostic, with automatic dependency removal disabled.
+The installed helper/assets and matching task RPM cache were absent afterward;
+original Fedora providers and integrity lockdown remained unchanged.
+
+This qualifies the owned-loop block-I/O path, not physical UFS ownership, the
+selected boot slot, the running Image, OEM trust, a boot role or key release.
+No production initrd or boot profile incorporates this inspection executable.
+
+A separate read-only probe subsequently read 4,160 bytes from each actual boot
+partition after checking unique labels, controller ancestry and opened device
+identity. Both showed Android v4, 1,584-byte headers, zero ramdisk/signature
+lengths, a 69,933,568-byte kernel and a little-endian ARM64 header with
+72,613,888-byte memory size. Those measured fields match the reader's current
+layout assumptions. This 8,320-byte observation does not compare complete
+prefix digests, inspect all header constraints or identify the booted slot.
 
 [header]: https://android.googlesource.com/platform/system/tools/mkbootimg/+/4a27dd13adf9846e12d585d6fe99a375ebb58396/include/bootimg/bootimg.h
 [arm64]: https://docs.kernel.org/arch/arm64/booting.html
 [qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329047/
+[blocks-qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329076/
