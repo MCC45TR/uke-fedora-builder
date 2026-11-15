@@ -1,0 +1,175 @@
+{
+  "schema_version": 1,
+  "scope": "installed-reference-read-only-prefix-inventory",
+  "dtbo": {
+    "version": 0,
+    "page_size": 4096,
+    "bytes": 592014,
+    "sha256": "0dc190c103d5b6b38eb0e856a86f882af0fad705366a7d7a8054510d9a50e50f",
+    "entries": [
+      {
+        "index": 0,
+        "bytes": 591950,
+        "offset": 64,
+        "id": 0,
+        "revision": 0,
+        "custom": [
+          0,
+          0,
+          0,
+          0
+        ],
+        "sha256": "3a7cbfe7af4ec2a3194ebddf2c274628b1ab76e9b733e8d0fa080f4417fda8e2",
+        "root": {
+          "model": "Qualcomm Technologies, Inc. Uke based on SM8635",
+          "compatible": [
+            "qcom,cliffs-mtp",
+            "qcom,cliffs",
+            "qcom,mtp"
+          ],
+          "msm_id_cells": [
+            642,
+            65536,
+            632,
+            65536,
+            643,
+            65536,
+            614,
+            65536
+          ],
+          "board_id_cells": [
+            8,
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "vendor_dtb_section": {
+    "bytes": 1885877,
+    "sha256": "77a857cfd1c67e76588d05051b836c756c4a5236a89e258c3a95a1e48ce1c21b",
+    "bases": [
+      {
+        "index": 0,
+        "bytes": 475400,
+        "offset": 0,
+        "sha256": "79059c1fc658d828bc7885fa024631637f0b12e3e0b8f2f756abc80774c6f909",
+        "root": {
+          "model": "Qualcomm Technologies, Inc. Cliffs SoC",
+          "compatible": [
+            "qcom,cliffs"
+          ],
+          "msm_id_cells": [
+            614,
+            65536
+          ],
+          "board_id_cells": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "index": 1,
+        "bytes": 474849,
+        "offset": 475400,
+        "sha256": "f978de9a1451fc9ed53a87c2d233e6ce73629520616ea876517106339e88c3fe",
+        "root": {
+          "model": "Qualcomm Technologies, Inc. Cliffs 7 SoC",
+          "compatible": [
+            "qcom,cliffs"
+          ],
+          "msm_id_cells": [
+            632,
+            65536
+          ],
+          "board_id_cells": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "index": 2,
+        "bytes": 467674,
+        "offset": 950249,
+        "sha256": "288246381e84b974f7e272c3ec7dda764822d8b22b261a9964533342dd255df5",
+        "root": {
+          "model": "Qualcomm Technologies, Inc. Cliffs7P SoC",
+          "compatible": [
+            "qcom,cliffsp"
+          ],
+          "msm_id_cells": [
+            643,
+            65536
+          ],
+          "board_id_cells": [
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "index": 3,
+        "bytes": 467954,
+        "offset": 1417923,
+        "sha256": "a636a4f5188075ca7c41b2f79cc44b18a38d172101bc13139ee91f443b51555f",
+        "root": {
+          "model": "Qualcomm Technologies, Inc. CliffsP SoC",
+          "compatible": [
+            "qcom,cliffsp"
+          ],
+          "msm_id_cells": [
+            642,
+            65536
+          ],
+          "board_id_cells": [
+            0,
+            0
+          ]
+        }
+      }
+    ]
+  },
+  "source_compiled": false,
+  "new_dtbo_image_produced": false,
+  "overlays_merged": false,
+  "bootloader_fixups_present": false,
+  "selected_base_authenticated": false,
+  "physical_ownership_verified": false,
+  "boot_or_hardware_qualified": false,
+  "role_or_key_admitted": false,
+  "observed_on": "2026-11-15",
+  "device": "Uke (SM7675)",
+  "dtbo_partition_capacity_bytes": {
+    "a": 25165824,
+    "b": 25165824
+  },
+  "dtbo_slots_declared_prefix_identical": true,
+  "vendor_boot_observation": {
+    "slot": "a",
+    "partition_bytes": 100663296,
+    "header_version": 4,
+    "header_bytes": 2128,
+    "page_bytes": 4096,
+    "vendor_ramdisk_bytes": 37136921,
+    "dtb_section_offset": 37142528
+  },
+  "bootconfig_report": {
+    "dtbo_index": 0,
+    "dtb_index": 2,
+    "authenticated": false
+  },
+  "oem_source": {
+    "repository": "https://github.com/MiCode/kernel_devicetree",
+    "commit": "94c84aeb9e517dbde546fc732033c184094c8e57",
+    "files": [
+      "qcom/uke-sm8635-overlay.dts",
+      "qcom/uke-sm8635.dtsi",
+      "qcom/Makefile"
+    ],
+    "binary_reproduction_qualified": false
+  },
+  "universal_geometry": false,
+  "raw_firmware_published": false
+}

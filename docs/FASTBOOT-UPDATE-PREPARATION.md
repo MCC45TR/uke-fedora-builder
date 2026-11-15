@@ -58,6 +58,12 @@ super and matching stock boot/vendor_boot/DTBO/vbmeta cohort; unchanged GPT
 geometry avoids a repartitioning requirement. This is a restore path to
 qualify, not a claim that retaining Android's old data is possible.
 
+The [DTBO preparation record](DTBO-PREPARATION.md) now includes fresh bounded
+installed-reference inspection, all four vendor_boot base DTBs and the
+existing kernel's once-only overlay boundary. Custom DTBO/vendor_boot production
+and boot acceptance remain open; an individual overlay is not the Android
+DTBO partition image.
+
 After mapping the logical partitions, grow rescue EXT4 to its allocated
 capacity and initialize/use the complete allocated swap device. Grow userdata
 EXT4 to its physical capacity, retaining the independent capacity gate. Do not

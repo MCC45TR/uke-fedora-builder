@@ -1,7 +1,7 @@
 # Physical cohort ownership and VBMeta snapshots
 
-15 November 2026. Source implementation; native and target qualification are
-pending. This is not installed as the protected admission policy. The existing
+15 November 2026. Native source checks and bounded target diagnostics passed.
+This is not installed as the protected admission policy. The existing
 dracut module still refuses assembly without that complete policy.
 
 `PhysicalBootDevices` owns read-only descriptors for both boot, vendor_boot,
@@ -72,13 +72,34 @@ slots are valid for the requested initial installation.
 
 ## Qualification and remaining authority
 
-The pending native fixture covers four pure layouts, 40 invalid topology
-observations, eight invalid compatible lists and refusal of the non-target
-COPR host. Synthetic facts never construct the physical owner. The signed
-regular-file fixture adds 14 descriptor/snapshot refusals, offset preservation,
-pathname replacement, zero-tail bounds and cleanup. The owned-loop diagnostic
-will also exercise a separate 128-KiB metadata block input with five refusals.
-These remain planned checks until their actual results are recorded.
+COPR build 11329227 compiled the implementation natively for Rawhide AArch64.
+Four pure layouts passed; 40 invalid topology observations, eight invalid
+compatible lists and the non-target COPR host were refused. Synthetic facts
+never construct the physical owner. The signed regular-file fixture passed
+14 descriptor/snapshot refusals, offset preservation, pathname replacement,
+zero-tail bounds and cleanup, alongside the existing 27 signature, 64 manifest,
+35 AVB and 31 content cases. The actual worker, 23 project source pins and
+43 original libavb inputs matched the signed package's source identity.
+
+The signed 1.0-10 diagnostic RPM was installed alone through GPG-checked DNF
+on Uke running `7.3.3-26-unstable` with integrity lockdown. Identity-only
+inspection selected all ten physical roles through the native owner, including
+their different UFS logical units. Retained-handle cleanup passed; peak RSS was
+9,524 KiB. This inspection did not read signed metadata or boot contents and
+did not establish the running slot or Image.
+
+Four task-owned read-only loop devices then exercised the content and metadata
+block paths: eight content refusals and five additional metadata refusals
+passed. The metadata input was a separate 128-KiB block device; its 64-KiB
+prefix and all three fixture boot inputs verified. Peak RSS was 8,756 KiB;
+the sparse backing files allocated 24,576 bytes. Whole backing hashes remained
+unchanged and all loop devices and temporary fixtures were removed. This is
+fixture block-I/O evidence, separate from the physical identity-only result.
+
+The diagnostic RPM and its task-owned download cache were removed through the
+reviewed DNF transaction. No dependencies were removed. Kernel, lockdown,
+Control and original Fedora providers remained unchanged. No physical boot,
+GPT, firmware, key, root or swap write and no reboot occurred.
 
 The inspection frontend offers `--identity-only`, `--inspect-slot` with explicit
 test pins/context, and `--fixture-vbmeta-fd` for owned descriptor tests. It grants

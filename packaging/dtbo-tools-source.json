@@ -1,0 +1,100 @@
+{
+  "repository": "https://android.googlesource.com/platform/system/libufdt",
+  "commit": "9b70f594cf149c7c73989c78f03d210f8aa1c1f6",
+  "license": "Apache-2.0",
+  "scope": "unmodified native COPR-host DTBO v0 producer source preparation",
+  "upstream_deprecated": true,
+  "replacement_upstream": "mkdtboimg.py",
+  "native_tool_reason": "The installed Uke table uses v0; the existing native upstream formatter supports this contract without another Python host tool.",
+  "native_build_qualified": false,
+  "fixture_only_until_qualified": true,
+  "device_payload": false,
+  "files": [
+    {
+      "path": "utils/src/Android.bp",
+      "sha256": "6dfd02385db1bf511d5445393f8331d854c900583bc98e01bfce78c0223ef897",
+      "git_blob_sha1": "41d6ca8b4c3b1113393856d5d90573ed2ea8469f"
+    },
+    {
+      "path": "utils/src/dt_table.h",
+      "sha256": "8e0a30dee64fc6fc968ec4244711585e21ab54a130fd1cbe0ffed9e7e74e59e5",
+      "git_blob_sha1": "bf149ddb8cb7ab31d1c2211c638693d5349afeb6"
+    },
+    {
+      "path": "utils/src/dt_table.c",
+      "sha256": "e09c1b35cf0ffedcad612608851f6c4cb0f80d53de0d750184863ae475981f25",
+      "git_blob_sha1": "e041d821a377743bca664eb21c97061be5631ae1"
+    },
+    {
+      "path": "utils/src/mkdtimg.c",
+      "sha256": "6778cc100f60c76fa6f3db0140bdca75f85b085d7658b636e008a9f9d9a7c320",
+      "git_blob_sha1": "d36db89b842e3647bb58986dcf15d023d619fb15"
+    },
+    {
+      "path": "utils/src/mkdtimg_core.h",
+      "sha256": "3cb613d44057441b2acc8601b93640f8d4e38a098c8f18159813eb1586e436d7",
+      "git_blob_sha1": "2e3af706cf608cd364b17b33d723880275b01c99"
+    },
+    {
+      "path": "utils/src/mkdtimg_core.c",
+      "sha256": "b12bc8a405abfc9bf82d10f2396c3cb11a28f3dabcae4fd8b458ccf3c0f42960",
+      "git_blob_sha1": "97c5478adb8aed4effd0a0a4a6b55ce13aadd2df"
+    },
+    {
+      "path": "utils/src/mkdtimg_create.c",
+      "sha256": "d66cf02aa7e1b644088adaf4c171ca72f84ca3fb749ff74c99696f5daf0ec6d3",
+      "git_blob_sha1": "d0cc349be5cfce1eb992e9e631f3d6b262117fae"
+    },
+    {
+      "path": "utils/src/mkdtimg_cfg_create.c",
+      "sha256": "66acfbf04d64c15aff3a8c50e9e7ccb87895ff573f09d2a91ef57e5a94d6b1bb",
+      "git_blob_sha1": "5b44e58601b6532468d9656bd85a202b1ce878c1"
+    },
+    {
+      "path": "utils/src/mkdtimg_dump.c",
+      "sha256": "fabcbc28494c0272ef1650eb286e510945175578837fa9dfbb8ca7eccb165c4b",
+      "git_blob_sha1": "14d4d5ae24924f14b282ca185ba5a50e50281fc6"
+    },
+    {
+      "path": "utils/README.md",
+      "sha256": "d2e9196848b1b9fdcbe293f2e21f1dc37bb44a9006de1f1b3599ee1fd16708c9",
+      "git_blob_sha1": "fa326eedd11e19ac87f57fdc4d90b0570db2950f"
+    },
+    {
+      "path": "sysdeps/include/libufdt_sysdeps.h",
+      "sha256": "4977f0fcd95171792d37c6a9fb46fc2ffa319df6bb31f3902d841596b2934ce4",
+      "git_blob_sha1": "f337b1a516a6b9d3c23851f4256bc24e6911677c"
+    },
+    {
+      "path": "sysdeps/libufdt_sysdeps_posix.c",
+      "sha256": "6f165ab2c2339462bd9a8e10766f2b0f155049a9098b1894ff71c6975a18a7d4",
+      "git_blob_sha1": "e4b1ed1b7c9a815177756f1845ee53e0e68ef379"
+    },
+    {
+      "path": "NOTICE",
+      "sha256": "c12447b044d68da79c63ba0b57301d62d18f22a55893a91a4a0a2869043b322d",
+      "git_blob_sha1": "d0a9991466daa29e9dfd8e5867799fd9b184c42a"
+    }
+  ],
+  "distribution_dependency": "original Fedora libfdt-devel; no libfdt fork",
+  "additional_sources": [
+    {
+      "repository": "https://android.googlesource.com/platform/external/dtc",
+      "commit": "2ec107c70426fb90c1ed0ac14877c4322e8ee12f",
+      "path": "libfdt/libacpi.h",
+      "archive_path": "external-dtc/libfdt/libacpi.h",
+      "sha256": "1abc05816ec9f0ee78c334a6975bc062d79544d3724f8e655bc174191f70f7d6",
+      "git_blob_sha1": "06cae6c2573a41a6853d1ff33ae0192433576deb",
+      "license": "BSD-3-Clause"
+    },
+    {
+      "repository": "https://android.googlesource.com/platform/external/dtc",
+      "commit": "2ec107c70426fb90c1ed0ac14877c4322e8ee12f",
+      "path": "libfdt/acpi.c",
+      "archive_path": "external-dtc/libfdt/acpi.c",
+      "sha256": "1405d369ea4c6b3601f19dfa8388285ad26b928bcbf679a825bbcf298d6ba3e9",
+      "git_blob_sha1": "58697268dda32eb3f5721c3c926d25d2f08f5bd9",
+      "license": "BSD-3-Clause"
+    }
+  ]
+}
