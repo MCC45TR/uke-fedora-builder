@@ -371,7 +371,7 @@ jobs:
           shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
           shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
-          shellcheck src/image/test-fastboot-profile.sh src/image/package-ext4-fastboot-test.sh
+          shellcheck src/image/test-fastboot-profile.sh src/image/package-ext4-fastboot-test.sh scripts/install-fastboot-test.sh
           shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh
           shellcheck src/image/compose-fastboot-super-seed.sh
           shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh

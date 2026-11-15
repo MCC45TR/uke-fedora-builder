@@ -1,6 +1,6 @@
 Name:           uke-fastboot-host
 Version:        37.0.0p1
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Host fastboot with numeric getvar whitespace normalization
 License:        Apache-2.0 AND BSD-3-Clause AND GPL-2.0-or-later AND LGPL-2.1-or-later AND MIT AND LicenseRef-Fedora-Public-Domain
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -30,7 +30,7 @@ tar -xJf %{SOURCE1} -C uke-inputs
 %cmake -DANDROID_TOOLS_ADB_ENABLE_MDNS:BOOL=OFF -DBUILD_SHARED_LIBS:BOOL=OFF
 %cmake_build --target fastboot
 
-%check
+# Generate the qualification receipt before %%install consumes it.
 # The synthetic planner needs Git metadata, not a historical source checkout.
 git -C uke-inputs init -q
 git -C uke-inputs add .
@@ -47,6 +47,9 @@ install -m644 %{SOURCE2} %{buildroot}%{_datadir}/uke-fastboot-host/source-identi
 # Retain the original source notices without shipping other Android programs.
 find vendor -type f \( -name NOTICE -o -name 'NOTICE.*' -o -name LICENSE -o -name 'LICENSE.*' -o -name COPYING \) -print0 | sort -z > original-notices.list
 tar --null -T original-notices.list -cJf original-notices.tar.xz
+
+%check
+jq -e '.partition_size_response_whitespace_normalized and .padded_wrong_capacity_and_malformed_values_refused and .every_destination_size_checked_before_mutation and .initial_test_other_slot_refused_before_mutation' host-fastboot-tests.json
 
 %files
 %license original-notices.tar.xz
