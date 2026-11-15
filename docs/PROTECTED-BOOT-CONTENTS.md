@@ -112,14 +112,32 @@ hashes must match after the test, and owned cache pages are discarded afterward.
 The checks exercise exact block capacity and 4-KiB ioctls, both
 requested slot values, and eight refusals: 512-byte sectors, two wrong
 capacities, an alias, a closed descriptor and each of three changed prefixes.
-Slot values and signing keys remain fixture inputs. The package passed
-[COPR 11329076][blocks-qualification] on native Rawhide AArch64 in 149 seconds,
+Slot values and signing keys remain fixture inputs. Version `1.0-8` passed
+COPR 11329076 on native Rawhide AArch64 in 149 seconds,
 including all prior 27/64/35/31 refusal cases and fixture export. Its pinned
 signature, 19 project and 43 upstream source pins, 16 native project and 43
 native upstream hashes, published recipe, licenses and archive identities
 matched. The signed RPM is 111,056 bytes; its 18 regular files total 368,654
 bytes, including one AArch64 ELF and one Bash diagnostic, with no RPM scriptlet,
 Python dependency or private signing key.
+
+Version `1.0-9` adds the original JSON MIT license and small original-source
+archives preserving the complete embedded copyright/permission notices from
+JSON headers and the compiled libavb routines. The archives include original
+Chromium, Olivier Gay and JSON internal attributions without truncating them.
+No provider source is patched. The original Fedora JSON license SHA-256 is
+`46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603`.
+The original libavb archive covers exactly 13 compiled C files plus its headers;
+the unused Apache-licensed CRC32 implementation is excluded from that notice
+archive. All included libavb source bytes match the existing upstream pins.
+
+This package passed [COPR 11329154][blocks-qualification] in 150 seconds,
+including all four existing native test groups. Its pinned signature, source
+inputs, 22 regular files totaling 514,027 bytes, three added license digests and
+both notice archives were checked. The signed RPM is 256,996 bytes. Executable
+instructions, read-only constants and relocation tables (`.text`, `.rodata`,
+`.data.rel.ro`) match version `1.0-8` byte for byte; original build providers
+and runtime requirements also match. No C++ or fixture-test code changed.
 
 The test then passed on the actual Uke `7.3.3-26-unstable` kernel through a
 GPG-checked DNF installation. That transaction installed only this diagnostic;
@@ -131,6 +149,10 @@ post-test check found zero owned loops and zero owned work directories. DNF
 then removed only the diagnostic, with automatic dependency removal disabled.
 The installed helper/assets and matching task RPM cache were absent afterward;
 original Fedora providers and integrity lockdown remained unchanged.
+That device execution used version `1.0-8`; the license-only `1.0-9` package
+was not installed on the tablet. The superseded temporary build 11329076 was
+retired after its signed RPM, SRPM, exact sources and runtime receipts were
+retained, with `1.0-9` preserving the unchanged diagnostic implementation.
 
 This qualifies the owned-loop block-I/O path, not physical UFS ownership, the
 selected boot slot, the running Image, OEM trust, a boot role or key release.
@@ -147,4 +169,4 @@ prefix digests, inspect all header constraints or identify the booted slot.
 [header]: https://android.googlesource.com/platform/system/tools/mkbootimg/+/4a27dd13adf9846e12d585d6fe99a375ebb58396/include/bootimg/bootimg.h
 [arm64]: https://docs.kernel.org/arch/arm64/booting.html
 [qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329047/
-[blocks-qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329076/
+[blocks-qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329154/
