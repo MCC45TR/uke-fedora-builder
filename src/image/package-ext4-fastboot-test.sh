@@ -7,6 +7,11 @@ umask 077
 input=$(realpath "$1") geometry=$(realpath "$2") output=$(realpath -m "$3") producer=$4
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 [[ -d $input && -f $geometry && ! -e $output && $producer =~ ^[a-f0-9]{40}$ ]]
+# Validate every geometry value before using it in arithmetic.
+# shellcheck source=test-fastboot-profile.sh
+# shellcheck disable=SC1091
+source "$repo/src/image/test-fastboot-profile.sh"
+test_fastboot_requirements "$geometry" > /dev/null
 for file in boot.img userdata.img manifest.json kernel-info.json SHA256SUMS; do
     [[ -f $input/$file && ! -L $input/$file ]]
 done
@@ -78,9 +83,6 @@ cmp "$work/root.raw" "$work/readback.raw"
 cp --reflink=auto "$input/boot.img" "$output/files/boot.img"
 (( $(stat -c %s "$output/files/boot.img") <= $(jq -er .partitions.boot_b "$geometry") ))
 (( raw_bytes <= $(jq -er .partitions.userdata "$geometry") ))
-# shellcheck source=test-fastboot-profile.sh
-# shellcheck disable=SC1091
-source "$repo/src/image/test-fastboot-profile.sh"
 test_fastboot_requirements "$geometry" > "$output/files/android-info.txt"
 test_fastboot_tasks > "$output/files/fastboot-info.txt"
 cp "$manifest" "$output/receipts/input-manifest.json"
