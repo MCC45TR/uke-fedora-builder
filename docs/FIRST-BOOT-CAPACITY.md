@@ -28,3 +28,18 @@ For an R2-derived repair, change only the existing capacity unit in a separate
 copy of the verified KDE filesystem and preserve its inode metadata, filesystem
 identity and matching R2 boot/kernel cohort. Record the exact payload difference
 and resulting image checksum before publication; never overwrite R2 assets.
+
+## Offline clock floor
+
+15 November 2026, fresh Uke EXT4 installation. The RTC starts in1970 and the
+original systemd package supplies a 6 November epoch. Before network time, RPM
+rejects a newer installed header signature; the same header verifies after
+chronyd synchronizes. This is not evidence of RPM database corruption.
+
+Composition now seeds the standard empty
+`/var/lib/systemd/timesync/clock` with the composition timestamp. PID1 reads
+this mtime as an offline lower bound even when chronyd supplies network time.
+No original Fedora file is modified and no extra clock daemon is enabled.
+Unexpected nonempty, linked or symlink state is refused. A native EXT4
+formatter/readback test verifies the actual inode timestamp; offline device
+boot and first health acceptance remain separate validation gates.
