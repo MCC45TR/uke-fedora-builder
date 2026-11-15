@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        6%{?dist}
+Release:        7%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -54,6 +54,13 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_VBMETA_CLI \
     build/libavb.a -o build/cohort-vbmeta $LDFLAGS -lcrypto
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Ibuild/upstream -c \
     src/image/protected-cohort-vbmeta.cpp -o build/cohort-vbmeta.o
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_CONTENT_CLI \
+    -Ibuild/upstream src/image/protected-cohort-{auth,manifest,vbmeta,content}.cpp \
+    build/libavb.a -o build/cohort-content $LDFLAGS -lcrypto
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Ibuild/upstream -c \
+    src/image/protected-cohort-content.cpp -o build/cohort-content.o
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/boot/boot-image.cpp \
+    -o build/boot-image $LDFLAGS
 
 # Native tests produce the receipts that the install stage packages. RPM runs
 # %%install before %%check, so these must exist before entering %%install.
@@ -63,9 +70,11 @@ readelf -h build/cohort-manifest | grep -E 'Machine:.*AArch64'
 bash tests/protected-cohort-manifest.sh build/cohort-manifest "$PWD/build/manifest-result.json"
 readelf -h build/cohort-vbmeta | grep -E 'Machine:.*AArch64'
 bash tests/protected-cohort-vbmeta.sh build/cohort-vbmeta "$PWD/build/vbmeta-result.json"
+readelf -h build/cohort-content | grep -E 'Machine:.*AArch64'
+bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json"
 rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 > build/original-tools.txt
-sha256sum src/image/protected-cohort-{auth,manifest,vbmeta}.* tests/protected-cohort-{auth,manifest,vbmeta}.sh \
-    src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh > build/source-sha256.txt
+sha256sum src/image/protected-cohort-{auth,manifest,vbmeta,content}.* tests/protected-cohort-{auth,manifest,vbmeta,content}.sh \
+    src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh src/boot/boot-image.cpp > build/source-sha256.txt
 find build/upstream/libavb -type f -print0 | sort -z | xargs -0 sha256sum > build/upstream-sha256.txt
 
 %check
@@ -77,11 +86,14 @@ jq -e '.real_signature_then_semantic_validation and .signed_invalid_cases_refuse
 jq -e '.original_fedora_avbtool_interoperability and .outer_avb_and_inner_pss_verified and
     .refused_cases==35 and .typed_manifest_and_hash_descriptor_sizes_bound and
     (.rollback_state_verified|not) and (.role_admitted|not)' build/vbmeta-result.json
+jq -e '.real_signed_metadata_then_fd_content_verification and .refused_cases==31 and
+    .partial_duplicate_failure_cleaned_up and .large_streaming_result.peak_rss_kib<65536 and
+    (.physical_block_branch_tested|not) and (.role_admitted|not)' build/content-result.json
 
 %install
 install -d %{buildroot}%{_datadir}/%{name}
 install -pm644 build/native-result.json build/original-tools.txt build/source-sha256.txt \
-    build/manifest-result.json build/vbmeta-result.json build/upstream-sha256.txt \
+    build/manifest-result.json build/vbmeta-result.json build/content-result.json build/upstream-sha256.txt \
     %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
 
 %files
@@ -89,6 +101,9 @@ install -pm644 build/native-result.json build/original-tools.txt build/source-sh
 %{_datadir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-7
+- Verify signed boot prefixes and the raw ARM64 kernel slice through owned read-only descriptors.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-6
 - Stage the upstream license in the build directory before packaging.
 

@@ -24,18 +24,20 @@ public:
     VerifiedVbmetaCohort& operator=(const VerifiedVbmetaCohort&) = default;
     VerifiedVbmetaCohort& operator=(VerifiedVbmetaCohort&&) noexcept = default;
     const ValidatedCohortManifest& manifest() const noexcept { return manifest_; }
+    const ObservedBootGeometry& observed_geometry() const noexcept { return observed_; }
     // Fixed order: boot, vendor_boot, dtbo. These are signed expected hashes;
     // an independent bounded physical read still has to compare actual bytes.
     const std::array<AvbBootHash, 3>& boot_hashes() const noexcept { return boot_hashes_; }
     const std::string& vbmeta_sha256() const noexcept { return vbmeta_sha256_; }
     uint64_t signed_rollback_index() const noexcept { return rollback_index_; }
 private:
-    VerifiedVbmetaCohort(ValidatedCohortManifest manifest, std::array<AvbBootHash, 3> hashes,
+    VerifiedVbmetaCohort(ValidatedCohortManifest manifest, std::array<AvbBootHash, 3> hashes, ObservedBootGeometry observed,
                          std::string digest, uint64_t rollback)
-        : manifest_(std::move(manifest)), boot_hashes_(std::move(hashes)),
+        : manifest_(std::move(manifest)), boot_hashes_(std::move(hashes)), observed_(observed),
           vbmeta_sha256_(std::move(digest)), rollback_index_(rollback) {}
     ValidatedCohortManifest manifest_;
     std::array<AvbBootHash, 3> boot_hashes_;
+    ObservedBootGeometry observed_;
     std::string vbmeta_sha256_;
     uint64_t rollback_index_;
     friend VerifiedVbmetaCohort verify_vbmeta_cohort_bytes(std::span<const unsigned char>,

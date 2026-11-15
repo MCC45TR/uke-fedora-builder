@@ -154,7 +154,8 @@ VerifiedVbmetaCohort verify_vbmeta_cohort_bytes(std::span<const unsigned char> c
     const std::array<uint64_t, 3> sizes{manifest.boot.bytes, manifest.vendor_boot.bytes, manifest.dtbo.bytes};
     for (size_t i = 0; i < sizes.size(); ++i)
         if (sizes[i] != descriptors.hashes[i].image_bytes) refuse();
-    return {std::move(manifest), std::move(descriptors.hashes), sha256({bytes.data(), static_cast<size_t>(end)}), header.rollback_index};
+    return {std::move(manifest), std::move(descriptors.hashes), observed,
+            sha256({bytes.data(), static_cast<size_t>(end)}), header.rollback_index};
 }
 }
 
