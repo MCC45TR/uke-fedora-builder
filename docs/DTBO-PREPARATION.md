@@ -126,12 +126,13 @@ format producer and synthetic fixture, not a new bootable Uke DTBO image.
 
 ## Remaining qualification
 
-The next source-cohort candidate pins 122 unchanged inputs (1,599,532 source
+The next source-cohort candidate pins 123 unchanged inputs (1,599,568 source
 bytes) from the exact board, camera, display and kernel releases below, plus
 camera-kernel headers at `699fa15a98abd40fbb94f3a6fc00f91723d29d35`.
 The [OEM source record](../packaging/dtbo-oem-source.json) preserves each Git
 blob, digest and any declared SPDX notice. The DMA-heap binding's original
-relative symlink and its in-repository target are retained. Unmarked files
+relative symlink and its in-repository target are retained, as is the input
+binding's relative `linux-event-codes.h` link. Unmarked files
 are recorded as such; a header's license is not silently assigned to a whole
 tree. Original sources and notices accompany the build inputs.
 
@@ -151,6 +152,13 @@ warning selector `graph_child_address`. Release 5 removes the downstream
 warning suppression list and uses Fedora's default diagnostics. OEM sources,
 bindings, composition and validation remain unchanged. This failure did not
 produce a DTBO or modify a device.
+
+COPR 11330817 then compiled all four base roots before CPP found the missing
+input-header symlink. The collector had resolved a relative include through
+the link and retained only its target. Release 6 preserves the lexical include
+path and original link, with unchanged target bytes. All nine root files pass
+bounded PC preprocessing with this closure; native DTC and graph composition
+are separate COPR checks. No source or hardware setting was substituted.
 
 The board include chain alone is incomplete. Installed entry 0 also contains
 the camera and O82 display layers. The corresponding OEM sources are separate:

@@ -1,6 +1,6 @@
 Name:           uke-dtbo-tools-source-check
 Version:        1.0
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Native Uke DTBO and vendor DTB source-cohort inputs
 License:        MIT AND Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause AND GPL-2.0-only AND GPL-2.0-or-later
 URL:            https://github.com/MCC45TR/uke-fedora-builder

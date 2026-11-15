@@ -72,8 +72,8 @@
       "msm_id": 0
     }
   ],
-  "source_file_count": 122,
-  "source_bytes": 1599532,
+  "source_file_count": 123,
+  "source_bytes": 1599568,
   "inputs": [
     {
       "kind": "regular",
@@ -1240,6 +1240,17 @@
       "git_blob_sha1": "bcf0ae100f21af8cfe0afc49d0a9107d4dfa62d7",
       "sha256": "2f7ae2ec64f1b033e9c3d34d9128c0851f86cfffa010a890b46ac49aae4f17ea",
       "declared_spdx": "GPL-2.0"
+    },
+    {
+      "kind": "symlink",
+      "owner": "kernel",
+      "repository": "https://github.com/MiCode/Xiaomi_Kernel_OpenSource",
+      "commit": "5712080a4b0c0b1a879e6d145c601c649ddaddfd",
+      "path": "include/dt-bindings/input/linux-event-codes.h",
+      "archive_path": "kernel/include/dt-bindings/input/linux-event-codes.h",
+      "git_blob_sha1": "693bbcd2670a41ce72418214217c613d8ad52037",
+      "sha256": "7a4b0eb4821228c164381b743ae67442fad85651359c2470eda69e5aedd398ad",
+      "link_target": "../../uapi/linux/input-event-codes.h"
     },
     {
       "kind": "regular",
