@@ -64,6 +64,20 @@ file. No physical disk or tablet is exposed to the container. This tests the
 runner kernel's verification path; it does not authenticate the recipe or
 qualify the Uke kernel, rescue startup or hardware.
 
+[Actions 43665688628][kernel-fixture] passed this kernel fixture at source
+`4dec3607375abd49a17668e6afd0af1253b93770`, using original Fedora tools and
+the x86_64 runner's `7.0.0-1017-azure` kernel. Its downloaded 22-member receipt
+archive and all 28 recorded source hashes matched. The preceding run stopped
+at removal of an open fixture mapping. Removal now uses libdevmapper's bounded
+`--retry` handling for short-lived udev opens; it does not force or defer
+removal or repeat integrity checks. See the [upstream removal contract][dmsetup].
+
+A fresh read-only check of the Uke tablet still found `CONFIG_DM_VERITY`
+disabled in `7.3.3-26-unstable`. The cumulative protected kernel needs this
+dependency and the early admission policy before any such rescue path can
+run on the tablet. No module loading, device write or reboot accompanied
+the host qualification.
+
 ## Remaining protected seed integration
 
 The current schema-3 physical provisioner grows plain EXT4 and initializes
@@ -97,3 +111,5 @@ physical acceptance are not qualified by these host artifacts.
 [verity]: https://docs.kernel.org/admin-guide/device-mapper/verity.html
 [avb]: https://android.googlesource.com/platform/external/avb/+/refs/heads/main/README.md
 [qualification]: https://github.com/MCC45TR/uke-fedora-builder/actions/runs/43664178768
+[kernel-fixture]: https://github.com/MCC45TR/uke-fedora-builder/actions/runs/43665688628
+[dmsetup]: https://github.com/lvmteam/lvm2/blob/main/man/dmsetup.8_main
