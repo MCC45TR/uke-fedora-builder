@@ -4,7 +4,14 @@
 set -Eeuo pipefail
 export LC_ALL=C
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
-[[ $# == 1 && ! -e $1 && ! -L $1 ]]
+[[ $# -ge 1 && $# -le 2 && ! -e $1 && ! -L $1 ]]
+padded_result=reject-before-mutation
+normalized=false
+if [[ $# == 2 ]]; then
+    [[ $2 == --normalizes-partition-size ]]
+    padded_result=success
+    normalized=true
+fi
 report=$(realpath -m "$1")
 for tool in fastboot socat zip jq lpmake; do command -v "$tool" >/dev/null; done
 work=$(mktemp -d)
@@ -138,7 +145,19 @@ grep -Fxq 'set_active:b' "$work/initial-test-b/commands.txt"
 run_case initial-test-a "$work/test-profile.zip" reject-before-mutation < "$work/base.json"
 run_case initial-test-wrong-size "$work/test-profile.zip" reject-before-mutation < <(
     jq '."current-slot"="b" | ."partition-size:userdata"="0x00100000"' "$work/base.json")
-jq -n --arg version "$(fastboot --version | head -n1)" \
+# Uke ABL returns a leading space in numeric getvar responses. Upstream's
+# requirement checker trims options but not the response, unlike get_uint_var.
+# The unmodified client must demonstrate this refusal; the isolated host fix
+# must accept the same exact capacities while retaining every negative gate.
+run_case padded-capacities "$work/guarded.zip" "$padded_result" < <(
+    jq 'with_entries(if (.key|startswith("partition-size:")) then .value=" "+.value else . end)' "$work/base.json")
+run_case initial-test-b-padded "$work/test-profile.zip" "$padded_result" < <(
+    jq '."current-slot"="b" | with_entries(if (.key|startswith("partition-size:")) then .value=" "+.value else . end)' "$work/base.json")
+for value in ' 0x00100000' ' 0x6000000junk' ' '; do
+    run_case "padded-invalid-${value//[^a-zA-Z0-9]/_}" "$work/test-profile.zip" reject-before-mutation < <(
+        jq --arg value "$value" '."current-slot"="b" | ."partition-size:boot_b"=$value' "$work/base.json")
+done
+jq -n --arg version "$(fastboot --version | head -n1)" --argjson normalized "$normalized" \
     '{schema_version:1,original_fastboot:$version,loopback_only:true,usb_used:false,
       synthetic_nonbootable_payloads:true,explicit_ten_partition_order_verified:true,
       both_initial_active_slots_tested:true,foreign_or_missing_geometry_refused_before_mutation:true,
@@ -147,5 +166,7 @@ jq -n --arg version "$(fastboot --version | head -n1)" \
       unguarded_sparse_extent_mismatch_reaches_flash:true,physical_fastboot_tested:false,
       initial_test_profile_exactly_boot_b_userdata:true,initial_test_other_slot_refused_before_mutation:true,
       initial_test_current_slot_b_preserved:true,
+      partition_size_response_whitespace_normalized:$normalized,
+      padded_wrong_capacity_and_malformed_values_refused:true,
       operating_system_booted:false,secure_boot_tested:false}' > "$report"
 printf 'Original fastboot ZIP parser, explicit slots and pre-mutation capacity requirements passed on loopback only.\n'

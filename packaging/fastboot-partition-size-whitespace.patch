@@ -1,0 +1,15 @@
+--- a/vendor/core/fastboot/fastboot.cpp
++++ b/vendor/core/fastboot/fastboot.cpp
+@@ -844,6 +844,12 @@ static bool CheckRequirement(const std::string& cur_product, const std::string& var,
+         return false;
+     }
+ 
++    // ABL can pad numeric getvar replies, as get_uint_var already documents.
++    // Keep exact capacity requirements; normalize only numeric response space.
++    if (var.rfind("partition-size:", 0) == 0) {
++        var_value = Trim(var_value);
++    }
++
+     bool match = false;
+     for (const auto& option : options) {
+         if (option == var_value ||
