@@ -92,8 +92,20 @@ set +e
 TMPDIR="$work" "$client" -s "$device" update "$archive" 2>&1 | while IFS= read -r line; do
     # Device serials are unnecessary in a support log.
     [[ $line != 'Serial Number'* ]] || continue
-    printf '%s\n' "$line"
     printf '%s\n' "$line" >> "$log"
+    # These exact optional probes are expected for this hash-pinned test ZIP.
+    # Keep them in the support log; actual failures and other missing files stay
+    # visible. The initial image does not claim verified boot qualification.
+    case $line in
+        "archive does not contain 'super_empty.img'"|"archive does not contain 'boot.sig'"|"archive does not contain 'userdata.sig'") continue;;
+    esac
+    printf '%s\n' "$line"
+    if [[ $line =~ ^Sending[[:space:]]sparse[[:space:]].*[[:space:]]([0-9]+)/([0-9]+)[[:space:]] ]]; then
+        current_piece=${BASH_REMATCH[1]} total_pieces=${BASH_REMATCH[2]}
+    fi
+    if [[ $line == Writing\ \'userdata\'*OKAY* && -n ${current_piece:-} ]]; then
+        say "Root image: piece $current_piece/$total_pieces written." "Kök imajı: $current_piece/$total_pieces parça yazıldı."
+    fi
     case $line in *Writing*) : > "$work/writing-started";; esac
 done
 status=${PIPESTATUS[0]}
