@@ -3,7 +3,7 @@
 public_core_desktop_free() {
     local inventory=$1
     [[ -s $inventory ]] || return 1
-    if LC_ALL=C grep -E '^(plasma-workspace|plasma-setup|plasma-login-manager|gnome-shell|gnome-session|gnome-session-wayland-session|gnome-initial-setup|gdm|sddm|cutefish-desktop|nextkde|quickshell|uke-kde-plasma-meta|uke-gnome-meta)-[0-9]' "$inventory"; then
+    if LC_ALL=C grep -E '^(plasma-workspace|plasma-setup|plasma-login-manager|gnome-shell|gnome-session|gnome-session-wayland-session|gnome-initial-setup|gdm|sddm|cutefish-desktop|cutefish-toolkit|cutefish-framework|cutefish-core|cutefish-compositor|cutefish-dm|cutefish-filemanager|cutefish-icon-theme|cutefish-settings|cutefish-terminal|cutefish-qt-plugins|cutefish-system-monitor|cutefish-text-editor|cutefish-video-player|cutefish-calendar|cutefish-calculator|cutefish-preview|xdg-desktop-portal-cutefish|uke-cutefish-meta|uke-cutefish-firstboot|uke-cutefish-session-config|uke-cutefish-wallpapers|wvkbd|nextkde|quickshell|uke-kde-plasma-meta|uke-gnome-meta)-[0-9]' "$inventory"; then
         printf 'Common core contains a desktop session or display manager\n' >&2
         return 1
     fi

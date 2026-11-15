@@ -10,10 +10,10 @@ release_manifest() {
       .image_built and .rpm_transaction_validated and .source_checked and
       .mode=="singleboot" and .partition=="userdata" and .filesystem=="ext4" and
       .device_private_data_included==false and .ssh_enabled==false and .automatic_kernel_activation==false and
-      ((.desktop=="cutefish" and .credentials_included==true and .public_test_account=="senemos" and
-        .account_setup=="gdm-expired-public-test-account" and .password_change_required==true and .password_change_backend_tested==true and
-        .autologin_enabled==false and .remote_password_login==false and .passwordless_sudo==false) or
-       (.desktop!="cutefish" and .credentials_included==false)) and
+      .credentials_included==false and
+      (.desktop!="cutefish" or (.account_setup=="uke-cutefish-firstboot" and
+        .firstboot_backend_input_tests==true and .autologin_enabled==false and
+        .remote_password_login==false and .passwordless_sudo==false)) and
       .kernel_rpm_signature=="verified COPR signature" and .kernel_rpms_locally_built==false and
       .filesystem_contents_readback and .filesystem_metadata_readback and
       .selinux_policy_contexts_verified and .independent_aosp_decoder_verified and .sparse_roundtrip_verified and
@@ -216,7 +216,7 @@ release_body() {
     printf '## Downloads\n\nChoose one desktop. Sizes are the actual compressed file sizes.\n\n| Desktop | Compressed image | Size (bytes) |\n| --- | --- | ---: |\n'
     while IFS=$'\t' read -r file bytes sha; do
         [[ $file != "$boot" ]] || continue
-        case $file in *-kde-plasma-*) example='KDE Plasma';; *-gnome-*) example=GNOME;; *) example=Desktop;; esac
+        case $file in *-kde-plasma-*) example='KDE Plasma';; *-gnome-*) example=GNOME;; *-cutefish-*) example=Cutefish;; *-kde-plasma-mobile-*) example='KDE Mobile';; *) example=Desktop;; esac
         printf '| %s | [%s](%s/%s) | %s |\n' "$example" "$file" "$url" "$file" "$bytes"
     done < "$inventory"
     boot_bytes=$(awk -F '\t' -v name="$boot" '$1==name {print $2}' "$inventory")
@@ -230,12 +230,12 @@ release_body() {
     [[ -n $example ]] || release_fail 'No system image in checksum inventory'
     printf 'After all checks, choose one desktop root. This example uses `%s`; extraction and each write must succeed before slot selection and reboot:\n\n```sh\n' "$example"
     printf 'zstd -d --keep %s -o system.img && \\\nfastboot flash userdata system.img && \\\nfastboot flash boot_b %s && \\\nfastboot set_active b && \\\nfastboot reboot\n```\n\n' "$example" "$boot"
-    printf 'Do not run `fastboot -w` or format userdata afterwards. Preserve stock early firmware and calibration partitions. The builder performs no tablet writes.\n\nEXT4 initially occupies the image capacity. Original systemd-growfs expands it to the measured userdata capacity before setup; the independent capacity gate remains enforced. Disk swap uses half physical RAM, or a valid unique linux_swap partition. Fastboot itself does not resize EXT4. KDE uses Plasma Setup; GNOME uses GNOME Initial Setup. These two images contain no preset human account; SSH is disabled.\n\n## After installation\n\n```sh\nsudo dnf update --refresh\n```\n\nUse the configured signed Fedora/COPR repositories. Kernel updates must retain matched Uke kernel, modules, DT and boot packages. Do not mix a generic Fedora kernel or an unrelated boot image with these roots. Automatic kernel activation is disabled; follow the documented guarded updater procedure rather than assuming a package update has safely activated new boot bytes.\n\n## Testing status\n\nAutomated checks cover signatures, matching kernel/module/DT/boot payloads, complete RPM translations including Turkish/help/Qt catalogs, EXT4 contents, ownership and SELinux metadata. These checks do not certify device runtime, first-account setup, full-capacity growth, swap, input, graphics, firmware compatibility or rollback.\n\n'
+    printf 'Do not run `fastboot -w` or format userdata afterwards. Preserve stock early firmware and calibration partitions. The builder performs no tablet writes.\n\nEXT4 initially occupies the image capacity. Original systemd-growfs expands it to the measured userdata capacity before setup; the independent capacity gate remains enforced. Disk swap uses half physical RAM, or a valid unique linux_swap partition. Fastboot itself does not resize EXT4. KDE uses Plasma Setup; GNOME uses GNOME Initial Setup. Images contain no preset human account; SSH is disabled. Cutefish uses its dedicated first-account setup and upstream Cutefish DM.\n\n## After installation\n\n```sh\nsudo dnf update --refresh\n```\n\nUse the configured signed Fedora/COPR repositories. Kernel updates must retain matched Uke kernel, modules, DT and boot packages. Do not mix a generic Fedora kernel or an unrelated boot image with these roots. Automatic kernel activation is disabled; follow the documented guarded updater procedure rather than assuming a package update has safely activated new boot bytes.\n\n## Testing status\n\nAutomated checks cover signatures, matching kernel/module/DT/boot payloads, complete RPM translations including Turkish/help/Qt catalogs, EXT4 contents, ownership and SELinux metadata. These checks do not certify device runtime, first-account setup, full-capacity growth, swap, input, graphics, firmware compatibility or rollback.\n\n'
     report=$(dirname -- "${BASH_SOURCE[0]}")/../../docs/release-testing/$day-r$revision.md
     if [[ -f $report && ! -L $report ]]; then cat "$report"; printf '\n'
     else printf 'No release-specific physical test report is recorded here. Report the device variant, desktop, exact hashes and logs; do not infer hardware acceptance from build success.\n\n'; fi
     if grep -q -- '-cutefish-uke-senemos-system-' "$inventory"; then
-        printf '**Historical Cutefish image only:** public test account `senemos`, initial password `fedora`; GDM requires a password change. Automatic login, remote password login and passwordless sudo are disabled.\n\n'
+        printf '**Cutefish test image:** no preset human account or password. A dedicated first-account setup session precedes Cutefish DM. Physical login, touch keyboard, GPU and application acceptance remain untested until a matching report is recorded.\n\n'
     elif [[ ${UKE_ALLOW_MISSING_CUTEFISH:-0} == 1 ]]; then printf '**Cutefish is currently unavailable.** Its separate validation must pass before a compatible image is added.\n\n'; fi
     printf '## Build evidence and support\n\nKernel source: `%s`; signer: `%s`; COPR RPM version-release: `%s%s`.\n\n' "$(jq -er .kernel_source_commit "$delivery/receipts/cohort.json")" "$(jq -er .kernel_key_fingerprint "$delivery/receipts/cohort.json")" "$(jq -er .rpm_version_release "$delivery/receipts/cohort.json")" "$(jq -er .rpm_dist "$delivery/receipts/cohort.json")"
     for manifest in "$delivery/receipts/images/"*.json; do

@@ -12,6 +12,14 @@ export UKE_RELEASE_BUILD_RUNS=${UKE_RELEASE_BUILD_RUNS:-$GITHUB_RUN_ID}
 # shellcheck disable=SC1091
 source "$layout_tool"
 bash "$layout_tool" verify "$delivery"
+# Test artifacts can be installed for physical qualification. A Cutefish release
+# additionally requires a separately recorded successful physical login/setup.
+for manifest in "$delivery/receipts/images/"*.json; do
+    if jq -e '.desktop=="cutefish"' "$manifest" >/dev/null; then
+        jq -e '.tablet_tested==true and .graphical_login_hardware_tested==true and .firstboot_hardware_tested==true' "$manifest" >/dev/null ||
+            release_fail 'Cutefish publication requires physical first-account and login acceptance; retain the Actions test artifact'
+    fi
+done
 if [[ -n ${UKE_EXPECTED_CORE_SHA:-} ]]; then
     [[ $UKE_EXPECTED_CORE_SHA =~ ^[0-9a-f]{64}$ ]] || release_fail 'Invalid expected core hash'
     for manifest in "$delivery/receipts/images/"*.json; do

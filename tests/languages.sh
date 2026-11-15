@@ -27,7 +27,7 @@ for desktop in core kde nextkde plasma-mobile gnome cutefish; do
         core) catalogs='';;
         kde|nextkde|plasma-mobile) catalogs='org.kde.plasmasetup.mo plasma_login.mo plasmashell.mo';;
         gnome) catalogs='gnome-initial-setup.mo gnome-shell.mo gdm.mo';;
-        cutefish) catalogs='gnome-shell.mo gdm.mo mutter.mo';;
+        cutefish) catalogs='';;
     esac
     for catalog in $catalogs; do
         printf 'catalog payload\n' > "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/$catalog"
@@ -44,6 +44,16 @@ for desktop in core kde nextkde plasma-mobile gnome cutefish; do
                 done
             done;;
     esac
+    if [[ $desktop == cutefish ]]; then
+        while IFS= read -r domain; do
+            for ((n=0;n<16;n++)); do
+                directory=/usr/share/locale/supplied_$n/LC_MESSAGES
+                mkdir -p "$work/$desktop$directory"
+                printf 'upstream supplied catalog\n' > "$work/$desktop$directory/$domain.mo"
+                printf '%s/%s.mo\t0\tsupplied\n' "$directory" "$domain" >> "$work/$desktop.tsv"
+            done
+        done < <(jq -r '.translation_domains[]' "$builder/configs/images/cutefish-rawhide.json")
+    fi
     public_language_audit "$work/$desktop" "$work/$desktop.tsv" "$desktop" "$work/locales" "$work/$desktop.json"
     # Locale archive/package presence still cannot excuse stripped catalogs.
     rm "$work/$desktop/usr/share/locale/tr/LC_MESSAGES/libc.mo"

@@ -92,7 +92,7 @@ TimeoutStartSec=infinity
 [Install]
 WantedBy=multi-user.target
 UNIT
-    for unit in systemd-user-sessions.service gdm.service plasmalogin.service plasma-setup.service; do
+    for unit in systemd-user-sessions.service gdm.service plasmalogin.service plasma-setup.service cutefish-dm.service uke-cutefish-firstboot.service; do
         mkdir -p "$root/etc/systemd/system/$unit.d"
         printf '[Unit]\nRequires=uke-root-capacity.service uke-swap-ready.service\nAfter=uke-root-capacity.service uke-swap-ready.service\n' > "$root/etc/systemd/system/$unit.d/20-storage-ready.conf"
     done

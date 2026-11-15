@@ -7,6 +7,7 @@ public_root_packages() {
     case $channel in stable|testing|unstable) ;; *) return 1;; esac
     case $desktop in core|kde|plasma-mobile|gnome|cutefish|nextkde) ;; *) return 1;; esac
     case $login_shell in bash|fish|zsh) ;; *) return 1;; esac
+    [[ $desktop != cutefish || ( $release == rawhide && $channel == unstable ) ]] || return 1
     selection=(fedora-release fedora-repos bash "$login_shell" coreutils dnf5 dnf5-plugins glibc-all-langpacks
         systemd systemd-udev systemd-pam NetworkManager NetworkManager-wifi bluez chrony
         firewalld openssh-server sudo shadow-utils cracklib-dicts selinux-policy-targeted policycoreutils
@@ -32,9 +33,13 @@ public_root_packages() {
         done
         selection=("${individual[@]}" uke-core-meta)
     fi
-    if [[ $desktop == kde || $desktop == plasma-mobile || $desktop == nextkde ]]; then
+    if [[ $desktop == plasma-mobile ]]; then
+        local mobile_profile mobile_selection
+        mobile_profile=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../../configs/images" && pwd)/plasma-mobile-rawhide.json
+        mobile_selection=$(jq -er '.packages[]' "$mobile_profile") || return
+        while IFS= read -r package; do selection+=("$package"); done <<< "$mobile_selection"
+    elif [[ $desktop == kde || $desktop == nextkde ]]; then
         selection+=(uke-kde-plasma-meta plasma-setup kde-settings-plasmalogin kio-admin)
-        [[ $desktop != plasma-mobile ]] || selection+=(plasma-mobile plasma-settings)
         [[ $desktop != nextkde ]] || selection+=(nextkde quickshell)
     elif [[ $desktop == gnome ]]; then
         selection+=(gnome-shell gnome-session-wayland-session gdm gnome-initial-setup
@@ -46,8 +51,13 @@ public_root_packages() {
             gvfs-mtp gvfs-smb gvfs-afc gvfs-fuse gvfs-goa gvfs-gphoto2 sushi glib-networking
             gnome-keyring PackageKit PackageKit-gtk3-module yelp orca)
     elif [[ $desktop == cutefish ]]; then
-        # The standalone bus is used by the isolated real GDM/PAM probe.
-        selection+=(cutefish-desktop gdm dbus-daemon)
+        [[ $release == rawhide && $channel == unstable ]] || return 1
+        # shellcheck source=cutefish-profile.sh
+        # shellcheck disable=SC1091
+        source "$(dirname -- "${BASH_SOURCE[0]}")/cutefish-profile.sh"
+        local selected_cutefish
+        selected_cutefish=$(public_cutefish_profile '.packages[]') || return
+        while IFS= read -r package; do selection+=("$package"); done <<< "$selected_cutefish"
     fi
 }
 

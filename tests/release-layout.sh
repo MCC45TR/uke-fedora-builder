@@ -34,12 +34,12 @@ reject bash "$tool" names "$work/kde/manifest.json" 011126 r0
 reject bash "$tool" names "$work/kde/manifest.json" 011126 00
 reject bash "$tool" names "$work/kde/manifest.json" 011126 '0;touch bad'
 cp -a "$work/kde" "$work/cutefish"
-jq '.desktop="cutefish"|.credentials_included=true|.public_test_account="senemos"|
-    .account_setup="gdm-expired-public-test-account"|.password_change_required=true|.password_change_backend_tested=true|
+jq '.desktop="cutefish"|.credentials_included=false|
+    .account_setup="uke-cutefish-firstboot"|.firstboot_backend_input_tests=true|
     .autologin_enabled=false|.remote_password_login=false|.passwordless_sudo=false' \
     "$work/kde/manifest.json" > "$work/cutefish/manifest.json"
 bash "$tool" names "$work/cutefish/manifest.json" 011126 1 > /dev/null
-for key in password_change_required password_change_backend_tested autologin_enabled remote_password_login passwordless_sudo; do
+for key in credentials_included firstboot_backend_input_tests autologin_enabled remote_password_login passwordless_sudo; do
     jq --arg key "$key" '.[$key]=(.[$key]|not)' "$work/cutefish/manifest.json" > "$work/invalid-account.json"
     reject bash "$tool" names "$work/invalid-account.json" 011126 1
 done
@@ -79,8 +79,8 @@ for desktop in kde gnome cutefish nextkde; do
     jq --arg desktop "$desktop" --arg core "$core_sha" --arg sha "$(sha256sum "$work/set-$desktop/userdata.img" | cut -d ' ' -f1)" \
         '.desktop=$desktop|.shared_core_sha256=$core|.desktop_isolation_audited=true|.previous_desktop_image_input=false|
          .channel="unstable"|.default_shell="bash"|.builder_commit=("b"*40)|.root_sparse_sha256=$sha|
-         if $desktop=="cutefish" then .credentials_included=true|.public_test_account="senemos"|
-           .account_setup="gdm-expired-public-test-account"|.password_change_required=true|.password_change_backend_tested=true|
+         if $desktop=="cutefish" then .credentials_included=false|
+           .account_setup="uke-cutefish-firstboot"|.firstboot_backend_input_tests=true|
            .autologin_enabled=false|.remote_password_login=false|.passwordless_sudo=false else . end' \
         "$work/kde/manifest.json" > "$work/set-$desktop/manifest.json"
     bash "$tool" stage "$work/set-$desktop" "$work/set-delivery-$desktop" 011126 1
@@ -237,6 +237,16 @@ jq '.assets += [{name:"manifest.json",state:"uploaded",digest:("sha256:"+("e"*64
 before=$(wc -l < "$work/remote/calls")
 reject bash "$publisher" "$work/gnome-only"
 [[ $(wc -l < "$work/remote/calls") == $((before + 1)) ]]
+# Hardware-untested Cutefish artifacts are valid test deliveries but cannot publish.
+UKE_GH_STATE="$work/remote-complete-set" UKE_REQUIRE_DESKTOP_SET=1 UKE_EXPECTED_CORE_SHA="$core_sha" reject bash "$publisher" "$work/complete-set"
+[[ ! -e $work/remote-complete-set/release.json ]]
+# This source-only fixture simulates a separately recorded physical acceptance.
+for manifest in "$work/complete-set/receipts/images/"*.json; do
+    if jq -e '.desktop=="cutefish"' "$manifest" >/dev/null; then
+        jq '.tablet_tested=true|.graphical_login_hardware_tested=true|.firstboot_hardware_tested=true' "$manifest" > "$work/qualified-cutefish.json"
+        cp "$work/qualified-cutefish.json" "$manifest"
+    fi
+done
 env UKE_GH_STATE="$work/remote-complete-set" UKE_REQUIRE_DESKTOP_SET=1 UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/complete-set"
 jq -e '.draft==false and (.assets|length==5) and ([.assets[]|select(.name|contains("-boot-"))]|length==1)' "$work/remote-complete-set/release.json" >/dev/null
 env UKE_GH_STATE="$work/remote-optional-cutefish" UKE_REQUIRE_DESKTOP_SET=1 UKE_ALLOW_MISSING_CUTEFISH=1 UKE_EXPECTED_CORE_SHA="$core_sha" bash "$publisher" "$work/without-cutefish"

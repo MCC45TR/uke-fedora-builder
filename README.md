@@ -61,17 +61,16 @@ The builder checks source and package inputs, keeps build records and generates 
 Package assembly never falls back to source compilation. `unstable` selects
 `mcc45tr/uke-linux-unstable` directly with its pinned signing fingerprint.
 `--kernel-rpm` can freeze an exact published kernel release. Kernel source options
-require `--build-from-source` for image builds. Plasma Mobile adds Fedora's
-`plasma-mobile` and `plasma-settings` packages and retains Plasma account setup;
-its graphical session and first-account flow require device testing. NextKDE
-uses Plasma Setup and starts its KOS services after normal account login.
-Cutefish uses GDM with the public test account `senemos` / `fedora`, requires a
-password change, and must pass the real GDM/PAM backend probe during assembly.
-No desktop silently substitutes another; tablet login and runtime remain
-unqualified. The [parallel shared-core workflow](docs/SHARED-CORE-IMAGES.md)
-builds the common core once, composes four independent desktop roots, and waits
-for the jobs to finish before publishing one shared boot and the validated roots.
-Cutefish failure is isolated; KDE, GNOME and NextKDE remain mandatory.
+require `--build-from-source` for image builds. Plasma Mobile uses the original
+Fedora mobile environment and application groups from the November 14 reference
+compose, with original Plasma Setup, touch keyboard and mobile look-and-feel.
+Cutefish uses the independently built upstream RPM set, Cutefish DM and a
+credentials-free first-account session. It is limited to Rawhide unstable.
+Both new profiles retain the shared kernel, filesystem and package checks;
+physical setup, login, touch/GPU and application acceptance remain pending.
+The [image profile notes](docs/DESKTOP-TEST-IMAGES.md) record their boundaries.
+Cutefish test images remain Actions artifacts until physical acceptance permits
+publication. Existing KDE/GNOME release assets are unchanged.
 
 Managed build environments may set `UKE_CA_BUNDLE` to a PEM trust bundle. It is
 mounted temporarily into workers and BuildKit build steps; it is not copied into

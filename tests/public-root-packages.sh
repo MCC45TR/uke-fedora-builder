@@ -9,6 +9,10 @@ contains() { local value; for value in "${packages[@]}"; do [[ $value != "$1" ]]
 for channel in stable testing unstable; do
     for desktop in core kde plasma-mobile gnome cutefish nextkde; do
         for login_shell in bash fish zsh; do
+            if [[ $desktop == cutefish && $channel != unstable ]]; then
+                if public_root_packages packages rawhide "$channel" "$desktop" "$login_shell"; then exit 1; fi
+                continue
+            fi
             public_root_packages packages rawhide "$channel" "$desktop" "$login_shell"
             contains "$login_shell"
             contains fedora-repos-rawhide
@@ -29,15 +33,20 @@ for channel in stable testing unstable; do
             if [[ $desktop == kde || $desktop == plasma-mobile || $desktop == nextkde ]]; then
                 contains plasma-setup
                 [[ $desktop != nextkde ]] || { contains nextkde; contains quickshell; }
-                if [[ $desktop == plasma-mobile ]]; then contains plasma-mobile; contains plasma-settings; fi
+                if [[ $desktop == plasma-mobile ]]; then contains plasma-mobile; contains plasma-settings; contains plasma-keyboard; contains qmlkonsole; if contains uke-kde-plasma-meta; then exit 1; fi; fi
                 if contains gdm; then exit 1; fi
             elif [[ $desktop == gnome ]]; then
                 contains gnome-initial-setup
                 if contains plasma-setup; then exit 1; fi
             elif [[ $desktop == cutefish ]]; then
                 contains cutefish-desktop
-                contains gdm
+                contains cutefish-dm
+                contains uke-cutefish-firstboot
+                contains uke-cutefish-session-config
+                contains cutefish-preview
+                contains wvkbd
                 contains dbus-daemon
+                if contains gdm; then exit 1; fi
                 if contains gnome-initial-setup || contains plasma-setup; then exit 1; fi
             else
                 if contains gdm || contains plasma-setup || contains nextkde || contains cutefish-desktop; then exit 1; fi

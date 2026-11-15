@@ -68,13 +68,17 @@ public_language_repair() {
 
 public_language_audit() {
     local root=$1 inventory=$2 desktop=$3 locales=$4 output=$5 listing path _flags _language _mode status
-    local checked=0 turkish=0 missing=0 required catalog locale shell=0 setup=0 login=0 qt=0
+    local checked=0 turkish=0 missing=0 required catalog locale shell=0 setup=0 login=0 qt=0 cutefish_catalogs=0 cutefish_turkish=0
     local -A directories=()
     case $desktop in
         core) required='';;
         kde|nextkde|plasma-mobile) required='org.kde.plasmasetup.mo plasma_login.mo plasmashell.mo';;
         gnome) required='gnome-initial-setup.mo gnome-shell.mo gdm.mo';;
-        cutefish) required='gnome-shell.mo gdm.mo mutter.mo';;
+        cutefish)
+            # shellcheck source=cutefish-profile.sh
+            # shellcheck disable=SC1091
+            source "$(dirname -- "${BASH_SOURCE[0]}")/cutefish-profile.sh"
+            required=$(public_cutefish_profile '.translation_domains[]') || return;;
         *) return 1;;
     esac
     [[ -d $root && ! -L $root && -s $inventory && -s $locales && $root != / ]] || return 1
@@ -114,6 +118,19 @@ public_language_audit() {
         return 1
     }
     for catalog in $required; do
+        if [[ $desktop == cutefish ]]; then
+            local supplied=() minimum
+            minimum=$(public_cutefish_profile '.minimum_catalog_languages') || return
+            mapfile -t supplied < <(LC_ALL=C awk -F '\t' -v domain="$catalog.mo" '
+                $1 ~ "^/usr/share/locale/[^/]+/LC_MESSAGES/" && substr($1,length($1)-length(domain)+1)==domain {print $1}' "$inventory" | LC_ALL=C sort -u)
+            ((${#supplied[@]} >= minimum)) || { printf 'Incomplete supplied Cutefish catalogs: %s\n' "$catalog" >&2; return 1; }
+            for path in "${supplied[@]}"; do
+                [[ -s $root$path && ! -L $root$path ]] || return 1
+                cutefish_catalogs=$((cutefish_catalogs+1))
+                [[ $path != /usr/share/locale/tr/LC_MESSAGES/* ]] || cutefish_turkish=$((cutefish_turkish+1))
+            done
+            continue
+        fi
         path=/usr/share/locale/tr/LC_MESSAGES/$catalog
         [[ -s $root$path && ! -L $root$path ]] || {
             printf 'Required Turkish desktop catalog missing or empty: %s\n' "$path" >&2
@@ -130,11 +147,14 @@ public_language_audit() {
             };;
     esac
     jq -n --arg desktop "$desktop" --argjson checked "$checked" --argjson turkish "$turkish" \
+        --argjson cutefish_catalogs "$cutefish_catalogs" --argjson cutefish_turkish "$cutefish_turkish" \
         --argjson directories "${#directories[@]}" --argjson shell "$shell" --argjson setup "$setup" --argjson login "$login" --argjson qt "$qt" \
         '{schema:2,desktop:$desktop,rpm_install_languages:"all",localized_paths_checked:$checked,
           documentation_translations_included:true,
           turkish_catalogs:$turkish,missing_localized_paths:0,turkish_utf8_locale:true,locale_directories:$directories,
-          plasmashell_catalogs:$shell,plasma_setup_catalogs:$setup,plasmalogin_catalogs:$login,qt_translation_paths:$qt}' > "$output"
+          plasmashell_catalogs:$shell,plasma_setup_catalogs:$setup,plasmalogin_catalogs:$login,qt_translation_paths:$qt,
+          cutefish_supplied_catalogs_checked:$cutefish_catalogs,cutefish_turkish_catalogs:$cutefish_turkish,
+          upstream_turkish_cutefish_ui_available:($cutefish_turkish>0)}' > "$output"
 }
 
 public_language_receipt() {

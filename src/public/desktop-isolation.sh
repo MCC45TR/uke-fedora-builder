@@ -10,16 +10,26 @@ public_desktop_isolation() {
             # shellcheck disable=SC1091
             source /builder/src/public/shared-core.sh
             public_core_desktop_free "$inventory" || return;;
-        kde|plasma-mobile)
+        plasma-mobile)
+            required=(plasma-workspace plasma-setup plasma-mobile plasma-settings plasma-keyboard plasma-lookandfeel-fedora-mobile)
+            forbidden=(gnome-shell gdm cutefish-desktop nextkde uke-kde-plasma-meta);;
+        kde)
             required=(plasma-workspace plasma-setup)
             forbidden=(gnome-shell gdm cutefish-desktop nextkde);;
         gnome)
             required=(gnome-shell gdm gnome-initial-setup)
             forbidden=(plasma-workspace plasma-setup uke-kde-plasma-meta cutefish-desktop nextkde);;
         cutefish)
-            required=(cutefish-desktop gdm)
-            forbidden=(plasma-workspace plasma-setup uke-kde-plasma-meta nextkde)
-            # Fedora GDM itself requires GNOME Shell/session packages.
+            # shellcheck source=cutefish-profile.sh
+            # shellcheck disable=SC1091
+            source "$(dirname -- "${BASH_SOURCE[0]}")/cutefish-profile.sh"
+            local selected_cutefish
+            selected_cutefish=$(public_cutefish_profile '.required_packages[]') || return
+            mapfile -t required <<< "$selected_cutefish"
+            # Inspect every transitive NEVRA, including libraries and portals.
+            if LC_ALL=C grep -E '^(plasma-|plasma5support-|kwin|kde|kf[56]-|kio-|sddm|breeze|dolphin|konsole-|spectacle-|okular|gwenview-|ark-|bluedevil-|kinfocenter-|kdialog-|kscreen-|kcm-|powerdevil-|libplasma-|uke-kde-plasma-meta-|uke-plasma-controls-|gdm-|gnome-shell-|gnome-session|xdg-desktop-portal-(kde|gnome)-|nextkde-)' "$inventory"; then
+                echo 'Forbidden desktop dependency in Cutefish root' >&2; return 1
+            fi
             ;;
         nextkde)
             required=(plasma-workspace plasma-setup nextkde quickshell)
@@ -35,5 +45,5 @@ public_desktop_isolation() {
             return 1
         fi
     done
-    printf 'Desktop isolation verified: %s; shared libraries permitted; GDM GNOME greeter/session dependencies permitted for Cutefish.\n' "$desktop"
+    printf 'Desktop isolation verified: %s; shared libraries permitted; installed transitive closure checked.\n' "$desktop"
 }

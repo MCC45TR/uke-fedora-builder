@@ -13,7 +13,7 @@ Usage: ./ukelinux.sh [--build image|kernel] [options]
   --mode multiboot|singleboot        Root partition: linux or userdata
   --filesystem ext4|f2fs|btrfs|xfs   Single-device root filesystem
   --release 44|45|rawhide            Target Fedora version; default Rawhide
-  --desktop kde|gnome                 Other desktop profiles are suspended
+  --desktop kde|gnome|cutefish|plasma-mobile
                                     Graphical session; unavailable sessions fail explicitly
   --build-from-source               Compile kernel and missing platform RPMs (opt-in)
   --shell bash|fish|zsh              New user login shell; default Bash
@@ -155,7 +155,7 @@ public_main() {
     if [[ $target == image ]]; then
         public_choice mode 'Boot mode: multiboot or singleboot'
         public_choice filesystem 'Root filesystem: ext4, f2fs, btrfs or xfs'
-        public_choice desktop 'Desktop: kde or gnome'
+        public_choice desktop 'Desktop: kde, gnome, cutefish or plasma-mobile'
         public_choice login_shell 'New user shell: bash, fish or zsh'
     fi
     public_choice channel 'Package channel: stable, testing or unstable'
@@ -167,7 +167,8 @@ public_main() {
     case $fedora_release in 44|45|rawhide) :;; *) die 'Fedora target must be 44, 45 or rawhide';; esac
     case $desktop in
         kde|gnome) :;;
-        cutefish|nextkde|plasma-mobile) die 'This desktop profile is suspended; select kde or gnome';;
+        cutefish|plasma-mobile) ;;
+        nextkde) die 'This desktop profile is suspended; select kde, gnome, cutefish or plasma-mobile';;
         *) die 'Unsupported desktop';;
     esac
     case $login_shell in bash|fish|zsh) :;; *) die 'Login shell must be bash, fish or zsh';; esac
@@ -224,6 +225,7 @@ public_main() {
     elif [[ -n $kernel_rpm ]]; then say 'Kernel: exact source revision will be read from the signed RPM cohort'
     else say "Kernel: ${kernel_request:-the policy default version}; source: the policy repository, resolved once when the build starts"; fi
     ((REUSE_KERNEL == 0)) || say 'Kernel: reusing the cached build of this source; a missing cache stops the build'
+    [[ $desktop != cutefish || ( $channel == unstable && $fedora_release == rawhide ) ]] || die 'Cutefish currently requires Rawhide unstable'
     ((DRY_RUN == 0)) || return 0
     [[ $channel != unstable || $fedora_release == rawhide ]] || die 'Unstable packages are available only for Fedora Rawhide AArch64'
     [[ $target != image || $fedora_release == rawhide ]] || die "Unsupported Fedora $fedora_release image: signed native Uke family builds and complete dependency resolution are pending; no Rawhide RPM fallback is allowed"

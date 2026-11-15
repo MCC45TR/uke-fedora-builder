@@ -37,7 +37,13 @@ done
 done
 done
 [[ $count == 432 && ! -e $fixture/out ]]
-for suspended in cutefish nextkde kdenext plasma-mobile kde-mobile; do reject --desktop "$suspended" --dry-run; done
+for suspended in nextkde kdenext; do reject --desktop "$suspended" --dry-run; done
+for choice in cutefish plasma-mobile kde-mobile; do
+    public_main --build image --desktop "$choice" --channel unstable --release rawhide --dry-run > "$fixture/plan"
+    grep -F 'unstable' "$fixture/plan" >/dev/null
+done
+reject --desktop cutefish --channel testing --dry-run
+reject --desktop cutefish --channel unstable --release 45 --dry-run
 for channel in stable testing unstable; do
     public_main --build-from-source --build kernel --channel "$channel" --dry-run > "$fixture/plan"
     grep -F 'kernel: Fedora Rawhide AArch64' "$fixture/plan" >/dev/null

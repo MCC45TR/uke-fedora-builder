@@ -65,6 +65,10 @@ public_first_boot_policy "$work/root" "$work/policy.json"
 grep -Fq 'Requires=systemd-growfs-root.service' "$work/root/etc/systemd/system/uke-root-capacity.service"
 grep -Fq 'After=uke-root-capacity.service uke-swap-ready.service' "$work/root/etc/systemd/system/plasma-setup.service.d/20-storage-ready.conf"
 grep -Fq 'After=uke-root-capacity.service uke-swap-ready.service' "$work/root/etc/systemd/system/gdm.service.d/20-storage-ready.conf"
+for unit in cutefish-dm.service uke-cutefish-firstboot.service; do
+    grep -Fq 'Requires=uke-root-capacity.service uke-swap-ready.service' "$work/root/etc/systemd/system/$unit.d/20-storage-ready.conf"
+    grep -Fq 'After=uke-root-capacity.service uke-swap-ready.service' "$work/root/etc/systemd/system/$unit.d/20-storage-ready.conf"
+done
 grep -Fq 'ExecStart=/usr/bin/uke-control swap apply' "$work/root/etc/systemd/system/uke-swap-ready.service"
 grep -Fq '%%s' "$work/root/etc/systemd/system/uke-root-capacity.service"
 jq -e '.duplicate_grow_service_masked and .capacity_gate_before_setup and .swap_after_capacity' "$work/policy.json" >/dev/null
