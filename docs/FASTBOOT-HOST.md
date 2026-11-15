@@ -15,6 +15,25 @@ not add wildcards, use `--force`, remove capacity requirements or alter firmware
 It installs below libexec and does not replace Fedora android-tools or enter
 the tablet root filesystem.
 
+COPR build `11331168` produced `uke-fastboot-host-37.0.0p1-3.fc46.x86_64`.
+Its two RPM signatures, source recipe and exact patch were checked before
+running the packaged executable. The complete loopback regression passed both
+on the COPR worker and with the packaged binary on a Fedora x86_64 PC.
+
+On 15 November, the same initial EXT4/Plasma ZIP passed all fourteen native
+requirements on the measured 512-GB Uke. Both requested payloads were written
+successfully and reboot was acknowledged in 129 seconds. The Plasma first
+account setup screen was observed. Runtime kernel/slot identity, full-capacity
+growth and native health acceptance remain separate SSH validation gates.
+
+`scripts/install-fastboot-test.sh` adds five stages, strict archive and host
+binary checks, all ten capacity checks, per-piece sparse progress, error
+explanations and a final summary. `--check` is read-only; `--install` explicitly
+replaces userdata. Temporary extraction uses the ZIP filesystem with a 10-GiB
+reserve. Expected optional archive probes stay in the support log; actual
+failures remain visible. The tool distinguishes completed flashing from a
+verified OS boot.
+
 The original-client fixture demonstrates refusal of correct padded capacities.
 The patched-client fixture must accept those capacities and retain refusal of
 wrong, missing, malformed and whitespace-only values before any mutation. Both
