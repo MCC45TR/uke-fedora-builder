@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        15%{?dist}
+Release:        16%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-2-Clause AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -160,7 +160,8 @@ readelf -h build/qtee-fedora-credentials-test | grep -E 'Machine:.*AArch64'
 build/qtee-fedora-credentials-test > build/qtee-credentials-result.json
 readelf -h build/qtee-tpm-probe | grep -E 'Machine:.*AArch64'
 if build/qtee-tpm-probe --inspect > build/qtee-host-refusal.txt 2>&1; then exit 1; fi
-grep -Fx 'UKE_QTEE_TPM_PROBE_REJECTED stage=physical-owner' build/qtee-host-refusal.txt
+test "$(id -u)" -ne 0
+grep -Fx 'UKE_QTEE_TPM_PROBE_REJECTED stage=root-required' build/qtee-host-refusal.txt
 readelf -h build/hwkm-probe | grep -E 'Machine:.*AArch64'
 if build/hwkm-probe --inspect > build/hwkm-host-refusal.txt 2>&1; then exit 1; fi
 grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal.txt
@@ -247,6 +248,9 @@ install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 %{_libexecdir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-16
+- Check the root-required refusal on the unprivileged COPR worker.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-15
 - Query only QTEE TPM information through ordinary Fedora credentials; retain all HWKM guards.
 
