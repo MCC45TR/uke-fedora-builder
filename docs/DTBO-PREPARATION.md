@@ -44,6 +44,15 @@ table length591857 and FDT payload591793bytes. It is a binary reference, not
 proof that the previous123-source candidate reproduces the installed overlay.
 That earlier candidate still lacks592 nodes and must not be flashed.
 
+A fresh PC inventory applies the signed source7 payload to the same exact
+installed base2. It has3602 nodes against4194 in the working graph. Of the
+592 missing paths,496 are under the LPASS LPI pin controller; other groups
+include audio codecs/clock links, WLAN SMP2P/ICNSS and fingerprint/board pins.
+The [gap inventory](../manifests/dtbo-source7-gaps-20261116.json) records the
+groups without importing private live FDT or calibration data. The board,
+camera and display closure must be extended with these subsystem layers;
+successful source7 compilation alone cannot admit a runtime DTBO package.
+
 Original Fedora fdtoverlay applies both the installed and public overlay to
 each exact installed base. A bounded private PC data analysis resolves only
 the byte offsets declared in `__local_fixups__` and `__fixups__`, using actual
