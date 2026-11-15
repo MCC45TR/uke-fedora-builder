@@ -84,6 +84,11 @@ bool whitespace(unsigned char value) {
 int no_password(char*, int, int, void*) { return 0; }
 }
 
+std::vector<unsigned char> read_cohort_metadata_file(const std::string& path, size_t maximum_bytes) {
+    if (!maximum_bytes || maximum_bytes > payload_limit) refuse();
+    return read_regular(path, maximum_bytes);
+}
+
 VerifiedCohortBytes verify_cohort_signature_bytes(std::span<const unsigned char> pem,
                                                 const std::string& trusted_spki_sha256,
                                                 std::span<const unsigned char> payload,

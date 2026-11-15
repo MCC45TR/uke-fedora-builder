@@ -1,0 +1,194 @@
+// SPDX-License-Identifier: MIT
+#include "protected-cohort-vbmeta.hpp"
+#include <libavb/libavb.h>
+#include <openssl/evp.h>
+#include <algorithm>
+#include <array>
+#include <cstring>
+#include <stdexcept>
+#include <string_view>
+#include <type_traits>
+#include <vector>
+#ifdef UKE_COHORT_VBMETA_CLI
+#include <charconv>
+#include <iostream>
+#include <nlohmann/json.hpp>
+#endif
+
+namespace uke::protected_boot {
+namespace {
+static_assert(!std::is_default_constructible_v<VerifiedVbmetaCohort>);
+static_assert(!std::is_aggregate_v<VerifiedVbmetaCohort>);
+constexpr size_t maximum_vbmeta = 65536;
+constexpr std::array<std::string_view, 3> property_names{
+    "com.uke.protected.cohort", "com.uke.protected.signature", "com.uke.protected.public_key"};
+constexpr std::array<std::string_view, 3> partition_names{"boot", "vendor_boot", "dtbo"};
+[[noreturn]] void refuse() { throw std::runtime_error("VBMeta cohort rejected"); }
+bool hex(const std::string& value) {
+    return value.size() == 64 && value.find_first_not_of("0123456789abcdef") == std::string::npos &&
+           value.find_first_not_of('0') != std::string::npos;
+}
+bool zero(std::span<const unsigned char> bytes) {
+    return std::all_of(bytes.begin(), bytes.end(), [](unsigned char value) { return value == 0; });
+}
+std::string sha256(std::span<const unsigned char> bytes) {
+    std::array<unsigned char, 32> digest{};
+    size_t written = 0;
+    if (EVP_Q_digest(nullptr, "SHA256", nullptr, bytes.data(), bytes.size(), digest.data(), &written) != 1 ||
+        written != digest.size()) refuse();
+    constexpr char digits[] = "0123456789abcdef";
+    std::string out;
+    out.reserve(64);
+    for (const auto value : digest) { out += digits[value >> 4]; out += digits[value & 15]; }
+    return out;
+}
+template<size_t N> size_t index_of(std::string_view name, const std::array<std::string_view, N>& names) {
+    for (size_t i = 0; i < N; ++i) if (name == names[i]) return i;
+    refuse();
+}
+struct Descriptors {
+    size_t count = 0;
+    std::array<bool, 3> property_seen{}, hash_seen{};
+    std::array<std::vector<unsigned char>, 3> properties;
+    std::array<AvbBootHash, 3> hashes{};
+};
+void property(const AvbDescriptor* raw, const AvbDescriptor& header, Descriptors& output) {
+    if (header.num_bytes_following < sizeof(AvbPropertyDescriptor) - sizeof(AvbDescriptor) + 2) refuse();
+    AvbPropertyDescriptor descriptor{};
+    if (!avb_property_descriptor_validate_and_byteswap(
+            reinterpret_cast<const AvbPropertyDescriptor*>(raw), &descriptor)) refuse();
+    const auto* bytes = reinterpret_cast<const unsigned char*>(raw);
+    const auto length = sizeof(AvbDescriptor) + header.num_bytes_following;
+    const auto key_end = sizeof(AvbPropertyDescriptor) + descriptor.key_num_bytes;
+    const auto value_end = key_end + 1 + descriptor.value_num_bytes;
+    // Upstream's bounds check above proves these additions fit the descriptor.
+    if (key_end >= length || value_end >= length || bytes[key_end] || bytes[value_end]) refuse();
+    const auto expected_length = (value_end + 1 + 7) / 8 * 8;
+    if (length != expected_length || !zero({bytes + value_end + 1, static_cast<size_t>(length - value_end - 1)})) refuse();
+    const auto index = index_of(std::string_view(reinterpret_cast<const char*>(bytes + sizeof(AvbPropertyDescriptor)),
+                                                static_cast<size_t>(descriptor.key_num_bytes)), property_names);
+    if (output.property_seen[index]) refuse();
+    const auto size = descriptor.value_num_bytes;
+    if ((index == 0 && (size == 0 || size > 65536)) || (index == 1 && size != 512) ||
+        (index == 2 && (size == 0 || size > 8192))) refuse();
+    output.property_seen[index] = true;
+    output.properties[index].assign(bytes + key_end + 1, bytes + value_end);
+}
+void hash_descriptor(const AvbDescriptor* raw, const AvbDescriptor& header, Descriptors& output) {
+    if (header.num_bytes_following < sizeof(AvbHashDescriptor) - sizeof(AvbDescriptor)) refuse();
+    AvbHashDescriptor descriptor{};
+    if (!avb_hash_descriptor_validate_and_byteswap(reinterpret_cast<const AvbHashDescriptor*>(raw), &descriptor)) refuse();
+    constexpr std::array<unsigned char, 32> algorithm{'s', 'h', 'a', '2', '5', '6'};
+    if (std::memcmp(descriptor.hash_algorithm, algorithm.data(), algorithm.size()) || descriptor.flags ||
+        !zero(descriptor.reserved) || descriptor.salt_len != 32 || descriptor.digest_len != 32 ||
+        !descriptor.image_size || descriptor.image_size > 536870912) refuse();
+    const auto* bytes = reinterpret_cast<const unsigned char*>(raw);
+    const auto length = sizeof(AvbDescriptor) + header.num_bytes_following;
+    const auto name_end = sizeof(AvbHashDescriptor) + descriptor.partition_name_len;
+    const auto digest_end = name_end + descriptor.salt_len + descriptor.digest_len;
+    if (digest_end > length || length != (digest_end + 7) / 8 * 8 ||
+        !zero({bytes + digest_end, static_cast<size_t>(length - digest_end)})) refuse();
+    const auto index = index_of(std::string_view(reinterpret_cast<const char*>(bytes + sizeof(AvbHashDescriptor)),
+                                                descriptor.partition_name_len), partition_names);
+    if (output.hash_seen[index]) refuse();
+    auto& hash = output.hashes[index];
+    hash.image_bytes = descriptor.image_size;
+    std::copy_n(bytes + name_end, 32, hash.salt.begin());
+    std::copy_n(bytes + name_end + 32, 32, hash.digest.begin());
+    if (zero(hash.digest)) refuse();
+    output.hash_seen[index] = true;
+}
+bool collect(const AvbDescriptor* descriptor, void* data) noexcept {
+    // Never unwind a C++ exception through upstream C library frames.
+    try {
+        auto& output = *static_cast<Descriptors*>(data);
+        if (++output.count > 6) return false;
+        AvbDescriptor header{};
+        if (!avb_descriptor_validate_and_byteswap(descriptor, &header)) return false;
+        if (header.tag == AVB_DESCRIPTOR_TAG_PROPERTY) property(descriptor, header, output);
+        else if (header.tag == AVB_DESCRIPTOR_TAG_HASH) hash_descriptor(descriptor, header, output);
+        else return false;
+        return true;
+    } catch (...) { return false; }
+}
+}
+
+VerifiedVbmetaCohort verify_vbmeta_cohort_bytes(std::span<const unsigned char> candidate,
+                                              const VbmetaTrustPins& trusted,
+                                              const ImmutableKernelContext& expected,
+                                              const ObservedBootGeometry& observed) {
+    if (candidate.size() < AVB_VBMETA_IMAGE_HEADER_SIZE || candidate.size() > maximum_vbmeta ||
+        !hex(trusted.avb_key_sha256) || !hex(trusted.cohort_spki_sha256)) refuse();
+    // The original descriptor API requires word alignment. This owned copy
+    // also prevents caller path changes from replacing bytes during parsing.
+    const std::vector<unsigned char> bytes(candidate.begin(), candidate.end());
+    const uint8_t* key = nullptr;
+    size_t key_size = 0;
+    if (avb_vbmeta_image_verify(bytes.data(), bytes.size(), &key, &key_size) != AVB_VBMETA_VERIFY_RESULT_OK ||
+        !key || key_size != 1032 || sha256({key, key_size}) != trusted.avb_key_sha256) refuse();
+    AvbVBMetaImageHeader header{};
+    avb_vbmeta_image_header_to_host_byte_order(reinterpret_cast<const AvbVBMetaImageHeader*>(bytes.data()), &header);
+    if (header.required_libavb_version_major != 1 || header.required_libavb_version_minor != 0 ||
+        header.algorithm_type != AVB_ALGORITHM_TYPE_SHA256_RSA4096 || header.flags ||
+        header.rollback_index_location || !zero(header.reserved) ||
+        header.hash_offset != 0 || header.hash_size != 32 || header.signature_offset != 32 ||
+        header.signature_size != 512 || header.authentication_data_block_size != 576 ||
+        header.public_key_metadata_size || header.public_key_metadata_offset > header.auxiliary_data_block_size) refuse();
+    const auto aux_size = header.auxiliary_data_block_size;
+    if (header.descriptors_offset > aux_size || header.descriptors_size > aux_size - header.descriptors_offset ||
+        header.descriptors_offset % 8 || header.descriptors_size % 8 || !header.descriptors_size ||
+        header.public_key_offset > aux_size || header.public_key_size > aux_size - header.public_key_offset) refuse();
+    const auto descriptor_end = header.descriptors_offset + header.descriptors_size;
+    const auto key_end = header.public_key_offset + header.public_key_size;
+    if (!(descriptor_end <= header.public_key_offset || key_end <= header.descriptors_offset)) refuse();
+    const auto end = AVB_VBMETA_IMAGE_HEADER_SIZE + header.authentication_data_block_size + aux_size;
+    if (end > bytes.size() || !zero({bytes.data() + end, bytes.size() - static_cast<size_t>(end)}) ||
+        !zero({bytes.data() + AVB_VBMETA_IMAGE_HEADER_SIZE + 544, 32})) refuse();
+    Descriptors descriptors;
+    if (!avb_descriptor_foreach(bytes.data(), bytes.size(), collect, &descriptors) || descriptors.count != 6 ||
+        !std::all_of(descriptors.property_seen.begin(), descriptors.property_seen.end(), [](bool value) { return value; }) ||
+        !std::all_of(descriptors.hash_seen.begin(), descriptors.hash_seen.end(), [](bool value) { return value; })) refuse();
+    const auto verified = verify_cohort_signature_bytes(descriptors.properties[2], trusted.cohort_spki_sha256,
+                                                        descriptors.properties[0], descriptors.properties[1]);
+    auto manifest = validate_cohort_manifest(verified, expected, observed);
+    const std::array<uint64_t, 3> sizes{manifest.boot.bytes, manifest.vendor_boot.bytes, manifest.dtbo.bytes};
+    for (size_t i = 0; i < sizes.size(); ++i)
+        if (sizes[i] != descriptors.hashes[i].image_bytes) refuse();
+    return {std::move(manifest), std::move(descriptors.hashes), sha256({bytes.data(), static_cast<size_t>(end)}), header.rollback_index};
+}
+}
+
+#ifdef UKE_COHORT_VBMETA_CLI
+// Inspection only; supplied CLI pins/context are ephemeral fixtures.
+int main(int argc, char** argv) {
+    if (argc != 16) return 2;
+    try {
+        auto number = [](const char* input) {
+            std::string_view value(input);
+            uint64_t result = 0;
+            if (value.empty() || value.size() > 13 || (value.size() > 1 && value.front() == '0') ||
+                value.find_first_not_of("0123456789") != std::string_view::npos) throw std::runtime_error("number");
+            const auto conversion = std::from_chars(value.data(), value.data() + value.size(), result);
+            if (conversion.ec != std::errc{} || conversion.ptr != value.data() + value.size()) throw std::runtime_error("number");
+            return result;
+        };
+        const uke::protected_boot::VbmetaTrustPins trust{argv[2], argv[3]};
+        const uke::protected_boot::ImmutableKernelContext expected{argv[4], argv[5], argv[6]};
+        const uke::protected_boot::ObservedBootGeometry observed{number(argv[7]), number(argv[8]), number(argv[9]),
+            {number(argv[10]), number(argv[11])}, {number(argv[12]), number(argv[13])}, {number(argv[14]), number(argv[15])}};
+        const auto bytes = uke::protected_boot::read_cohort_metadata_file(argv[1], 65536);
+        const auto result = uke::protected_boot::verify_vbmeta_cohort_bytes(bytes, trust, expected, observed);
+        const nlohmann::json report{{"avb_signature_verified", true}, {"cohort_signature_verified", true},
+            {"manifest_schema_valid", true}, {"exact_geometry_selected", true}, {"both_slot_limits_checked", true},
+            {"boot_hash_descriptors_bound", true}, {"vbmeta_sha256", result.vbmeta_sha256()},
+            {"signed_rollback_index", result.signed_rollback_index()}, {"boot_payloads_verified", false},
+            {"rollback_state_verified", false}, {"physical_identity_verified", false},
+            {"hardware_trust_qualified", false}, {"role_admitted", false}, {"storage_or_key_release_executed", false}};
+        std::cout << report.dump() << '\n';
+        return 0;
+    } catch (const std::exception&) {
+        std::cerr << "UKE_COHORT_VBMETA_REJECTED\n";
+        return 1;
+    }
+}
+#endif

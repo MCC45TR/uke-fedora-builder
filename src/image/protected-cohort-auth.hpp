@@ -6,6 +6,9 @@
 #include <utility>
 
 namespace uke::protected_boot {
+// Untrusted regular-file snapshot for inspection frontends only. Same strict
+// openat2/identity checks as signature inputs; this does not authenticate it.
+std::vector<unsigned char> read_cohort_metadata_file(const std::string& path, size_t maximum_bytes);
 // The caller must obtain this pin from its authenticated immutable policy,
 // never from the same storage that supplied the candidate key or payload.
 class VerifiedCohortBytes {

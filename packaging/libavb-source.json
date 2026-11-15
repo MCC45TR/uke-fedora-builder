@@ -1,0 +1,10 @@
+{
+  "repository": "https://android.googlesource.com/platform/external/avb",
+  "commit": "ba2dec4b035b0a3b61c5f8f8a74d86bcd450b1ee",
+  "archive_sha256": "afb2e19128204c6263673574f6900b8cf4cb26d19ca49a0068a2d2d8997f8f2b",
+  "license_sha256": "7b64210dc457e50fdcdf49c44d3efa19d78d6f49aa141862592ac31b700c19d2",
+  "fedora_avbtool_sha256": "87a5708a7e697c13b6b960c6bb5b695aff2689514d552aee0221b56463b0cef8",
+  "backend": "unmodified upstream portable crypto; unsupported ML-DSA fails closed",
+  "profile": "AVB 1.0-required SHA256_RSA4096, zero flags, location zero, six descriptors",
+  "source_only_fixture": true
+}
