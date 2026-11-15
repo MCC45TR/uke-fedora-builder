@@ -72,8 +72,11 @@ case ${1:-} in
             if dmsetup info "$name" >/dev/null 2>&1; then echo 'Fixture name occupied' >&2; exit 1; fi
         done
         close_maps() {
-            dmsetup --noudevsync remove "$child"
-            dmsetup --noudevsync remove "$parent"
+            # A host udev worker can briefly open a new map while probing it.
+            # Original libdevmapper bounds --retry for this removal race; no
+            # force/deferred removal or test/data-verification retry is used.
+            dmsetup --noudevsync remove --retry "$child"
+            dmsetup --noudevsync remove --retry "$parent"
         }
         open_maps() {
             local digest=$1 parent_devno
@@ -105,10 +108,12 @@ case ${1:-} in
         if dd if=/dev/zero of="/dev/mapper/$child" bs=4096 count=1 conv=notrunc status=none > "$work/write.log" 2>&1; then exit 1; fi
         dd if="/dev/mapper/$child" of="$work/past-end" bs=4096 skip="$blocks" count=1 iflag=direct status=none
         [[ ! -s $work/past-end && $(sha256sum "$device" | cut -d ' ' -f1) == "$before" ]]
+        echo 'Kernel verity: complete readback, read-only and data boundary passed'
         close_maps
         if [[ ${root:0:1} == 0 ]]; then wrong_root=1${root:1}; else wrong_root=0${root:1}; fi
         open_maps "$wrong_root"
         expect_bad_read
+        echo 'Kernel verity: wrong root refused'
         close_maps
         # Remove both maps before each mutation, then create fresh devices so
         # cached successful verification cannot hide changed backing bytes.
@@ -122,6 +127,7 @@ case ${1:-} in
             dd if="$work/changed" of="$device" bs=4096 seek="$block" count=1 oflag=direct conv=notrunc status=none
             open_maps "$root"
             expect_bad_read
+            printf 'Kernel verity: corruption at backing block %s refused\n' "$block"
             close_maps
             dd if="$work/original" of="$device" bs=4096 seek="$block" count=1 oflag=direct conv=notrunc status=none
             [[ $(sha256sum "$device" | cut -d ' ' -f1) == "$before" ]]
