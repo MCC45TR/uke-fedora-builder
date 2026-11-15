@@ -90,32 +90,54 @@ avoids introducing another host Python tool for this existing v0 contract.
 Its original C sources and POSIX sysdeps must remain unchanged and compile in
 COPR with original Fedora libfdt. Its `libacpi.h` and `acpi.c` dependencies are
 separately pinned from AOSP external/dtc; their BSD-3-Clause notices are preserved
-alongside libufdt's Apache-2.0 notices. This source closure is preparation,
-not a passed native build or authorization to accept other table versions.
+alongside libufdt's Apache-2.0 notices. The source-pin record alone does not
+assert native qualification or authorize accepting other table versions.
 The scoped `uke-dtbo-tools-source-check` recipe builds those original sources
 and checks deterministic v0 output, preserved payload bytes, four synthetic
-bases and ten malformed inventory cases. Its planned RPM contains only receipts
-and original notices, with no executable, target dependency or boot hook.
+bases and ten malformed inventory cases. Its RPM contains only receipts and
+original notices, with no executable, target dependency or boot hook.
+
+## Native formatter result
+
+COPR [11329504][copr] built source commit
+`b505a00` as `uke-dtbo-tools-source-check-1.0-2.fc46.aarch64`, on the sole
+Rawhide AArch64 target, in 60 seconds. Original GCC 16.2.1, dtc/libfdt
+1.8.1-6.fc46 and ShellCheck 0.11.0 were used. Shell syntax and ShellCheck
+passed. The original formatter produced the exact v0 header/entry geometry,
+preserved the supplied FDT bytes and produced byte-identical repeated output.
+The four synthetic bases were inventoried, all ten malformed inventory cases
+were refused, and the formatter refused an invalid FDT. No installed firmware
+input or Python was used in this build.
+
+The actual source worker and published spec matched the reviewed recipe.
+All five project source pins, the four native project hashes and all fifteen
+original upstream inputs matched. The signed result package's source identity
+matched both source archives; its original-notices archive was byte-identical
+to the audited upstream source archive. The package contains eight regular
+files totaling 27,902 bytes, no ELF, scriptlet, service or runtime dependency.
+Its signature matched COPR key
+`DAFC3C5A881FB49C7167EE2D6F772E3D487BD13E`; RPM SHA-256 is
+`9a55e165c724f459ef6b202b95eb40a84c8d9ea9f2c1db442bb8d323e6c6d8df`.
+It was not installed on the PC or tablet. This qualifies the scoped native
+format producer and synthetic fixture, not a new bootable Uke DTBO image.
 
 ## Remaining qualification
 
-1. Compile and exercise the pinned native table producer in COPR with public
-   disposable FDTs. Check exact v0 fields, payload hashes, reproducibility and
-   failure handling without publishing installed firmware references.
-2. Qualify the complete OEM DTS/include/source dependency closure and its
+1. Qualify the complete OEM DTS/include/source dependency closure and its
    differences from the installed reference, then build the custom board
    overlay with the coordinated cumulative kernel contract. No standalone
    kernel revision is reserved by this preparation.
-3. Produce matching vendor_boot with the necessary base alternatives and
+2. Produce matching vendor_boot with the necessary base alternatives and
    preserved bootloader handoff. Validate kernel-side transformations exactly
    once, including actual RAM/reserved-memory and protected hardware gates.
-4. Bind boot, DTBO and vendor_boot to the same signed manifest and VBMeta.
+3. Bind boot, DTBO and vendor_boot to the same signed manifest and VBMeta.
    Define hash-prefix lengths separately from any AVB footer/transport padding;
    check complete expanded files against both slots before any write.
-5. Qualify the OEM-to-Linux trust chain, actual capacity variants and independent
+4. Qualify the OEM-to-Linux trust chain, actual capacity variants and independent
    rescue route. Only then compose and audit the requested Actions ZIP and
    proceed to the user's flash and physical acceptance. A format/tool test
    alone cannot establish these properties.
 
 [oem-dt]: https://github.com/MiCode/kernel_devicetree/tree/94c84aeb9e517dbde546fc732033c184094c8e57/qcom
 [aosp-tools]: https://android.googlesource.com/platform/system/libufdt/+/9b70f594cf149c7c73989c78f03d210f8aa1c1f6/utils/
+[copr]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329504/
