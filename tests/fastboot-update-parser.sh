@@ -59,7 +59,6 @@ read -r b0 b1 b2 b3 < <(od -An -v -j16 -N4 -tu1 "$work/images/super.img")
 cp "$work/guarded.zip" "$work/unguarded.zip"
 printf 'require product=uke\n' > "$work/images/android-info.txt"
 (cd "$work/images"; zip -q "$work/unguarded.zip" android-info.txt)
-jq '[.payloads[].partition]' "$root/configs/images/fastboot-update-uke.json" > "$work/allowed.json"
 make_vars() {
     local partition bytes
     jq -n '{product:"uke","is-userspace":"no","slot-count":"2","current-slot":"a",
@@ -78,7 +77,13 @@ run_case() {
     local name=$1 archive=$2 expected=$3 port status=0
     case_dir=$work/$name
     mkdir "$case_dir"
-    cp "$work/allowed.json" "$case_dir/"
+    # Select the mock write set per archive. A later two-payload test must not
+    # change the peer's allowed list for a subsequent complete-cohort case.
+    case $archive in
+        "$work/test-profile.zip") printf '["boot_b","userdata"]\n' > "$case_dir/allowed.json";;
+        "$work/guarded.zip"|"$work/unguarded.zip") jq '[.payloads[].partition]' "$root/configs/images/fastboot-update-uke.json" > "$case_dir/allowed.json";;
+        *) return 1;;
+    esac
     cat > "$case_dir/vars.json"
     : > "$case_dir/commands.txt"
     # socat alone listens, only on127.0.0.1. An occupied port is retried without
@@ -138,7 +143,6 @@ run_case unguarded "$work/unguarded.zip" reject-at-flash < <(jq '."partition-siz
 source "$root/src/image/test-fastboot-profile.sh"
 test_fastboot_requirements "$work/geometry.json" > "$work/images/android-info.txt"
 test_fastboot_tasks > "$work/images/fastboot-info.txt"
-printf '["boot_b","userdata"]\n' > "$work/allowed.json"
 (cd "$work/images"; zip -q "$work/test-profile.zip" android-info.txt fastboot-info.txt boot.img userdata.img)
 run_case initial-test-b "$work/test-profile.zip" success < <(jq '."current-slot"="b"' "$work/base.json")
 grep -Fxq 'set_active:b' "$work/initial-test-b/commands.txt"

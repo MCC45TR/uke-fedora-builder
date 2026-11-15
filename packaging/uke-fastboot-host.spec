@@ -1,6 +1,6 @@
 Name:           uke-fastboot-host
 Version:        37.0.0p1
-Release:        2%{?dist}
+Release:        3%{?dist}
 Summary:        Host fastboot with numeric getvar whitespace normalization
 License:        Apache-2.0 AND BSD-3-Clause AND GPL-2.0-or-later AND LGPL-2.1-or-later AND MIT AND LicenseRef-Fedora-Public-Domain
 URL:            https://github.com/MCC45TR/uke-fedora-builder
