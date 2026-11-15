@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        5%{?dist}
+Release:        6%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -21,6 +21,7 @@ This does not qualify an OEM trust anchor, boot, key release or hibernation.
 
 %prep
 %autosetup
+cp %{SOURCE3} libavb-LICENSE
 test "$(uname -m)" = aarch64
 
 %build
@@ -84,10 +85,13 @@ install -pm644 build/native-result.json build/original-tools.txt build/source-sh
     %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
 
 %files
-%license LICENSE %{SOURCE3}
+%license LICENSE libavb-LICENSE
 %{_datadir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-6
+- Stage the upstream license in the build directory before packaging.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-5
 - Pin every upstream blob before generating the source archive.
 
