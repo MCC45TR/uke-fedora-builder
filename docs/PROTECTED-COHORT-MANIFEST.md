@@ -34,8 +34,13 @@ That immutable context and the complete OEM trust anchor are not integrated yet.
 `payloads` has exactly `kernel_image`, `boot`, `vendor_boot`, `dtbo`, `super_seed`
 and `userdata_seed`. Each contains `bytes` and a nonzero lower-case SHA-256.
 `kernel_image` denotes the actual kernel payload bytes embedded in the Android
-boot image. Seed sizes/hashes describe expanded raw inputs, not sparse transport
-encoding. The boot, vendor_boot and DTBO inputs must fit **both** observed slots;
+boot image. The boot, vendor_boot and DTBO records cover exactly the raw data
+prefix authenticated by their AVB hash descriptor, before any optional footer
+or transport padding. Their plain SHA-256 and AVB's salted digest must be
+checked over that same prefix. Full flash-file expansion, including any footer,
+still requires the independent fastboot before-write capacity check.
+Seed sizes/hashes describe expanded raw inputs, not sparse transport encoding.
+The boot, vendor_boot and DTBO inputs must fit **both** observed slots;
 both seeds must fit **every** listed geometry. Do not add a VBMeta digest here:
 VBMeta is the proposed external signed carrier and cannot contain its own hash.
 The future producer must make every raw byte covered by a seed digest explicit

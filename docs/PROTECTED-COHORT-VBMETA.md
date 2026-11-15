@@ -81,6 +81,10 @@ This verifies metadata signatures and their cross-field contract. It does
 **not** read actual boot partition contents or establish their physical identity.
 The next admission layer must compare actual bytes against both the plain
 manifest digest and AVB's salted digest using pinned physical descriptors.
+Both hashes cover the exact `image_size` data prefix; an optional AVB footer
+or sparse transport padding belongs to the separate complete flash-file audit.
+Using an external hash descriptor does not require padding each boot input
+to the full physical partition size.
 The signed rollback value is returned as a claim; protected stored-state
 comparison, OEM trust, hardware keys and actual role authorization remain open.
 CLI pins and capacities are test inputs, not a substitute for immutable policy.
