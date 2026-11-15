@@ -2,10 +2,42 @@
 
 15 November 2026. The primary target is hardware-protected automatic release
 during an accepted boot, with the selected password available for recovery.
-Userdata and persistent swap/hibernate must share that policy. No hardware key
-has yet been generated, persisted or prepared by this work.
+Userdata and persistent swap/hibernate must share that policy. Disposable
+hardware-key generation, preparation and reuse across a normal reboot are now
+verified. Production boot-bound release and encrypted storage remain open.
 
-## Fitted evidence
+## Current device result
+
+The [signed cumulative kernel27 qualification][kernel27] includes actual
+27/A boot acceptance and preserved 26/B recovery. Its forced embedded
+initramfs enables HWKM before the first ICE probe. The fitted profile now
+advertises hardware-wrapped keys, excludes raw keys and retains 64 keyslots
+and AES-256-XTS with 4-KiB units. SELinux Enforcing, automatic staging and
+the existing rollback preference remain intact.
+
+The diagnostic generated a disposable hardware key, prepared two copies and
+required rejection of an altered copy. A private 128-byte wrapped record then
+survived a second observed normal reboot and prepared without regeneration:
+one key ioctl, status 0 and 4,744 KiB peak RSS. This is a normal-reboot result;
+a physical power-cycle and encrypted data I/O have not been tested.
+
+Two initial record commands returned generic refusals despite a committed
+record; the cause remains unresolved. [Diagnostic14][stage-native] adds fixed
+failure-stage labels, preserving every ownership and key guard. Its native
+49 HWKM and 30 record refusal cases pass. The actual worker, 30 project pins,
+27 native hashes, 43 upstream hashes, archives, recipe and both signatures
+were audited before signed DNF delivery. On the device, it refused an existing
+record at the presence guard, prepared that record and removed it. A separate
+new disposable record then completed create/prepare/remove with status 0.
+All test-key records were removed; no production key, block or mapping was
+written. These later successes do not identify the earlier refusals' cause.
+
+Fresh kernel27 boot configuration still reports secureboot 1 and AVB orange.
+Hibernate remains disabled under the existing protection. Trusted key release,
+authenticated resume, actual encrypted I/O and data-preserving conversion are
+required before enabling production encryption.
+
+## Kernel26 baseline before the opt-in
 
 Read-only SSH inspection of Uke/SM7675 running `7.3.3-26-unstable` found ICE
 4.0.2, HWKM v2 and the exact message `Not using HWKM. Supporting raw keys only.`
@@ -38,9 +70,9 @@ Qualcomm object-ABI service. Existing Control already links original Fedora
 quic-teec for its separately gated accessory client; reuse original providers
 where appropriate without creating another runtime hardware bridge.
 
-No parameter change, driver rebind/reset, key operation, mapping, partition or
-bootloader write, lock-state change or reboot occurred. No diagnostic was
-installed. A TEE version ioctl or trusted-application session was not used.
+That initial read-only investigation changed no parameter, controller, key,
+mapping, bootloader or lock state and installed no diagnostic. A TEE version
+ioctl or trusted-application session was not used at that stage.
 
 ## Intended native lifecycle
 
@@ -66,12 +98,18 @@ The wrapped blob can reside on disk while the non-exportable wrapping key stays
 inside hardware. ICE keyslots themselves are volatile and are not persistent
 key storage. The [AOSP design][aosp] describes this distinction.
 
-Hardware wrapping alone does not authenticate the OS requesting preparation.
-The ioctl argument structures carry no boot measurement. The fitted boot still
+Successful storage-key ioctls do not establish which boot identity firmware
+authorizes. Their argument structures carry no boot measurement. The fitted boot still
 reports AVB orange. The required OEM-to-Linux chain, authenticated running
 cohort, normal/rescue role policy and fitted firmware binding remain mandatory;
 see [OEM trust investigation](OEM-TRUST-INVESTIGATION.md). No current diagnostic
 or frontend preference grants storage/key authority.
+
+The [AOSP KeyMint contract][version-binding] binds keys to the boot verification
+key and bootloader lock state, with separate version/patch binding. The fitted
+QTEE service, its enforcement and recoverable Linux update behavior still need
+qualification; this contract is a research reference, not proof of Uke support.
+Normal and rescue boots need distinct admitted roles under that policy.
 
 ## Next acceptance
 
@@ -220,21 +258,27 @@ initramfs, retain `CONFIG_QCOM_INLINE_CRYPTO_ENGINE=m` and the early ICE module,
 and qualify the original modprobe/UFS dependency path before the first probe.
 The current forced command line does not accept an arbitrary added bootloader
 parameter, and a later vendor ramdisk is not a replacement for this integration.
-No current boot image or installed module configuration changed.
+That host-only fixture changed no installed boot image. Kernel27's later
+cumulative embedded-image and physical-profile results are recorded above.
 
 The updated barrier fixture passed on the separate PC with original Fedora
 systemd `262.2-1.fc46` and kmod. It verified the config copy/parser, missing-policy
 refusal, generator masks, resume conditions, ordering-cycle refusal and missing
 executable refusal without starting a manager or accessing a device/key. This
 host result is separate from the native AArch64 key-mechanism qualification
-above; embedded first-probe ordering and target operation remain unproved.
+above; it is not the embedded-image or target proof recorded for kernel27.
 
-Then separately establish wrapped-mode advertisement, hardware-generated key
-creation/preparation, cold-boot reuse of the long-term blob, refusal of altered
-blobs and encrypted write/read on explicitly owned inactive storage. Storage
+Extend the verified lifecycle and normal-reboot result to a physical power-cycle
+and encrypted write/read on explicitly owned inactive storage. Storage
 selection and independent ownership guards remain pending. A disposable imported
 test key can support the upstream ciphertext test methodology while remaining
 distinct from the hardware-generated production key.
+
+The original [dm-inlinecrypt documentation][dm-inlinecrypt] explicitly says
+cryptsetup cannot create this target. The earlier generic EXT4-to-LUKS loop
+test therefore does not qualify ICE conversion. Keep the original Fedora
+cryptsetup; production mapping, metadata and interrupted conversion need an
+explicit native integration rather than a silent dm-crypt fallback.
 
 Only after these results and boot-policy admission pass should data-preserving
 userdata conversion, password recovery, protected swap and authenticated resume
@@ -251,3 +295,7 @@ be enabled. Source APIs and driver logs do not mark those behaviors complete.
 [native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329719/
 [probe-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329763/
 [record-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11330057/
+[stage-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11330110/
+[kernel27]: https://github.com/MCC45TR/senemos-uke-kernel-mainline/blob/72270bfc/docs/HWKM-EARLY-QUALIFICATION.md
+[version-binding]: https://source.android.com/docs/security/features/keystore/version-binding
+[dm-inlinecrypt]: https://www.kernel.org/doc/html/latest/admin-guide/device-mapper/dm-inlinecrypt.html
