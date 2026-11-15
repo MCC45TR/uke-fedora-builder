@@ -1,0 +1,153 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "scope": "PC FDT graph observation only",
+  "public_reference": {
+    "repository": "Xiaomi-Pad-7-Pro-Resources/android_device_xiaomi_uke-kernel",
+    "commit": "0d2b9c42b8e1873e6c7b61326b35c94c991ab713",
+    "dtbo_payload_bytes": 591793,
+    "dtbo_payload_sha256": "59b5a643dd0a50be879b1903de0667b5f026e9c754b65af5a1680d01bdedeb3e"
+  },
+  "normalization": "Exact object relocation offsets and base symbols; every numeric cell outside those offsets remains raw",
+  "base_results": [
+    {
+      "input_sha256": [
+        "79059c1fc658d828bc7885fa024631637f0b12e3e0b8f2f756abc80774c6f909",
+        "3a7cbfe7af4ec2a3194ebddf2c274628b1ab76e9b733e8d0fa080f4417fda8e2",
+        "eecfa4bb80119046e75ddc4e81a4c19b40eaf84ca11f5c61b6c68e5a904b01ef",
+        "59b5a643dd0a50be879b1903de0667b5f026e9c754b65af5a1680d01bdedeb3e",
+        "b76067a7272cf0c4fd4dbb0d9a18b15873f2118ca24a1718a7e30d75462aa999"
+      ],
+      "stock": {
+        "masked_reference_cells": 523,
+        "nodes": 4209,
+        "properties": 20942
+      },
+      "candidate": {
+        "masked_reference_cells": 523,
+        "nodes": 4209,
+        "properties": 20942
+      },
+      "overlay_root_property_count": 7,
+      "raw_property_differences": 390,
+      "raw_difference_classes": {
+        "other_properties": 114,
+        "phandle_definitions": 276
+      },
+      "negative_controls": [
+        "ordinary_number_equal_to_valid_phandle",
+        "missing_property",
+        "reference_redirected_to_other_valid_provider",
+        "missing_provider_node",
+        "relocation_offset_outside_property"
+      ],
+      "equivalent": true
+    },
+    {
+      "input_sha256": [
+        "f978de9a1451fc9ed53a87c2d233e6ce73629520616ea876517106339e88c3fe",
+        "3a7cbfe7af4ec2a3194ebddf2c274628b1ab76e9b733e8d0fa080f4417fda8e2",
+        "905bfb2fe7b67a6fa8d11abcefc6e829be09677c1ab840e0a246f667e913c658",
+        "59b5a643dd0a50be879b1903de0667b5f026e9c754b65af5a1680d01bdedeb3e",
+        "4635e6a39da697a336bcdb6f8fc77b771b1f68989df166af50244a0bc1d6cc88"
+      ],
+      "stock": {
+        "masked_reference_cells": 523,
+        "nodes": 4206,
+        "properties": 20921
+      },
+      "candidate": {
+        "masked_reference_cells": 523,
+        "nodes": 4206,
+        "properties": 20921
+      },
+      "overlay_root_property_count": 7,
+      "raw_property_differences": 390,
+      "raw_difference_classes": {
+        "other_properties": 114,
+        "phandle_definitions": 276
+      },
+      "negative_controls": [
+        "ordinary_number_equal_to_valid_phandle",
+        "missing_property",
+        "reference_redirected_to_other_valid_provider",
+        "missing_provider_node",
+        "relocation_offset_outside_property"
+      ],
+      "equivalent": true
+    },
+    {
+      "input_sha256": [
+        "288246381e84b974f7e272c3ec7dda764822d8b22b261a9964533342dd255df5",
+        "3a7cbfe7af4ec2a3194ebddf2c274628b1ab76e9b733e8d0fa080f4417fda8e2",
+        "37ff9b605048587ab9e9ebcb0bc78a5ebef968f017f54a43b1c87def4848d5d2",
+        "59b5a643dd0a50be879b1903de0667b5f026e9c754b65af5a1680d01bdedeb3e",
+        "b81bc03daa83c33dfc07fd700527887204230b48af45a331c26c6c6dd854e796"
+      ],
+      "stock": {
+        "masked_reference_cells": 523,
+        "nodes": 4194,
+        "properties": 20797
+      },
+      "candidate": {
+        "masked_reference_cells": 523,
+        "nodes": 4194,
+        "properties": 20797
+      },
+      "overlay_root_property_count": 7,
+      "raw_property_differences": 390,
+      "raw_difference_classes": {
+        "other_properties": 114,
+        "phandle_definitions": 276
+      },
+      "negative_controls": [
+        "ordinary_number_equal_to_valid_phandle",
+        "missing_property",
+        "reference_redirected_to_other_valid_provider",
+        "missing_provider_node",
+        "relocation_offset_outside_property"
+      ],
+      "equivalent": true
+    },
+    {
+      "input_sha256": [
+        "a636a4f5188075ca7c41b2f79cc44b18a38d172101bc13139ee91f443b51555f",
+        "3a7cbfe7af4ec2a3194ebddf2c274628b1ab76e9b733e8d0fa080f4417fda8e2",
+        "913b54b76e8310d0b3c18194a703fce2bc0f93440a982ce8d0355371767d66b9",
+        "59b5a643dd0a50be879b1903de0667b5f026e9c754b65af5a1680d01bdedeb3e",
+        "6dcfa88e4af835a99ac789ab3fc670bd99413c9921a78a36573ecb95905d0c25"
+      ],
+      "stock": {
+        "masked_reference_cells": 523,
+        "nodes": 4196,
+        "properties": 20811
+      },
+      "candidate": {
+        "masked_reference_cells": 523,
+        "nodes": 4196,
+        "properties": 20811
+      },
+      "overlay_root_property_count": 7,
+      "raw_property_differences": 390,
+      "raw_difference_classes": {
+        "other_properties": 114,
+        "phandle_definitions": 276
+      },
+      "negative_controls": [
+        "ordinary_number_equal_to_valid_phandle",
+        "missing_property",
+        "reference_redirected_to_other_valid_provider",
+        "missing_provider_node",
+        "relocation_offset_outside_property"
+      ],
+      "equivalent": true
+    }
+  ],
+  "pc_graph_equivalence_observed": true,
+  "public_base_substitution_qualified": false,
+  "source_reproduction_qualified": false,
+  "dtbo_rpm_qualified": false,
+  "physical_update_qualified": false,
+  "oem_verified_boot_qualified": false,
+  "analysis_program_sha256": "d6bf0baf5334491f4225c8fd50b0ec588f86de04a72f5ddd40db97b51c9ab473"
+}

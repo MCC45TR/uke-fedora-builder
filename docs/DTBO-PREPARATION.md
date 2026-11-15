@@ -35,6 +35,45 @@ installed reference, not a universal partition-capacity lock.
 
 ## Existing kernel contract
 
+### Complete public reference observation,16 November
+
+The public boot cohort at
+[`0d2b9c42`](https://github.com/Xiaomi-Pad-7-Pro-Resources/android_device_xiaomi_uke-kernel/tree/0d2b9c42b8e1873e6c7b61326b35c94c991ab713)
+contains a complete overlay reference. Its padded file is593920bytes, declared
+table length591857 and FDT payload591793bytes. It is a binary reference, not
+proof that the previous123-source candidate reproduces the installed overlay.
+That earlier candidate still lacks592 nodes and must not be flashed.
+
+Original Fedora fdtoverlay applies both the installed and public overlay to
+each exact installed base. A bounded private PC data analysis resolves only
+the byte offsets declared in `__local_fixups__` and `__fixups__`, using actual
+base symbols and provider paths. Every ordinary numeric cell remains raw.
+The overlay's seven root selection properties are separately byte-identical.
+All four applied graphs match:4209/4206/4194/4196nodes and
+20942/20921/20797/20811properties. Each has523 declared reference cells.
+The390 raw property differences are276 phandle definitions and114 properties
+with relocated references; no semantic difference remains in this comparison.
+
+For every base, five in-memory negative controls reject an ordinary number
+matching a valid phandle, a missing property, a reference redirected to another
+valid provider, a missing provider node and an out-of-range relocation offset.
+Reserved-memory records and the boot CPU identity also match. The
+[observation manifest](../manifests/dtbo-public-reference-20261116.json) pins
+all inputs, counts and the analysis-program digest. This is PC data evidence,
+not a native package/physical/verified-boot admission gate.
+
+All four public base binaries differ from their installed counterparts. The
+observation therefore qualifies neither replacing vendor_boot's bases nor
+using public bases in the final cohort. Preserve the actual base alternatives,
+OEM dynamic RAM handoff and existing once-only Linux transformations. Complete
+original source reproduction, attribution, coupled A/B delivery and physical
+acceptance remain required before producing the installable DTBO package.
+
+The relocation interpretation follows the
+[original DTC object-format documentation](https://android.googlesource.com/platform/external/dtc/+/refs/heads/main/Documentation/dt-object-internal.txt)
+and the pinned original libfdt implementation. No generic integer-to-phandle
+heuristic, tablet Python, local C compiler or hardware write was used.
+
 The installed overlay's root declares:
 
 ```dts
