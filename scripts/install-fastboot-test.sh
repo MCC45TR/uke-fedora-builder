@@ -13,7 +13,7 @@ usage() {
 [[ $# -ge 2 ]] || { usage >&2; exit 2; }
 action=$1
 case $action in --check|--install) :;; *) usage >&2; exit 2;; esac
-[[ -f $2 && ! -L $2 ]] || fail 'The installation ZIP was not found.' 'Kurulum ZIP’i bulunamadı.'
+[[ -f $2 && ! -L $2 ]] || fail 'The installation ZIP was not found.' 'Kurulum ZIP dosyası bulunamadı.'
 archive=$(realpath -e "$2")
 shift 2
 client=$(dirname "$archive")/fastboot
@@ -31,10 +31,10 @@ work=$(mktemp -d)
 started=$(date +%s)
 cleanup() { find "$work" -depth -delete; }
 trap cleanup EXIT
-stage 1 'Checking the complete installation ZIP' 'Kurulum ZIP’inin tamamı doğrulanıyor'
+stage 1 'Checking the complete installation ZIP' 'Kurulum ZIP dosyasının tamamı doğrulanıyor'
 expected=89ba8ad9d791971ffe1ad0ac5ccaea356a4e66dda7a0486a28fb0898fe1825d2
 actual=$(sha256sum "$archive" | cut -d ' ' -f1)
-[[ $actual == "$expected" ]] || fail 'This is not the qualified test ZIP; no device was changed.' 'Bu dosya doğrulanmış test ZIP’iyle eşleşmiyor; cihaza işlem yapılmadı.'
+[[ $actual == "$expected" ]] || fail 'This is not the qualified test ZIP; no device was changed.' 'Bu dosya doğrulanmış test ZIP dosyasıyla eşleşmiyor; cihaza işlem yapılmadı.'
 unzip -p "$archive" manifest.json > "$work/manifest.json"
 jq -e '.artifact_kind=="ext4-singleboot-fastboot-test" and .destinations==["boot_b","userdata"] and
     .required_current_slot=="b" and .root_raw_bytes==8589934592 and
