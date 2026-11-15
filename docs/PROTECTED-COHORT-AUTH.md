@@ -41,5 +41,15 @@ is not installed under that name. Physical/cohort semantic matching, authenticat
 rescue contents, persistent hardware keys, kernel snapshot verification and
 the complete OEM-to-Linux chain remain required.
 
+On 15 November 2026, [COPR 11328615](https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11328615/)
+qualified source `31e5a0098c7cf90a006eba6505bb07cde68560c1` on
+`fedora-rawhide-aarch64` in 72 seconds, including native compilation and the
+27 refusal cases. Original OpenSSL 4.0.3 and GCC 16.2.1 were used with Fedora
+hardening/LTO and warnings treated as errors. The signed
+`uke-protected-cohort-source-check-1.0-2.fc46.noarch` contains only 2,402 bytes
+of license and text/JSON receipts; its source hashes, published spec and source
+archive were checked against that revision. The preceding release failed at
+RPM install ordering before tests ran and is not a passing qualification.
+
 API references: [OpenSSL EVP verification](https://docs.openssl.org/3.6/man3/EVP_DigestVerifyInit/)
 and [RSA-PSS](https://docs.openssl.org/3.6/man7/RSA-PSS/).
