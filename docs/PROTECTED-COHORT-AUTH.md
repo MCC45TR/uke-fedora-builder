@@ -16,8 +16,9 @@ to 8 KiB and the detached signature to 512 bytes. Keys must use exponent
 65537. The PEM parser rejects additional keys, trailing non-whitespace and
 password requests. Signature parameters are fixed rather than inferred from
 candidate data. The separate [typed manifest consumer](PROTECTED-COHORT-MANIFEST.md)
-adds schema, immutable kernel context and exact capacity checks; its new native
-qualification is pending. A signature over arbitrary bytes is not role admission.
+adds schema, immutable kernel context and exact capacity checks. It passed
+native COPR qualification separately; a signature over arbitrary bytes is not
+role admission.
 
 The byte-span API accepts snapshots directly from a descriptor-owning physical
 selector. It returns an owned copy of the verified bytes for later parsing;

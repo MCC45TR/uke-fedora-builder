@@ -1,8 +1,8 @@
 # Signed cohort manifest constraints
 
 15 November 2026. `protected-cohort-manifest.cpp` is the typed manifest layer
-after the existing RSA-PSS signature primitive. Its native COPR qualification
-is pending. Neither library is installed as `uke-protected-boot-policy`; the
+after the existing RSA-PSS signature primitive. Native source qualification
+passed in [COPR 11328876][native-build]. Neither library is installed as `uke-protected-boot-policy`; the
 protected dracut profile still refuses assembly without that complete policy.
 
 The input is the owned `VerifiedCohortBytes` snapshot, including the existing
@@ -69,6 +69,19 @@ bounds and immutable-context mismatches. The eight-geometry boundary is also
 exercised. Every signing key and payload hash in this fixture is disposable.
 The existing 27 signature refusal cases remain part of the same COPR build.
 
+Source `224834240b5ccb2992017d6416759db28d928404` passed native AArch64
+compilation, library-object compilation and all 64 manifest refusals in 125
+seconds on Rawhide. Original OpenSSL 4.0.3, json-devel 3.12.0 and GCC 16.2.1
+were used with Fedora hardening/LTO and warnings treated as errors. Both the
+measured capacity tuple and synthetic tuple selected correctly; the exact
+eight-geometry boundary also passed. No test payload was a real release image.
+
+The downloaded `uke-protected-cohort-source-check-1.0-3.fc46.noarch` signature
+was verified with the pinned COPR key. Its six files contain only 3,754 bytes
+of license and text/JSON receipts, with no ELF or package script. All eight
+native source hashes, all twelve source-archive pins, the published spec and
+the archive identity carried by the signed RPM matched the reviewed revision.
+
 The typed result provides parameters for later image hashing and mappings;
 it does not perform them. The physical selector, image-content comparison,
 authenticated VBMeta transport, OEM anchor/rollback, protected kernel, boot
@@ -79,3 +92,4 @@ renamed to the missing admission policy. A native test result is not tablet
 boot or secure-boot acceptance.
 
 [callback]: https://json.nlohmann.me/api/basic_json/parser_callback_t/
+[native-build]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11328876/
