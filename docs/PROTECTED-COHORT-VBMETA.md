@@ -1,6 +1,7 @@
 # External AVB cohort carrier
 
-15 November 2026. Native qualification is pending. This layer keeps the signed
+15 November 2026. Native qualification passed in [COPR 11328931][qualification].
+This layer keeps the signed
 manifest outside the kernel/rescue self-reference. `protected-cohort-vbmeta.cpp`
 uses unmodified upstream libavb to verify the outer AVB signature and known-key
 pin before walking descriptors. It then invokes the existing PSS verifier and
@@ -91,5 +92,21 @@ the 64-KiB boundary, padding and special-file refusal. It never boots an OS.
 No successful source test qualifies the current tablet kernel, a common
 256/512-GB installable ZIP or the complete OEM-to-Linux chain.
 
+Source `7cdbe21697b72724d5dc4b8bb65f6370fd85f373` completed the Rawhide AArch64
+build in 116 seconds, including the original upstream C library, production
+C++ objects and all 35 carrier refusal cases. The prior 27 PSS and 64 manifest
+refusal cases also passed. Original OpenSSL 4.0.3, json-devel 3.12.0, GCC 16.2.1
+and android-tools 37.0.0p1-2 were used; upstream Python ran only as that COPR
+host formatter. Project C++ retained Fedora hardening/LTO and `-Werror`.
+
+The downloaded signed `uke-protected-cohort-source-check-1.0-6.fc46.noarch`
+contains nine license/text/JSON files totaling 22,477 bytes, without ELF,
+package scripts or a Python/runtime dependency. The pinned COPR key verified
+its signature. All 17 project source-archive pins, 43 original upstream files,
+11 native project-source hashes, 43 native upstream hashes, both archive
+identities and the published spec matched. These are reproducible source and
+native metadata-verification results, with the admission limits above intact.
+
 [upstream]: https://android.googlesource.com/platform/external/avb/+/ba2dec4b035b0a3b61c5f8f8a74d86bcd450b1ee/libavb/
 [slot]: https://android.googlesource.com/platform/external/avb/+/ba2dec4b035b0a3b61c5f8f8a74d86bcd450b1ee/libavb/avb_slot_verify.c#41
+[qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11328931/
