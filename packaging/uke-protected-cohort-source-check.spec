@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        13%{?dist}
+Release:        14%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -130,12 +130,12 @@ readelf -h build/hwkm-record-test | grep -E 'Machine:.*AArch64'
 build/hwkm-record-test > build/hwkm-record-result.json
 readelf -h build/hwkm-probe | grep -E 'Machine:.*AArch64'
 if build/hwkm-probe --inspect > build/hwkm-host-refusal.txt 2>&1; then exit 1; fi
-grep -Fx 'UKE_HWKM_PROBE_REJECTED' build/hwkm-host-refusal.txt
+grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal.txt
 if build/hwkm-probe --exercise-disposable-key > build/hwkm-host-refusal-exercise.txt 2>&1; then exit 1; fi
-grep -Fx 'UKE_HWKM_PROBE_REJECTED' build/hwkm-host-refusal-exercise.txt
+grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal-exercise.txt
 for mode in create prepare remove; do
     if build/hwkm-probe "--$mode-disposable-key-record" > "build/hwkm-host-refusal-$mode.txt" 2>&1; then exit 1; fi
-    grep -Fx 'UKE_HWKM_PROBE_REJECTED' "build/hwkm-host-refusal-$mode.txt"
+    grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' "build/hwkm-host-refusal-$mode.txt"
 done
 bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json" "$PWD/build/content-fixture" build/cohort-physical
 rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 systemd-devel systemd-libs kernel-headers > build/original-tools.txt
@@ -199,6 +199,9 @@ install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 %{_libexecdir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-14
+- Report fixed diagnostic failure stages without keys, paths or weakened ownership checks.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-13
 - Add private disposable-key record transactions for an explicit cross-reboot HWKM diagnostic.
 

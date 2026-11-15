@@ -111,12 +111,14 @@ int record_directory(bool create) {
     if (create && fsync(parent.fd) < 0) { close(result); reject(); }
     return result;
 }
-std::pair<nlohmann::json, int> probe(Mode mode) {
+std::pair<nlohmann::json, int> probe(Mode mode, const char*& phase) {
+    phase = "physical-owner-open";
     auto devices = open_physical_boot_devices();
     const auto& part = devices.partitions()[static_cast<size_t>(PhysicalRole::Userdata)];
     Fd sys(open("/sys", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
     struct statfs fs{};
     if (fstatfs(sys.fd, &fs) || fs.f_type != SYSFS_MAGIC) reject();
+    phase = "capabilities-before";
     const auto before = capabilities(sys.fd, part);
     const bool exercise = mode == Mode::Exercise;
     const bool key_operation = exercise || mode == Mode::CreateRecord || mode == Mode::PrepareRecord;
@@ -135,6 +137,7 @@ std::pair<nlohmann::json, int> probe(Mode mode) {
         report["result"] = "requires-wrapped-only-early-profile";
         status = 77;
     } else if (mode == Mode::RemoveRecord) {
+        phase = "record-cleanup";
         const int directory = record_directory(false);
         if (directory >= 0) {
             Fd parent(directory);
@@ -143,6 +146,7 @@ std::pair<nlohmann::json, int> probe(Mode mode) {
         }
         report["result"] = "disposable-record-cleanup-complete";
     } else if (key_operation) {
+        phase = "physical-key-descriptor";
         Fd dev(open("/dev", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
         Fd block(beneath(dev.fd, part.name));
         struct stat st{};
@@ -152,30 +156,39 @@ std::pair<nlohmann::json, int> probe(Mode mode) {
             ioctl(block.fd, BLKGETSIZE64, &size) || size != part.capacity_bytes ||
             ioctl(block.fd, BLKGETDISKSEQ, &sequence) || sequence != part.disk_sequence ||
             ioctl(block.fd, BLKSSZGET, &logical) || logical != 4096) reject();
+        phase = "physical-owner-before-key";
         devices.revalidate();
         if (!exercise) {
+            phase = "record-directory";
             Fd parent(record_directory(mode == Mode::CreateRecord));
+            phase = "record-lock";
             hwkm::disposable::Record record(parent.fd);
             if (mode == Mode::CreateRecord) {
                 // Refuse an existing record before requesting a new key. An
                 // uncertain durable commit must never silently regenerate it.
+                phase = "record-presence";
                 if (record.exists()) reject();
                 report["key_ioctl_attempts"] = 1;
+                phase = "record-key-generate";
                 auto key = hwkm::generate_v2(block.fd);
                 report["disposable_hardware_key_generated"] = true;
+                phase = "record-create";
                 record.create(key);
                 report["key_persisted"] = true;
                 report["disposable_record_written"] = true;
                 report["result"] = "disposable-record-created";
             } else {
+                phase = "record-read";
                 auto key = record.read();
                 report["key_ioctl_attempts"] = 1;
+                phase = "record-key-prepare";
                 auto prepared = hwkm::prepare_v2(block.fd, std::move(key));
                 if (prepared.lifetime() != hwkm::Lifetime::PerBoot) reject();
                 report["prepared_from_persistent_record"] = true;
                 report["result"] = "disposable-record-prepared";
             }
         } else {
+            phase = "exercise-key-lifecycle";
             report["key_ioctl_attempts"] = 1;
             auto generated = hwkm::generate_v2(block.fd);
             report["disposable_hardware_key_generated"] = true;
@@ -206,7 +219,9 @@ std::pair<nlohmann::json, int> probe(Mode mode) {
             report["result"] = "disposable-key-lifecycle-passed";
         }
     } else report["result"] = "capability-inspection-only";
+    phase = "physical-owner-after";
     devices.revalidate();
+    phase = "capabilities-after";
     if (before != capabilities(sys.fd, part)) reject();
     return {std::move(report), status};
 }
@@ -221,18 +236,23 @@ int main(int argc, char** argv) {
     else if (mode == "--prepare-disposable-key-record") action = Mode::PrepareRecord;
     else if (mode == "--remove-disposable-key-record") action = Mode::RemoveRecord;
     else return 2;
+    const char* phase = "descriptor-baseline";
     try {
         const auto initial = descriptor_count();
-        auto [report, status] = probe(action);
+        auto [report, status] = probe(action, phase);
         report["mode"] = std::string(mode);
+        phase = "owned-handle-release";
         if (descriptor_count() != initial) reject();
         struct rusage usage{};
+        phase = "resource-report";
         if (getrusage(RUSAGE_SELF, &usage)) reject();
         report["owned_handles_released"] = true;
         report["peak_rss_kib"] = usage.ru_maxrss;
         std::cout << report.dump() << '\n';
         return status;
     } catch (const std::system_error& error) {
-        std::cerr << "UKE_HWKM_PROBE_REJECTED errno=" << error.code().value() << '\n'; return 1;
-    } catch (const std::exception&) { std::cerr << "UKE_HWKM_PROBE_REJECTED\n"; return 1; }
+        std::cerr << "UKE_HWKM_PROBE_REJECTED stage=" << phase << " errno=" << error.code().value() << '\n'; return 1;
+    } catch (const std::exception&) {
+        std::cerr << "UKE_HWKM_PROBE_REJECTED stage=" << phase << '\n'; return 1;
+    }
 }
