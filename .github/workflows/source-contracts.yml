@@ -12,6 +12,10 @@ on:
         description: Exact cumulative unstable kernel RPM version-release for the test filesystem
         type: string
         default: 7.3.3-28.fc46
+      package_test_input_run_id:
+        description: Completed successful test-image run to package as the measured B-slot EXT4 test ZIP
+        type: string
+        default: ''
       build_rescue:
         description: Assemble an unqualified native AArch64 Fedora rescue filesystem
         type: boolean
@@ -46,10 +50,66 @@ on:
         default: c7adc996350e3692b4492ab007cad63070dde6c2
 permissions:
   contents: read
+  actions: read
 concurrency:
-  group: image-source-contracts-${{ github.ref }}
+  group: image-source-contracts-${{ github.ref }}-${{ inputs.build_test_image && 'test-image' || inputs.package_test_input_run_id != '' && 'package-test' || 'contracts' }}
   cancel-in-progress: false
 jobs:
+  package-test:
+    if: github.event_name == 'workflow_dispatch' && inputs.package_test_input_run_id != ''
+    needs: [source, logical-container]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify the selected completed image producer
+        id: producer
+        env:
+          INPUT_RUN: ${{ inputs.package_test_input_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $INPUT_RUN =~ ^[1-9][0-9]{0,19}$ && $(uname -m) == aarch64 ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$INPUT_RUN" > "$RUNNER_TEMP/input-run.json"
+          jq -e '.status=="completed" and .conclusion=="success" and .event=="workflow_dispatch" and .path==".github/workflows/source-contracts.yml"' "$RUNNER_TEMP/input-run.json"
+          producer=$(jq -er .head_sha "$RUNNER_TEMP/input-run.json")
+          [[ $producer =~ ^[a-f0-9]{40}$ ]]
+          printf 'commit=%s\n' "$producer" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ext4-plasma-test-input
+          path: ${{ runner.temp }}/uke-fastboot-package/input
+          run-id: ${{ inputs.package_test_input_run_id }}
+          github-token: ${{ github.token }}
+      - name: Enable fresh-install staging and package only the measured test destinations
+        env:
+          INPUT_PRODUCER: ${{ steps.producer.outputs.commit }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
+          [[ $image =~ ^registry\.fedoraproject\.org/fedora@sha256:[a-f0-9]{64}$ ]]
+          docker build --build-arg "BASE_IMAGE=$image" -f configs/Containerfile.public-unstable -t uke-test-packager configs
+          job="$RUNNER_TEMP/uke-fastboot-package"
+          docker run --rm --cpus=2 --memory=3g --pids-limit=512 \
+            --security-opt apparmor=unconfined \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$job,target=/job" \
+            uke-test-packager bash /builder/src/image/package-ext4-fastboot-test.sh \
+              /job/input /builder/configs/images/uke-512gb-test-geometry.json /job/result "$INPUT_PRODUCER"
+          sudo chown -R "$(id -u):$(id -g)" "$job/result"
+          echo 'Initial EXT4/Plasma installation test: only boot_b and userdata; current slot B and all measured sizes required. Existing native health approval/staging enabled. Secure Boot, encryption, hibernation, rescue and the complete A/B image remain open.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain the fastboot-update test ZIP and checksums without a Release
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: fastboot-update-test
+          path: ${{ runner.temp }}/uke-fastboot-package/result
+          compression-level: 0
+          if-no-files-found: error
+          retention-days: 7
   test-image:
     if: github.event_name == 'workflow_dispatch' && inputs.build_test_image
     needs: source
@@ -311,6 +371,7 @@ jobs:
           shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
           shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
+          shellcheck src/image/test-fastboot-profile.sh src/image/package-ext4-fastboot-test.sh
           shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh
           shellcheck src/image/compose-fastboot-super-seed.sh
           shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh

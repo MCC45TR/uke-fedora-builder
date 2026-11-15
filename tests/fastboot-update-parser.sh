@@ -94,7 +94,7 @@ run_case() {
     if [[ $expected == success ]]; then
         [[ $status == 0 ]]
         awk '/^flash:/ {sub(/^flash:/, ""); print}' "$case_dir/commands.txt" > "$case_dir/actual.txt"
-        jq -r '.payloads[].partition' "$root/configs/images/fastboot-update-uke.json" > "$case_dir/expected.txt"
+        jq -r '.[]' "$case_dir/allowed.json" > "$case_dir/expected.txt"
         cmp "$case_dir/actual.txt" "$case_dir/expected.txt"
         [[ $(grep -c '^reboot$' "$case_dir/commands.txt") == 1 ]]
         [[ $(grep -c '^set_active:' "$case_dir/commands.txt") == 1 ]]
@@ -125,6 +125,19 @@ run_case missing "$work/guarded.zip" reject-before-mutation < <(jq 'del(."partit
 # Demonstrate why ZIP/sparse stored size is insufficient: original fastboot
 # reaches download/flash without the whole-package android-info size checks.
 run_case unguarded "$work/unguarded.zip" reject-at-flash < <(jq '."partition-size:super"="0x00100000"' "$work/base.json")
+# The initial installation test has a distinct, strictly smaller write set.
+# shellcheck source=../src/image/test-fastboot-profile.sh
+# shellcheck disable=SC1091
+source "$root/src/image/test-fastboot-profile.sh"
+test_fastboot_requirements "$work/geometry.json" > "$work/images/android-info.txt"
+test_fastboot_tasks > "$work/images/fastboot-info.txt"
+printf '["boot_b","userdata"]\n' > "$work/allowed.json"
+(cd "$work/images"; zip -q "$work/test-profile.zip" android-info.txt fastboot-info.txt boot.img userdata.img)
+run_case initial-test-b "$work/test-profile.zip" success < <(jq '."current-slot"="b"' "$work/base.json")
+grep -Fxq 'set_active:b' "$work/initial-test-b/commands.txt"
+run_case initial-test-a "$work/test-profile.zip" reject-before-mutation < "$work/base.json"
+run_case initial-test-wrong-size "$work/test-profile.zip" reject-before-mutation < <(
+    jq '."current-slot"="b" | ."partition-size:userdata"="0x00100000"' "$work/base.json")
 jq -n --arg version "$(fastboot --version | head -n1)" \
     '{schema_version:1,original_fastboot:$version,loopback_only:true,usb_used:false,
       synthetic_nonbootable_payloads:true,explicit_ten_partition_order_verified:true,
@@ -132,5 +145,7 @@ jq -n --arg version "$(fastboot --version | head -n1)" \
       same_archive_two_synthetic_capacities_tested:true,
       every_destination_size_checked_before_mutation:true,fastbootd_and_non_ab_refused:true,
       unguarded_sparse_extent_mismatch_reaches_flash:true,physical_fastboot_tested:false,
+      initial_test_profile_exactly_boot_b_userdata:true,initial_test_other_slot_refused_before_mutation:true,
+      initial_test_current_slot_b_preserved:true,
       operating_system_booted:false,secure_boot_tested:false}' > "$report"
 printf 'Original fastboot ZIP parser, explicit slots and pre-mutation capacity requirements passed on loopback only.\n'
