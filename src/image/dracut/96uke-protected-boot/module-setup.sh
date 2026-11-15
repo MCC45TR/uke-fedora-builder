@@ -10,6 +10,11 @@ install() {
     # A tool-only archive or an older physical-root guard cannot substitute.
     require_binaries /usr/libexec/uke-protected-boot-policy || return 1
     inst_multiple /usr/libexec/uke-protected-boot-policy || return 1
+    # qcom_ice is an early module in the cumulative kernel. Its advertised
+    # key types are fixed when the controller probes. The enclosing producer
+    # must embed this config before that first probe, not append it to a later
+    # vendor ramdisk or attempt a mounted-root controller reset.
+    inst_simple "$moddir/uke-hwkm.conf" /usr/lib/modprobe.d/uke-hwkm.conf || return 1
     [[ -f $initdir$systemdsystemunitdir/systemd-hibernate-resume.service &&
        -x $initdir/usr/lib/systemd/systemd-hibernate-resume ]] || return 1
     cmp -s "$systemdsystemunitdir/systemd-hibernate-resume.service" \

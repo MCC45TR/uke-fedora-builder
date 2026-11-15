@@ -67,6 +67,12 @@ fi
 [[ ! -e $initdir/etc/systemd && ! -e $initdir/usr/libexec ]]
 have_policy=1
 install
+cmp "$module/uke-hwkm.conf" "$initdir/usr/lib/modprobe.d/uke-hwkm.conf"
+# Parse the exact installed config with original kmod. This only emits config;
+# it does not load a module, change a parameter or prove first-probe ordering.
+modprobe --showconfig --config "$initdir/usr/lib/modprobe.d/uke-hwkm.conf" > "$work/kmod.conf"
+[[ $(grep -c '^options qcom_ice ' "$work/kmod.conf") == 1 ]]
+grep -Fx 'options qcom_ice use_wrapped_keys=1' "$work/kmod.conf" >/dev/null
 for generator in systemd-hibernate-resume-generator systemd-cryptsetup-generator systemd-gpt-auto-generator; do
     [[ $(readlink "$initdir/etc/systemd/system-generators/$generator") == /dev/null ]]
 done
@@ -119,6 +125,8 @@ verify > "$work/restored.log" 2>&1
 jq -n --arg version "$native_version" \
     '{schema_version:1,original_systemd:$version,explicit_module_only:true,
       missing_native_policy_refused:true,automatic_generators_masked:true,
+      hwkm_opt_in_config_copied_and_original_kmod_parsed:true,
+      hwkm_first_probe_order_or_hardware_not_proved:true,
       initrd_swap_and_software_cryptsetup_masked:true,original_helper_explicit_device:true,
       kernel_noresume_required_by_role:true,kernel_profile_itself_qualified:false,
       native_condition_semantics_verified:true,fixture_role_markers_not_authentication:true,

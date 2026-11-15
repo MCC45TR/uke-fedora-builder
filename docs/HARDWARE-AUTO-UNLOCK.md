@@ -105,8 +105,15 @@ locking, dump/fork flags and fork behavior are exercised. It checks generation
 and preparation, consumed inputs, replacement cleanup, five errno paths without
 retries, malformed returned sizes/pointers/reserved fields, protection failures,
 invalid descriptors and zeroed pages at every intercepted unmap. Synthetic
-100-byte values are public fixtures, not hardware-generated keys. Native build
-and test qualification are pending; this fixture cannot establish physical
+100-byte values are public fixtures, not hardware-generated keys. The
+[native Rawhide AArch64 qualification][native] passed in 163 seconds:
+49 refused cases, 49 zeroed unmaps and at most three live key pages. Source
+worker, all 26 project source pins, 23 native project hashes, 43 upstream hashes,
+source-archive identity and the published recipe match. The signed
+`uke-protected-cohort-source-check-1.0-11.fc46.aarch64` RPM was audited with
+the pinned COPR key and contains the receipt, preserving the prior disposable
+cohort diagnostics; no HWKM executable, package script or Python dependency is
+shipped. It was not installed on the PC or target. This fixture cannot establish physical
 HWKM operation, persistent reuse or boot binding.
 
 The ABI is pinned to [v7.3.3 UAPI][uapi] blob
@@ -123,6 +130,23 @@ before the first ICE probe, preserving existing features, hardening, recovery,
 staging and preferences. The initial root remains unencrypted EXT4. Writing
 the live module parameter would not rebuild the existing crypto profile;
 the mounted-root controller must not be reset to attempt this transition.
+
+The explicit dracut 96 profile now carries `uke-hwkm.conf`, parsed by original
+kmod as `options qcom_ice use_wrapped_keys=1`. Its install function still refuses
+assembly when the native boot policy is missing. Copying this configuration is
+not enough: the cumulative producer must include it in the **forced embedded**
+initramfs, retain `CONFIG_QCOM_INLINE_CRYPTO_ENGINE=m` and the early ICE module,
+and qualify the original modprobe/UFS dependency path before the first probe.
+The current forced command line does not accept an arbitrary added bootloader
+parameter, and a later vendor ramdisk is not a replacement for this integration.
+No current boot image or installed module configuration changed.
+
+The updated barrier fixture passed on the separate PC with original Fedora
+systemd `262.2-1.fc46` and kmod. It verified the config copy/parser, missing-policy
+refusal, generator masks, resume conditions, ordering-cycle refusal and missing
+executable refusal without starting a manager or accessing a device/key. This
+host result is separate from the native AArch64 key-mechanism qualification
+above; embedded first-probe ordering and target operation remain unproved.
 
 Then separately establish wrapped-mode advertisement, hardware-generated key
 creation/preparation, cold-boot reuse of the long-term blob, refusal of altered
@@ -143,3 +167,4 @@ be enabled. Source APIs and driver logs do not mark those behaviors complete.
 [aosp]: https://source.android.com/docs/security/features/encryption/hw-wrapped-keys
 [block]: https://github.com/gregkh/linux/blob/v7.3.3/block/blk-crypto.c
 [ioctl]: https://github.com/gregkh/linux/blob/v7.3.3/block/ioctl.c
+[native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329719/
