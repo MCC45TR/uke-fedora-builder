@@ -4,6 +4,14 @@ on:
   pull_request:
   workflow_dispatch:
     inputs:
+      build_test_image:
+        description: Assemble a native EXT4 Plasma singleboot test image from signed COPR packages
+        type: boolean
+        default: false
+      test_image_kernel_evr:
+        description: Exact cumulative unstable kernel RPM version-release for the test filesystem
+        type: string
+        default: 7.3.3-28.fc46
       build_rescue:
         description: Assemble an unqualified native AArch64 Fedora rescue filesystem
         type: boolean
@@ -42,6 +50,56 @@ concurrency:
   group: image-source-contracts-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  test-image:
+    if: github.event_name == 'workflow_dispatch' && inputs.build_test_image
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Assemble original Fedora Plasma and the matching cumulative kernel
+        env:
+          IMAGE_EVR: ${{ inputs.test_image_kernel_evr }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 && $IMAGE_EVR =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ ]]
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq zstd unzip
+          export UKE_CONTAINER_ENGINE=docker
+          bash scripts/build-image.sh --mode singleboot --filesystem ext4 --desktop kde \
+            --channel unstable --kernel-profile unstable --kernel-rpm "$IMAGE_EVR" \
+            --linux-size 8192 --jobs 2 --out "$RUNNER_TEMP/uke-test-image" --yes
+          mapfile -t manifests < <(find "$RUNNER_TEMP/uke-test-image" -mindepth 3 -maxdepth 3 -path '*/artifacts/manifest.json')
+          [[ ${#manifests[@]} == 1 ]]
+          artifacts=${manifests[0]%/manifest.json}
+          (cd "$artifacts"; sha256sum --check --strict SHA256SUMS)
+          jq -e '.image_built and .filesystem=="ext4" and .partition=="userdata" and .kernel_profile=="unstable"' "${manifests[0]}"
+          destination="$RUNNER_TEMP/uke-test-image-result"
+          mkdir -m700 "$destination"
+          for file in boot.img userdata.img manifest.json; do
+            ln "$artifacts/$file" "$destination/$file"
+          done
+          cp "$artifacts/kernel/kernel-info.json" "$destination/kernel-info.json"
+          find "$artifacts" -maxdepth 1 -type f -name '*.json' ! -name manifest.json -exec cp -t "$destination" -- {} +
+          (cd "$destination"; sha256sum -- boot.img userdata.img ./*.json > SHA256SUMS)
+          echo 'Signed-package EXT4/Plasma input composed and read back. This artifact is not a fastboot-update ZIP or secure-boot, encryption, rescue or hardware acceptance.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Retain the test filesystem and exact matching boot input
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ext4-plasma-test-input
+          path: ${{ runner.temp }}/uke-test-image-result
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 3
+      - name: Retain bounded failure diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: ext4-plasma-test-diagnostics
+          path: ${{ runner.temp }}/uke-test-image/image-*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
   super-runtime:
     if: github.event_name == 'workflow_dispatch' && inputs.build_super_runtime
     needs: source
