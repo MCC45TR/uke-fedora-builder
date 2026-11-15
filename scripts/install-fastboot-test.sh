@@ -42,6 +42,15 @@ jq -e '.artifact_kind=="ext4-singleboot-fastboot-test" and .destinations==["boot
 available=$(df -B1 --output=avail "$work" | tail -n1)
 ((available >= 10737418240)) || fail 'Keep at least 10 GiB free beside the ZIP for extraction and reserve.' 'ZIP dosyasının bulunduğu diskte açma ve pay için en az 10 GiB boş alan gerekli.'
 say 'ZIP checksum and test scope verified.' 'ZIP özeti ve test kapsamı doğrulandı.'
+qualification=$(dirname "$archive")/receipts/host-fastboot-qualification.json
+client_checksums=$(dirname "$archive")/receipts/host-fastboot-SHA256SUMS
+[[ -f $qualification && ! -L $qualification && -f $client_checksums && ! -L $client_checksums ]] ||
+    fail 'The compatible fastboot verification files are missing beside this ZIP.' 'Bu ZIP için uyumlu fastboot aracının doğrulama dosyaları eksik.'
+jq -e '.partition_size_response_whitespace_normalized and .padded_wrong_capacity_and_malformed_values_refused' "$qualification" >/dev/null ||
+    fail 'This fastboot client has not passed the required response-format tests.' 'Bu fastboot aracı gerekli yanıt biçimi testlerini geçmemiş.'
+read -r expected_client client_name < "$client_checksums"
+[[ $expected_client =~ ^[a-f0-9]{64}$ && $client_name == fastboot && $(sha256sum "$client" | cut -d ' ' -f1) == "$expected_client" ]] ||
+    fail 'Use the verified fastboot supplied next to the ZIP.' 'ZIP dosyasının yanında verilen doğrulanmış fastboot aracını kullanın.'
 stage 2 'Checking the connected tablet and all ten partition capacities' 'Bağlı tablet ve on bölümün kapasitesi denetleniyor'
 mapfile -t devices < <(timeout 8s "$client" devices | awk '$2=="fastboot"{print $1}')
 [[ ${#devices[@]} == 1 ]] || fail 'Connect exactly one tablet in bootloader fastboot mode.' 'Bootloader fastboot modunda tam bir tablet bağlı olmalı.'
