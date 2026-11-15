@@ -1,6 +1,6 @@
 # Descriptor-based boot content verification
 
-15 November 2026. Native qualification is pending. The existing AVB carrier
+15 November 2026. Native qualification passed in [COPR 11329047][qualification]. The existing AVB carrier
 authenticates metadata; `protected-cohort-content.cpp` compares the actual
 bytes supplied through three open descriptors in boot/vendor_boot/DTBO order.
 It is not installed as the protected admission policy and does not release
@@ -55,6 +55,9 @@ OEM root, protected rollback, role/key admission and authenticated resume remain
 separate required gates. The inspection CLI reports those as false even after
 all content checks pass.
 
+Vendor boot and DTBO are checked against both authenticated digests; this
+layer does not parse their formats or establish that OEM firmware accepts them.
+
 ## Source fixture
 
 The COPR fixture reuses the existing native boot codec with a small owned
@@ -72,5 +75,21 @@ separate from that process measurement. No fixture boots an OS or uses a
 physical partition. Python remains limited to the already documented original
 avbtool COPR-host exception; no project Python or target payload is introduced.
 
+Source `3ddf7c2db8b93df8c8ce041b9ed167c348221b87` passed native Rawhide
+AArch64 compilation, production-object compilation and all 31 content refusal
+cases in 136 seconds. The prior 27 PSS, 64 manifest and 35 AVB refusal cases
+also passed. The large fixture verified 100,675,584 bytes with a measured peak
+process RSS of 9,928 KiB. Original Fedora hardening/LTO and `-Werror` remained
+enabled. These are owned regular-file fixtures, without a block-device ioctl
+or tablet boot acceptance claim.
+
+The downloaded signed `uke-protected-cohort-source-check-1.0-7.fc46.noarch`
+contains ten license/text/JSON files totaling 24,350 bytes. Its pinned COPR
+signature, all 18 source-archive project pins, 43 original libavb file pins,
+15 native project hashes, 43 native upstream hashes, both archive identities,
+published spec and licenses matched. No ELF, package script or Python/runtime
+dependency is packaged or installed on either PC or tablet.
+
 [header]: https://android.googlesource.com/platform/system/tools/mkbootimg/+/4a27dd13adf9846e12d585d6fe99a375ebb58396/include/bootimg/bootimg.h
 [arm64]: https://docs.kernel.org/arch/arm64/booting.html
+[qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329047/

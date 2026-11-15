@@ -81,6 +81,10 @@ This verifies metadata signatures and their cross-field contract. It does
 **not** read actual boot partition contents or establish their physical identity.
 The next admission layer must compare actual bytes against both the plain
 manifest digest and AVB's salted digest using pinned physical descriptors.
+The [content reader](PROTECTED-BOOT-CONTENTS.md) now supplies the bounded
+comparison and kernel-slice check; its native qualification currently covers
+owned regular-file fixtures. Physical ownership and selected-slot binding
+remain outside that reader and are still required by admission.
 Both hashes cover the exact `image_size` data prefix; an optional AVB footer
 or sparse transport padding belongs to the separate complete flash-file audit.
 Using an external hash descriptor does not require padding each boot input
