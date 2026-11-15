@@ -160,6 +160,13 @@ path and original link, with unchanged target bytes. All nine root files pass
 bounded PC preprocessing with this closure; native DTC and graph composition
 are separate COPR checks. No source or hardware setting was substituted.
 
+COPR 11330826 compiled all nine roots and merged the OEM board, camera and
+display layers. The additional source marker used an absolute target path,
+which the Qualcomm overlay merger rejected. Release 7 targets the OEM's
+existing `chosen` symbol instead. This marker records source provenance after
+boot; it is neither a trust anchor nor hardware configuration. The real
+platform layers and graph checks remain unchanged.
+
 The board include chain alone is incomplete. Installed entry 0 also contains
 the camera and O82 display layers. The corresponding OEM sources are separate:
 camera DT `57d2135ee6909ffb7d288a7dc4d82c85d95fc10d` and display DT

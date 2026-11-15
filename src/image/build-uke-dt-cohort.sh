@@ -59,7 +59,7 @@ done < <(jq -r '.roots[]|[.owner,.path,.target]|@tsv' "$pins")
 
 # An update receipt, not a trust anchor: it identifies the overlay that reached
 # Linux after boot. It carries no key authority or hardware configuration.
-printf '/dts-v1/;\n/plugin/;\n/ { fragment@0 { target-path = "/chosen"; __overlay__ { uke,dtbo-source = "%s"; }; }; };\n' \
+printf '/dts-v1/;\n/plugin/;\n&chosen { uke,dtbo-source = "%s"; };\n' \
  "$source_pin_sha" > "$output/source-marker.dts"
 dtc -@ -I dts -O dtb -o "$output/compiled/source-marker.dtb" "$output/source-marker.dts"
 
