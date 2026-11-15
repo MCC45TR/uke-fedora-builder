@@ -135,6 +135,12 @@ and first-stage verifier to be protected. A signed but replaceable U-Boot does
 not close that chain. Do not relock stock ABL without an accepted custom-key
 contract, or pass blanket AVB verification-disable flags.
 
+Read-only inspection subsequently found real custom-key dispatch and AVB
+validation paths in both installed ABL copies. See the
+[OEM trust investigation](OEM-TRUST-INVESTIGATION.md) for the source comparison
+and its limits. Virtual-target support is not a qualified enrollment, relock,
+tamper-rejection or sealed-key-release procedure.
+
 Build DTBO and vendor_boot from the qualified cumulative source/board selection,
 including fitted suppliers, table IDs, reservations, bootconfig and handoff.
 Do not publish a private tablet dump or treat a compiled overlay as a complete
