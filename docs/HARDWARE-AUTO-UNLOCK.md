@@ -50,6 +50,12 @@ UID81 service-open refusal, before vendor information or TPM commands. This
 extends the access result beyond ordinary userspace credentials; it still
 supplies no usable TPM, sealing policy or boot-bound automatic release.
 
+[Resident Keymaster/QSEECOM research](KEYMASTER-QSEECOM-RESEARCH.md) identifies
+a separate fixed-version contract in the fitted ABL code and compares exact
+Uke, same-SoC and upstream sources. No Keymaster request or provider is yet
+qualified; the next experiment must preserve non-loading discovery and the
+existing refusal of unsupported secure callbacks.
+
 ## Kernel26 baseline before the opt-in
 
 Read-only SSH inspection of Uke/SM7675 running `7.3.3-26-unstable` found ICE
