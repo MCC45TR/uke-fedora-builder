@@ -37,6 +37,12 @@ Hibernate remains disabled under the existing protection. Trusted key release,
 authenticated resume, actual encrypted I/O and data-preserving conversion are
 required before enabling production encryption.
 
+The subsequent [ordinary-credential QTEE TPM diagnostic](QTEE-TPM-DISCOVERY.md)
+passed native tests and signed DNF delivery. On Uke, registration succeeded,
+but opening UID81 returned remote result11/status77 before either vendor
+information query. This does not prove TPM absence or establish a sealing
+provider. The kernel-only privileged credential restriction remains intact.
+
 ## Kernel26 baseline before the opt-in
 
 Read-only SSH inspection of Uke/SM7675 running `7.3.3-26-unstable` found ICE

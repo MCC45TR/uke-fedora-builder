@@ -1,8 +1,37 @@
 # Bounded QTEE TPM discovery
 
-15 November 2026. This is a source candidate, not a fitted TPM or automatic
-unlock result. The accepted kernel27 HWKM results are recorded separately in
+15 November 2026. Native tests and signed DNF delivery passed. The fitted
+firmware refused userspace access to UID81; no TPM or automatic unlock has
+been qualified. The accepted kernel27 HWKM results are recorded separately in
 [hardware automatic unlock](HARDWARE-AUTO-UNLOCK.md).
+
+## Observed result
+
+COPR [11330412][build16], package `1.0-16`, succeeded in 244 seconds. The
+actual source worker, recipe, 36 project inputs, 33 native source hashes,
+43 AVB inputs and nine unchanged MINK inputs were checked. Both RPM signatures
+match the existing test-project key. The package contains four AArch64
+diagnostics, retained fixtures and notices: 46 regular files, 1,295,386 bytes,
+no RPM scriptlets, Python runtime or service. The 31 parser refusal cases,
+all three reported TPM types and actual Fedora/MINK marshalling tests pass,
+along with the retained cohort, 49 HWKM and 30 record refusal cases.
+
+DNF with mandatory signature checking upgraded only diagnostic14 to16 and
+changed no dependency. Installed RPM verification and the frontend digest
+match the audited package. One actual Uke query completed ordinary userspace
+credential registration, then returned status 77 at
+`qtee-tpm-service-open`, remote result 11. No service object was obtained;
+neither vendor information query nor any TPM2 command was sent. This result
+does not distinguish firmware absence from principal/service admission.
+The public IClientEnv definition does not establish the fitted firmware's
+meaning for this open-method result; its numeric code remains unclassified.
+
+The system remained healthy on accepted27/A with no pending slot change,
+SELinux Enforcing and unchanged update/rollback preferences. No diagnostic
+process or disposable key record remained. Free space stayed 372,216 MiB on
+root and 3,691 MiB in `/tmp`. No reboot, firmware, lock, partition, mapping
+or key write was part of this test. Kernel-only discovery, any fitted sealing
+service, measured boot and production key-release policy remain open.
 
 ## Sources and match limits
 
@@ -52,7 +81,9 @@ protected character node must have identical identity before and after access.
 Other provider numbering is refused. The adapter's transient callback workers
 exist only during this explicit process; there is no installed service or idle
 poll. Successful completion additionally requires the original descriptor
-count, physical-owner revalidation and explicit object-release success.
+count, physical-owner revalidation and adapter reference-release success.
+The adapter's local reference release and context closure are not an
+attestation of remote TA teardown.
 
 Only signed COPR RPM/DNF delivery may precede a device query. Discovery refusal
 must distinguish credential, service-open, transport and malformed-response
@@ -66,3 +97,4 @@ production key or boot-selection change is part of discovery.
 [kernel]: https://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git/tree/drivers/tee/qcomtee/call.c?h=v7.3.3
 [mink]: https://github.com/qualcomm/minkipc/tree/5e3c6951d13162a262ea65ea8e8351228f092b58/libminkadaptor
 [credentials]: https://github.com/qualcomm/quic-teec/blob/736419e25a2036aac3292a10a93e394a90750ca3/tests/common.c
+[build16]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11330412/
