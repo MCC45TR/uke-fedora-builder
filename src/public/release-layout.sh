@@ -216,7 +216,7 @@ release_body() {
     printf '## Downloads\n\nChoose one desktop. Sizes are the actual compressed file sizes.\n\n| Desktop | Compressed image | Size (bytes) |\n| --- | --- | ---: |\n'
     while IFS=$'\t' read -r file bytes sha; do
         [[ $file != "$boot" ]] || continue
-        case $file in *-kde-plasma-*) example='KDE Plasma';; *-gnome-*) example=GNOME;; *-cutefish-*) example=Cutefish;; *-kde-plasma-mobile-*) example='KDE Mobile';; *) example=Desktop;; esac
+        case $file in *-kde-plasma-mobile-*) example='KDE Mobile';; *-kde-plasma-*) example='KDE Plasma';; *-gnome-*) example=GNOME;; *-cutefish-*) example=Cutefish;; *) example=Desktop;; esac
         printf '| %s | [%s](%s/%s) | %s |\n' "$example" "$file" "$url" "$file" "$bytes"
     done < "$inventory"
     boot_bytes=$(awk -F '\t' -v name="$boot" '$1==name {print $2}' "$inventory")

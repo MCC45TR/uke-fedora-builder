@@ -3,7 +3,7 @@
 set -Eeuo pipefail
 root=$(git rev-parse --show-toplevel)
 [[ -x $root/ukelinux.sh && $(uname -m) == aarch64 ]]
-case ${IMAGE_DESKTOP:-kde} in kde|gnome|cutefish|nextkde) ;; *) exit 2;; esac
+case ${IMAGE_DESKTOP:-kde} in kde|gnome|cutefish|plasma-mobile|nextkde) ;; *) exit 2;; esac
 case ${IMAGE_SHELL:-bash} in bash|fish|zsh) ;; *) exit 2;; esac
 case ${IMAGE_CHANNEL:-unstable} in stable|testing|unstable) ;; *) exit 2;; esac
 case ${IMAGE_SIZE_MIB:-16384} in 8192|16384) ;; *) exit 2;; esac
