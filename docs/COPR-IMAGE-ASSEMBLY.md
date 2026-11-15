@@ -57,11 +57,9 @@ All 12 KDE/GNOME, Bash/Fish/Zsh and linux/userdata goals resolve against the
 exact kernel 7.3.1-3 parts. The KDE closures contain 961–965 packages; GNOME has
 768–772. DNF stops at its confirmation boundary with `--assumeno`; only solver
 metadata is retained, with empty target databases and RPM caches. The unstable
-selection explicitly names `uke-pipewire` and `uke-pipewire-pulseaudio`, avoiding
-a conflicting newer Fedora provider without relaxing solver policy. Device-local
-touch and video-firmware RPMs are excluded from generic images. These metadata
-results do not verify target RPM signatures, firmware rights, installation or
-full composition.
+selection uses original Fedora `pipewire`, `pipewire-pulseaudio` and
+`wireplumber`. The retired Uke producer names are not requested. Hardware
+protocol and lifecycle work remains in the cumulative kernel and DT.
 
 The source exposes `src/public/copr-root-stage.sh` for a COPR producer.
 It accepts the checked SDK inputs and one complete frozen target set, rebuilds
