@@ -119,6 +119,11 @@ HWKM. The upstream ICE driver has a wrapped-key mode requiring qualified
 initialization/key lifecycle; do not toggle storage ownership/mode on a live
 mounted root. A TEE device node alone is not a sealing service.
 
+The fresh [hardware auto-unlock investigation](HARDWARE-AUTO-UNLOCK.md) relates
+the fitted HWKM v2 log to the installed module's actual control flow. It
+supports firmware ABI availability with wrapped mode disabled, while key
+generation, cold-boot preparation and verified-boot binding remain unqualified.
+
 Upstream dm-inlinecrypt currently lacks original cryptsetup/LUKS integration.
 Ordinary cryptsetup/dm-crypt conversion does not satisfy hardware-only bulk
 crypto. The native mapper/key/reencryption integration, wrapped-key provisioning,
