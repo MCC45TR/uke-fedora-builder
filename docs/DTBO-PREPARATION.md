@@ -22,8 +22,11 @@ full 96-MiB vendor_boot partition nor a full fastboot ROM was downloaded.
 Bootconfig reports `dtbo_idx=0` and `dtb_idx=2`. Base 2 identifies Cliffs7P,
 with `qcom,msm-id=<643 65536>`. This is a reported selection, separate from
 authenticated proof of the running slot and boot cohort. Four base variants
-are retained in the inventory; another capacity/RAM model must not be reduced
-to the current unit's selected base or live memory map.
+are retained in the inventory, including the bootloader's dynamic memory
+handoff. The 256-GB and 512-GB models have the same DTBO partition capacity;
+one common `dtbo.img` is required. Storage capacity does not select another
+DTBO or justify a separate overlay build. Source/firmware base ordering is a
+separate property and must be checked by payload identities.
 
 The sanitized [reference manifest](../manifests/dtbo-reference-20261115.json)
 records exact prefix, payload and base hashes. Raw firmware and decompiled
@@ -149,11 +152,26 @@ runtime library. No source is patched. The 24 input files, GPL/dual-license
 notices and source identity are pinned in `packaging/dtbo-merge-source.json`.
 The recipe's generated version header records upstream 1.7.0 and its commit.
 
-The planned native fixture composes synthetic board/camera/display layers,
-checks external and local phandles, preserves board root metadata and synthetic
-memory/reserved regions, compares resulting graphs with sequential application,
-checks reproducibility and refuses an incomplete layer set. These checks do
-not establish an installed Uke source reproduction or hardware acceptance.
+COPR [11329537][merge-copr] qualified that unmodified merger natively on the
+sole Rawhide AArch64 target in 125 seconds. Synthetic board/camera/display
+layers merged successfully; external and local phandles resolved, the board
+root metadata and synthetic memory/reserved regions remained intact, and
+selected resulting graph relationships matched sequential application.
+Repeated merging produced identical bytes. The merged payload packed into
+the required v0 container, while omitting the required camera layer prevented
+successful final application. No Python or installed firmware input was used.
+The formatter's prior fixture and ShellCheck also passed.
+
+The signed `1.0-3.fc46.aarch64` result contains twelve regular receipt/notice
+files totaling 82,947 bytes, with no ELF, scriptlet or runtime dependency. The
+actual worker/spec, seven project input pins, six native project hashes and
+all 39 original upstream hashes matched. Three source archive identities and
+both byte-identical original-notice archives were checked against the signed
+package. Its RPM SHA-256 is
+`d1c180def4ee2bd964ce59fc0c99270512f3cc1c4aa1ca0becf424b54a839609`.
+No package or replacement libfdt was installed on the PC or tablet. This
+qualifies the host composition tool and scoped synthetic graph checks; it
+does not establish an installed Uke source reproduction or hardware acceptance.
 
 1. Qualify the complete OEM DTS/include/source dependency closure and its
    differences from the installed reference, then build the custom board
@@ -173,3 +191,4 @@ not establish an installed Uke source reproduction or hardware acceptance.
 [oem-dt]: https://github.com/MiCode/kernel_devicetree/tree/94c84aeb9e517dbde546fc732033c184094c8e57/qcom
 [aosp-tools]: https://android.googlesource.com/platform/system/libufdt/+/9b70f594cf149c7c73989c78f03d210f8aa1c1f6/utils/
 [copr]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329504/
+[merge-copr]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329537/
