@@ -16,6 +16,14 @@ on:
         description: Qualify the original Fedora ARM64 super tool closure without boot hooks
         type: boolean
         default: false
+      build_rescue_verity:
+        description: Qualify a native Fedora EXT4+verity rescue container without installing a boot profile
+        type: boolean
+        default: false
+      verity_super_bytes:
+        description: Actual geometry for the candidate; default is measured 512-GB Uke only
+        type: string
+        default: '11274289152'
       minimum_super_bytes:
         description: Supplied minimum super capacity; default is measured 512-GB Uke only, not 256-GB evidence
         type: string
@@ -83,7 +91,7 @@ jobs:
           if-no-files-found: error
           retention-days: 14
   rescue-root:
-    if: github.event_name == 'workflow_dispatch' && (inputs.build_rescue || inputs.build_super_seed)
+    if: github.event_name == 'workflow_dispatch' && (inputs.build_rescue || inputs.build_super_seed || inputs.build_rescue_verity)
     needs: [source, logical-container]
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 30
@@ -95,11 +103,16 @@ jobs:
           RESCUE_SOURCE: ${{ inputs.rescue_kernel_source }}
           SUPER_SEED: ${{ inputs.build_super_seed }}
           MINIMUM_SUPER: ${{ inputs.minimum_super_bytes }}
+          RESCUE_VERITY: ${{ inputs.build_rescue_verity }}
+          VERITY_SUPER: ${{ inputs.verity_super_bytes }}
         shell: bash
         run: |
           set -Eeuo pipefail
           [[ $(uname -m) == aarch64 && $RESCUE_EVR =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ && $RESCUE_SOURCE =~ ^[a-f0-9]{40}$ ]]
           [[ $SUPER_SEED == true || $SUPER_SEED == false ]]
+          [[ $RESCUE_VERITY == true || $RESCUE_VERITY == false ]]
+          [[ $SUPER_SEED != true || $RESCUE_VERITY != true ]]
+          [[ $VERITY_SUPER =~ ^[1-9][0-9]{0,12}$ ]]
           [[ $MINIMUM_SUPER =~ ^[1-9][0-9]{0,12}$ ]]
           image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
           [[ $image =~ ^registry\.fedoraproject\.org/fedora@sha256:[a-f0-9]{64}$ ]]
@@ -128,10 +141,14 @@ jobs:
           if [[ $SUPER_SEED == true ]]; then
             (( $(df -Pk "$job" | awk 'NR==2{print $4}') >= 24*1024*1024 )) || { echo 'Need 24GiB free for owned seed/provision fixtures and reserve' >&2; exit 1; }
           fi
+          if [[ $RESCUE_VERITY == true ]]; then
+            (( $(df -Pk "$job" | awk 'NR==2{print $4}') >= 12*1024*1024 ))
+          fi
           jq -n --arg evr "$RESCUE_EVR" --arg source "$RESCUE_SOURCE" \
             '{channel:"unstable",fedora_release:"rawhide",kernel_profile:"unstable",kernel_rpm_request:$evr,kernel_commit:$source}' > "$job/request.json"
           docker run --rm --cpus=2 --memory=2g --pids-limit=512 \
             --env "UKE_BUILD_SUPER_SEED=$SUPER_SEED" --env "UKE_MINIMUM_SUPER=$MINIMUM_SUPER" \
+            --env "UKE_BUILD_RESCUE_VERITY=$RESCUE_VERITY" --env "UKE_VERITY_SUPER=$VERITY_SUPER" \
             --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
             --mount "type=bind,source=$job,target=/job" \
@@ -145,6 +162,10 @@ jobs:
               for tool in cc c++ gcc g++ clang clang++ as ld rpmbuild; do ln -s refuse /run/refuse-native-build/$tool; done
               export PATH=/run/refuse-native-build:$PATH
               bash /builder/src/image/compose-fedora-rescue.sh
+              if [[ $UKE_BUILD_RESCUE_VERITY == true ]]; then
+                dnf5 -y --setopt=install_weak_deps=False install veritysetup
+                bash /builder/src/image/qualify-fedora-rescue-verity.sh /job/artifacts/rescue "$UKE_VERITY_SUPER"
+              fi
               if [[ $UKE_BUILD_SUPER_SEED == true ]]; then
                 dnf5 -y --setopt=install_weak_deps=False install android-tools
                 bash /builder/src/image/compose-fastboot-super-seed.sh /job/artifacts/rescue "$UKE_MINIMUM_SUPER" /job/artifacts/super-seed
@@ -182,10 +203,19 @@ jobs:
           fi
           echo 'Signed original Fedora rescue filesystem assembled; protected boot, authenticated repair and physical UFS acceptance remain open. No release or tablet write.' >> "$GITHUB_STEP_SUMMARY"
       - name: Retain rescue input and bounded receipts
-        if: ${{ !inputs.build_super_seed }}
+        if: ${{ !inputs.build_super_seed && !inputs.build_rescue_verity }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: unqualified-fedora-rescue
+          path: ${{ runner.temp }}/uke-rescue-result
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
+      - name: Retain original rescue input and verity qualification receipts
+        if: inputs.build_rescue_verity
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: unqualified-fedora-rescue-verity
           path: ${{ runner.temp }}/uke-rescue-result
           if-no-files-found: error
           retention-days: 7
@@ -228,6 +258,7 @@ jobs:
           shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh
           shellcheck src/image/select-uke-super.sh tests/fastboot-physical-super.sh
           shellcheck src/image/dracut/96uke-protected-boot/module-setup.sh tests/protected-initrd-barriers.sh
+          shellcheck src/image/rescue-verity-layout.sh src/image/build-rescue-verity.sh src/image/qualify-fedora-rescue-verity.sh tests/rescue-verity.sh
           bash tests/fastboot-singleboot-layout.sh
           for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
@@ -306,10 +337,11 @@ jobs:
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/source,readonly" \
             --mount "type=bind,source=$fixture,target=/fixture" \
             "$image" bash -Eeuo pipefail -c '
-              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils socat zip git-core strace systemd systemd-udev
+              dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils socat zip git-core strace systemd systemd-udev veritysetup
               mkdir -m700 /fixture/result
               rpm -q android-tools e2fsprogs util-linux jq coreutils systemd systemd-udev > /fixture/result/original-tools.txt
               bash /source/tests/protected-initrd-barriers.sh /fixture/result/protected-initrd-barriers.json
+              bash /source/tests/rescue-verity.sh /fixture/result/rescue-verity.json
               bash /source/tests/fastboot-update-parser.sh /fixture/result/fastboot-parser.json
               bash /source/tests/fastboot-super-inspection.sh
               bash /source/tests/fastboot-super-provision-plan.sh
@@ -326,6 +358,7 @@ jobs:
               bash /source/tests/fastboot-super-grow.sh prepare /fixture/super-grow
               sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super,fastboot-requirements,plan-fastboot-update,select-uke-super}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow,update-parser,tcp-peer,physical-super}.sh > /fixture/result/source-sha256.txt
               sha256sum /source/src/image/dracut/96uke-protected-boot/* /source/tests/protected-initrd-barriers.sh >> /fixture/result/source-sha256.txt
+              sha256sum /source/src/image/rescue-verity-layout.sh /source/src/image/build-rescue-verity.sh /source/src/image/qualify-fedora-rescue-verity.sh /source/tests/rescue-verity.sh >> /fixture/result/source-sha256.txt
             '
           # The host lends only this owned loop device and the DM control node.
           # No tablet, physical disk, host root mount or privileged container.
