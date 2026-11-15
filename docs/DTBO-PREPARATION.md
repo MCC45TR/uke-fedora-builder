@@ -123,6 +123,38 @@ format producer and synthetic fixture, not a new bootable Uke DTBO image.
 
 ## Remaining qualification
 
+The board include chain alone is incomplete. Installed entry 0 also contains
+the camera and O82 display layers. The corresponding OEM sources are separate:
+camera DT `57d2135ee6909ffb7d288a7dc4d82c85d95fc10d` and display DT
+`4a3e1c391130237c5e8c2b250d1c94f3e25b9b11`. A static union scan of the board
+overlay and four base roots found 71 files with no missing literal include;
+that scan neither includes every external hardware layer nor proves the active
+preprocessor/build profile. It cannot be used as a complete production closure.
+
+The original OEM `kernel_build` script `android/merge_dtbs.py` at
+`e6b1cb8a38fa93564009bbd8116094928c67b876` matches platform, board, PMIC and
+Xiaomi board IDs, merges subsystem overlays, rewrites the selected ID sets,
+and checks applicable base/overlay combinations. It uses `fdtoverlaymerge` for
+overlay-to-overlay composition and `fdtoverlay` for application to a base DTB.
+Its source was inspected without executing Python. Its API must not be
+replaced by ordinary base-DTB overlay application.
+
+The scoped native merger preparation pins the original Qualcomm implementation
+as maintained in LineageOS external/dtc at
+`c1197f56b8f468effbbf5e79feae353c4280e2ea`. This is a current host-tool source
+comparison, not proof of the exact OEM tool revision. Original Fedora libfdt
+does not provide `fdt_overlay_merge`; the isolated COPR host fixture therefore
+builds the original private host library and merger without replacing Fedora's
+runtime library. No source is patched. The 24 input files, GPL/dual-license
+notices and source identity are pinned in `packaging/dtbo-merge-source.json`.
+The recipe's generated version header records upstream 1.7.0 and its commit.
+
+The planned native fixture composes synthetic board/camera/display layers,
+checks external and local phandles, preserves board root metadata and synthetic
+memory/reserved regions, compares resulting graphs with sequential application,
+checks reproducibility and refuses an incomplete layer set. These checks do
+not establish an installed Uke source reproduction or hardware acceptance.
+
 1. Qualify the complete OEM DTS/include/source dependency closure and its
    differences from the installed reference, then build the custom board
    overlay with the coordinated cumulative kernel contract. No standalone

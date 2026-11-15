@@ -1,0 +1,132 @@
+{
+  "repository": "https://github.com/LineageOS/android_external_dtc",
+  "commit": "c1197f56b8f468effbbf5e79feae353c4280e2ea",
+  "scope": "unmodified Qualcomm overlay-merging host tool and private libfdt; source preparation",
+  "oem_binary_version_matched": false,
+  "board_sources_included": false,
+  "native_build_qualified": false,
+  "distribution_libfdt_replaced": false,
+  "device_payload": false,
+  "files": [
+    {
+      "path": "fdtoverlaymerge.c",
+      "git_blob_sha1": "57631e32463f9b90e3b96194620f3e8907237532",
+      "sha256": "c7aa0ba3d6aff82240b55b6c523ce2217b0feb5a67ca2d59e34a7c47469cfdec"
+    },
+    {
+      "path": "libfdt/fdt_overlay.c",
+      "git_blob_sha1": "b466ee6ed691219580bbf4f523dc622f45eda5dc",
+      "sha256": "7fb2eed43fd35eb23f07c6f45542da089e59721095b31c416027d2386868aaf1"
+    },
+    {
+      "path": "libfdt/Makefile.libfdt",
+      "git_blob_sha1": "3e70abfb90e0af25f7fa090f0e656a1b50801e64",
+      "sha256": "93e1d8969fda2337ee2af324f7ff8bbd1cf91f2978d9823941073b2fa6d52059"
+    },
+    {
+      "path": "README.license",
+      "git_blob_sha1": "102b004d02290bddd7e537d5d45a0ba8f724d85b",
+      "sha256": "78e1e1ce5728a990d59c7de61d4741c49185d5129daf783b386380a214328d68"
+    },
+    {
+      "path": "Makefile",
+      "git_blob_sha1": "f33f2abefaf1ebf30a7ba2a14372137b1d1a18f5",
+      "sha256": "ae57d10f83b5a51589be8ea6c28ee5f974500b81c79ed3ce26e4945faddfa19b"
+    },
+    {
+      "path": "util.h",
+      "git_blob_sha1": "9d38edee9736ef2513e6f6980011513fc59584a4",
+      "sha256": "4399a610497db39c7fa3743119cdaa34ce372515ec34b197c0bb9f3ccd593564"
+    },
+    {
+      "path": "util.c",
+      "git_blob_sha1": "507f0120cd13ebe9a16f449ec14b8758e3b61fb0",
+      "sha256": "68376fceb65c498edad09f4eee02e3058de38b4281b9cf998611142f831a31b0"
+    },
+    {
+      "path": "libfdt/fdt.c",
+      "git_blob_sha1": "dda342df8a56a6eebc7e38b2b4d15de8aaf7e1b7",
+      "sha256": "5830a7b433d422f248a7003ee34ebe0e4c9ed801a2f4c8dd389497efe031944e"
+    },
+    {
+      "path": "libfdt/fdt_ro.c",
+      "git_blob_sha1": "09d92d438e13e628596e4a364ad16aeb730f71cb",
+      "sha256": "483fb274c775a97c0d4c07b43aa5aabb1b9d277425c51970f3c64cf04508bf04"
+    },
+    {
+      "path": "libfdt/fdt_wip.c",
+      "git_blob_sha1": "c2d7566a67dcf114cb15e0e233c8bff126744365",
+      "sha256": "a26966b2d991b432473f5c7f6740a3db97ae51313da0ad9eba56048d56c06c73"
+    },
+    {
+      "path": "libfdt/fdt_sw.c",
+      "git_blob_sha1": "4c569ee7eb0d1810d385aaaa3a11172c512e783e",
+      "sha256": "e9d193f023880f4359c3ed9954d678b51a87b1d66b783318a9d69a8122378122"
+    },
+    {
+      "path": "libfdt/fdt_rw.c",
+      "git_blob_sha1": "e6cd18efd3f8dc57a279ba6c7f4e7c7ea1427540",
+      "sha256": "54c04d4012ee2e2dd6d5f6bdfe5c73022de41e4408b8b32a71c55794e18da6d3"
+    },
+    {
+      "path": "libfdt/fdt_strerror.c",
+      "git_blob_sha1": "d852b77e81e77ef171ddbedcbcfea9d4ed67746c",
+      "sha256": "4a1de9eb7eadefe07cfe53c238785aa9bdd54e5387903c2faa7e42006027c137"
+    },
+    {
+      "path": "libfdt/fdt_empty_tree.c",
+      "git_blob_sha1": "49d54d44b8e78be6d110c41db97312ef66ff89aa",
+      "sha256": "f3cdbfa1bcc86cc841544fee5a16c2f66a4da86b1065eaadab9700addb858369"
+    },
+    {
+      "path": "libfdt/fdt_addresses.c",
+      "git_blob_sha1": "c40ba094f1f87a4f85828fc25023f521111faf63",
+      "sha256": "11ac9fb9f20f798483bc1e9e2835b79ef110e55ed7114e20337e59a1b6f4125f"
+    },
+    {
+      "path": "libfdt/fdt_check.c",
+      "git_blob_sha1": "a21ebbc9239f0991b3582d9d8a401c48a7c483fa",
+      "sha256": "17475451c6fece9b27097b3a3709540299e2316ca33a1c37605b97230ff31c7e"
+    },
+    {
+      "path": "libfdt/acpi.c",
+      "git_blob_sha1": "58697268dda32eb3f5721c3c926d25d2f08f5bd9",
+      "sha256": "1405d369ea4c6b3601f19dfa8388285ad26b928bcbf679a825bbcf298d6ba3e9"
+    },
+    {
+      "path": "libfdt/fdt.h",
+      "git_blob_sha1": "0c91aa7f67b5b7d75d94cef2c61e8f7ec2c973c0",
+      "sha256": "60269146c0f49a3da5e260763f4c59ff3257bc1ca01d0b11784ded6d2cb07492"
+    },
+    {
+      "path": "libfdt/libfdt.h",
+      "git_blob_sha1": "8576aef728e5423f66021df0158db201edcb14ff",
+      "sha256": "3a159b7b489d6d02843dcc349246b30b7ea5c3fa8e81e63fde7b6e9ff074e495"
+    },
+    {
+      "path": "libfdt/libfdt_env.h",
+      "git_blob_sha1": "73b6d40450aca51d94245be59490f6ee3454241d",
+      "sha256": "273bb264cacd60bb005cfa558bee084558469b9107eaf40d7e1362571ed1bc94"
+    },
+    {
+      "path": "libfdt/libfdt_internal.h",
+      "git_blob_sha1": "16bda1906a7b335519b9f748d1be6110de551e79",
+      "sha256": "7c29a6e30115cdd0a30fb4014c7674ead0d4bd39b9989bed46acb4f838bbd4e8"
+    },
+    {
+      "path": "libfdt/libacpi.h",
+      "git_blob_sha1": "06cae6c2573a41a6853d1ff33ae0192433576deb",
+      "sha256": "1abc05816ec9f0ee78c334a6975bc062d79544d3724f8e655bc174191f70f7d6"
+    },
+    {
+      "path": "GPL",
+      "git_blob_sha1": "d159169d1050894d3ea3b98e1c965c4058208fe1",
+      "sha256": "8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643"
+    },
+    {
+      "path": "BSD-2-Clause",
+      "git_blob_sha1": "da366e2ce50be9b4ec250cad773677bee7fc1d9d",
+      "sha256": "6313108c23efffa36948f8b2cff1560a5935373b527b0e1a837cc77e6ed1bacd"
+    }
+  ]
+}
