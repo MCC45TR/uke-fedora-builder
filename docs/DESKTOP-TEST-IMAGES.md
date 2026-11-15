@@ -12,7 +12,7 @@ compositor, DM, applications and icons have separate source RPMs. The image
 includes Uke's dedicated first-account and session configuration packages.
 The root account is locked and no human account, public password, automatic
 login or passwordless sudo is included. Storage growth and swap gates precede
-both setup and DM. The packaged input validator runs during composition.
+both setup and DM. The packaged input validator and systemd unit verification run during composition.
 
 Cutefish language auditing retains every supplied RPM catalog. The source lock
 provides sixteen languages per translated domain, with no upstream Turkish UI
@@ -46,3 +46,9 @@ complete supplied translations, source-stage routing, CLI selection, first-boot
 storage ordering, passive icon provenance and release-layout/publication gates.
 Signed native RPM builds, actual installroot transactions and filesystem/boot
 integrity are required in addition before an artifact is described as built.
+
+Upstream portal routing retains GTK as the default fallback, Cutefish for
+Settings/FileChooser/Inhibit/ScreenCast and GNOME Keyring for Secret. Original
+Fedora's GTK portal is included. Upstream advertises no Screenshot portal
+interface; do not report that interface as working. The native screenshot
+utility and ScreenCast remain physical acceptance items.

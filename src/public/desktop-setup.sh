@@ -60,7 +60,9 @@ AUTOSTART
             [[ -x $root/usr/libexec/uke-cutefish-firstboot && -x $root/usr/libexec/uke-cutefish-firstboot-backend ]]
             # Execute the packaged production validator on the native ARM64 worker.
             chroot "$root" /usr/libexec/uke-cutefish-firstboot-backend --self-test
-            printf '{"account_setup":"uke-cutefish-firstboot","credentials_included":false,"firstboot_backend_input_tests":true,"graphical_login_hardware_tested":false,"firstboot_hardware_tested":false,"autologin_enabled":false,"remote_password_login":false,"passwordless_sudo":false,"validation_status":"build-verified-hardware-untested"}\n' > "$receipt";;
+            systemd-analyze --root="$root" verify cutefish-dm.service uke-cutefish-firstboot.service uke-cutefish-firstboot.socket uke-cutefish-firstboot@audit.service
+            awk -F: '$1=="root" {if ($2!~/^[!*]/) exit 1; found=1} END {if(!found)exit 1}' "$root/etc/shadow"
+            printf '{"account_setup":"uke-cutefish-firstboot","credentials_included":false,"firstboot_backend_input_tests":true,"systemd_units_verified":true,"root_password_locked":true,"graphical_login_hardware_tested":false,"firstboot_hardware_tested":false,"autologin_enabled":false,"remote_password_login":false,"passwordless_sudo":false,"validation_status":"build-verified-hardware-untested"}\n' > "$receipt";;
         *) return 1;;
     esac
     # Setup and greeter users are system accounts. Every image starts without a human account.

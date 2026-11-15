@@ -12,7 +12,7 @@ release_manifest() {
       .device_private_data_included==false and .ssh_enabled==false and .automatic_kernel_activation==false and
       .credentials_included==false and
       (.desktop!="cutefish" or (.account_setup=="uke-cutefish-firstboot" and
-        .firstboot_backend_input_tests==true and .autologin_enabled==false and
+        .firstboot_backend_input_tests==true and .systemd_units_verified==true and .root_password_locked==true and .autologin_enabled==false and
         .remote_password_login==false and .passwordless_sudo==false)) and
       .kernel_rpm_signature=="verified COPR signature" and .kernel_rpms_locally_built==false and
       .filesystem_contents_readback and .filesystem_metadata_readback and

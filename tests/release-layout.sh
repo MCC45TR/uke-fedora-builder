@@ -35,11 +35,11 @@ reject bash "$tool" names "$work/kde/manifest.json" 011126 00
 reject bash "$tool" names "$work/kde/manifest.json" 011126 '0;touch bad'
 cp -a "$work/kde" "$work/cutefish"
 jq '.desktop="cutefish"|.credentials_included=false|
-    .account_setup="uke-cutefish-firstboot"|.firstboot_backend_input_tests=true|
+    .account_setup="uke-cutefish-firstboot"|.firstboot_backend_input_tests=true|.systemd_units_verified=true|.root_password_locked=true|
     .autologin_enabled=false|.remote_password_login=false|.passwordless_sudo=false' \
     "$work/kde/manifest.json" > "$work/cutefish/manifest.json"
 bash "$tool" names "$work/cutefish/manifest.json" 011126 1 > /dev/null
-for key in credentials_included firstboot_backend_input_tests autologin_enabled remote_password_login passwordless_sudo; do
+for key in credentials_included firstboot_backend_input_tests systemd_units_verified root_password_locked autologin_enabled remote_password_login passwordless_sudo; do
     jq --arg key "$key" '.[$key]=(.[$key]|not)' "$work/cutefish/manifest.json" > "$work/invalid-account.json"
     reject bash "$tool" names "$work/invalid-account.json" 011126 1
 done
@@ -80,7 +80,7 @@ for desktop in kde gnome cutefish nextkde; do
         '.desktop=$desktop|.shared_core_sha256=$core|.desktop_isolation_audited=true|.previous_desktop_image_input=false|
          .channel="unstable"|.default_shell="bash"|.builder_commit=("b"*40)|.root_sparse_sha256=$sha|
          if $desktop=="cutefish" then .credentials_included=false|
-           .account_setup="uke-cutefish-firstboot"|.firstboot_backend_input_tests=true|
+           .account_setup="uke-cutefish-firstboot"|.firstboot_backend_input_tests=true|.systemd_units_verified=true|.root_password_locked=true|
            .autologin_enabled=false|.remote_password_login=false|.passwordless_sudo=false else . end' \
         "$work/kde/manifest.json" > "$work/set-$desktop/manifest.json"
     bash "$tool" stage "$work/set-$desktop" "$work/set-delivery-$desktop" 011126 1
