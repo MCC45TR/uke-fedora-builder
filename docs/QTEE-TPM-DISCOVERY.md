@@ -1,8 +1,9 @@
 # Bounded QTEE TPM discovery
 
 15 November 2026. Native tests and signed DNF delivery passed. The fitted
-firmware refused userspace access to UID81; no TPM or automatic unlock has
-been qualified. The accepted kernel27 HWKM results are recorded separately in
+firmware refused both ordinary userspace and privileged kernel access to
+UID81; no TPM or automatic unlock has been qualified. The accepted kernel27
+HWKM results are recorded separately in
 [hardware automatic unlock](HARDWARE-AUTO-UNLOCK.md).
 
 ## Observed result
@@ -32,6 +33,16 @@ process or disposable key record remained. Free space stayed 372,216 MiB on
 root and 3,691 MiB in `/tmp`. No reboot, firmware, lock, partition, mapping
 or key write was part of this test. Kernel-only discovery, any fitted sealing
 service, measured boot and production key-release policy remain open.
+
+The subsequent [signed kernel28 test][kernel28] completed normal DNF delivery,
+accepted28/B boot and protected running-image verification, preserving27/A
+recovery and existing preferences. Its explicit kernel-only request obtained
+the privileged environment, but UID81 open again returned remote11 at stage3:
+transport0, two counted invocation attempts and zero vendor queries. The
+24-ms end-to-end request sent no TPM command. Before the request, the cached
+parameter showed zero attempts; reading the result did not repeat it.
+Status11 still does not establish TPM absence or its fitted-firmware cause.
+No user ioctl restriction, TA loader or firmware policy was changed.
 
 ## Sources and match limits
 
@@ -98,3 +109,4 @@ production key or boot-selection change is part of discovery.
 [mink]: https://github.com/qualcomm/minkipc/tree/5e3c6951d13162a262ea65ea8e8351228f092b58/libminkadaptor
 [credentials]: https://github.com/qualcomm/quic-teec/blob/736419e25a2036aac3292a10a93e394a90750ca3/tests/common.c
 [build16]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11330412/
+[kernel28]: https://github.com/MCC45TR/senemos-uke-kernel-mainline/blob/488db5d7/docs/QTEE-TPM-INFORMATION-RESULT.md

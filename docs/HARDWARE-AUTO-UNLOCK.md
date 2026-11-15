@@ -43,6 +43,13 @@ but opening UID81 returned remote result11/status77 before either vendor
 information query. This does not prove TPM absence or establish a sealing
 provider. The kernel-only privileged credential restriction remains intact.
 
+The [subsequent cumulative kernel28 result][kernel28] is accepted on B with
+27/A recovery and the wrapped profile preserved. A single explicit kernel
+request obtained the privileged environment but encountered the same remote11
+UID81 service-open refusal, before vendor information or TPM commands. This
+extends the access result beyond ordinary userspace credentials; it still
+supplies no usable TPM, sealing policy or boot-bound automatic release.
+
 ## Kernel26 baseline before the opt-in
 
 Read-only SSH inspection of Uke/SM7675 running `7.3.3-26-unstable` found ICE
@@ -303,5 +310,6 @@ be enabled. Source APIs and driver logs do not mark those behaviors complete.
 [record-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11330057/
 [stage-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11330110/
 [kernel27]: https://github.com/MCC45TR/senemos-uke-kernel-mainline/blob/72270bfc/docs/HWKM-EARLY-QUALIFICATION.md
+[kernel28]: https://github.com/MCC45TR/senemos-uke-kernel-mainline/blob/488db5d7/docs/QTEE-TPM-INFORMATION-RESULT.md
 [version-binding]: https://source.android.com/docs/security/features/keystore/version-binding
 [dm-inlinecrypt]: https://www.kernel.org/doc/html/latest/admin-guide/device-mapper/dm-inlinecrypt.html
