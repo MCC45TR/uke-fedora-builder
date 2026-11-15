@@ -2,4 +2,4 @@
 fe2f616f09a709f09b4af03f44e9d2073045c34a3308dbe864315b1c161c95dc  src/image/inspect-dtbo-reference.sh
 d6370436564a9d74098f427072fa068e2681d1ca6d68e00a4cce3ac175f52ae7  tests/dtbo-producer.sh
 3aaab0f431855c74ed541cc601a4cf51bfd6e844836702b6195d00606af0a0da  packaging/dtbo-tools-source.json
-17c13950ca488a8973752fc8d2737fc43cce924d97b4711d5507eb54cda56d3a  packaging/uke-dtbo-tools-source-check.spec
+10657e0409f00decb2805406835698eaf3dcf9ecee617fc787e709212599af21  packaging/uke-dtbo-tools-source-check.spec

@@ -1,6 +1,6 @@
 Name:           uke-dtbo-tools-source-check
 Version:        1.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Native source verification of the Uke DTBO v0 producer
 License:        MIT AND Apache-2.0 AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -33,7 +33,7 @@ gcc $CFLAGS -std=c11 -D_GNU_SOURCE -Wall -Wextra \
     upstream/sysdeps/libufdt_sysdeps_posix.c upstream/external-dtc/libfdt/acpi.c \
     -o build/mkdtimg $LDFLAGS -lfdt
 
-%check
+# Receipts consumed by %%install must exist before that RPM stage.
 bash -n src/image/inspect-dtbo-reference.sh tests/dtbo-producer.sh
 shellcheck src/image/inspect-dtbo-reference.sh tests/dtbo-producer.sh
 bash tests/dtbo-producer.sh build/mkdtimg src/image/inspect-dtbo-reference.sh build/native-dtbo.json
@@ -45,6 +45,11 @@ rpm -q gcc dtc libfdt libfdt-devel ShellCheck glibc > build/distribution-tools.t
 # Full original notices, including those embedded in C/header files.
 tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
     -cJf build/upstream-notices.tar.xz -C upstream .
+
+%check
+jq -e '.version_zero_layout_verified and .payload_bytes_preserved and .repeat_output_identical and .malformed_inventory_cases_refused==10' build/native-dtbo.json
+sha256sum -c build/project-native-sha256.txt
+sha256sum -c build/upstream-native-sha256.txt
 
 %install
 dest=%{buildroot}%{_datadir}/uke-dtbo-tools-source-check
@@ -58,5 +63,8 @@ install -m0644 packaging/dtbo-tools-source.json "$dest/upstream-source.json"
 %{_datadir}/uke-dtbo-tools-source-check/
 
 %changelog
+* Sun Nov 15 2026 Uke Linux <uke-linux@users.noreply.github.com> - 1.0-2
+- Produce test receipts before the RPM install stage consumes them.
+
 * Sun Nov 15 2026 Uke Linux <uke-linux@users.noreply.github.com> - 1.0-1
 - Verify the original native DTBO v0 formatter with public synthetic inputs.
