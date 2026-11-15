@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        1%{?dist}
+Release:        2%{?dist}
 Summary:        Native source verification of the Uke cohort signature primitive
 License:        MIT
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -26,11 +26,16 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_AUTH_CLI \
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -c \
     src/image/protected-cohort-auth.cpp -o build/cohort-auth.o
 
-%check
+# Native tests produce the receipts that the install stage packages. RPM runs
+# %%install before %%check, so these must exist before entering %%install.
 readelf -h build/cohort-auth | grep -E 'Machine:.*AArch64'
 bash tests/protected-cohort-auth.sh build/cohort-auth "$PWD/build/native-result.json"
 rpm -q openssl openssl-libs gcc-c++ > build/original-tools.txt
 sha256sum src/image/protected-cohort-auth.* tests/protected-cohort-auth.sh > build/source-sha256.txt
+
+%check
+jq -e '.openssl_interoperability and .refused_cases==27 and .exact_limit_passed and
+    .original_inputs_unchanged and (.role_admitted|not) and (.snapshot_authenticated|not)' build/native-result.json
 
 %install
 install -d %{buildroot}%{_datadir}/%{name}
@@ -42,5 +47,8 @@ install -pm644 build/native-result.json build/original-tools.txt build/source-sh
 %{_datadir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-2
+- Produce native test receipts before the RPM install stage.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-1
 - Compile the production verifier and check detached signatures and bounded input refusal.
