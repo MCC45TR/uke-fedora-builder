@@ -14,8 +14,9 @@ The libavb revision is AOSP
 [`ba2dec4b035b0a3b61c5f8f8a74d86bcd450b1ee`][upstream], the `vendor/avb`
 gitlink in original android-tools 37.0.0p1. Fedora's avbtool 1.4.0 body matches
 that source byte for byte; only its shebang differs. `packaging/libavb-source.json`
-pins the upstream library archive, license and original Fedora script digest.
-The source worker verifies these before RPM construction. No reference source
+pins all 43 upstream file digests and Git blob identities, the license and
+original Fedora script digest. The source worker downloads and verifies each
+pinned blob, then creates the canonical archive used by RPM. No reference source
 is patched. Original upstream C is compiled as C, with its portable SHA/RSA
 and POSIX backend. The supplied unsupported ML-DSA backend returns failure;
 this profile accepts only SHA256_RSA4096, without replacing a verification

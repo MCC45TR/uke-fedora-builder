@@ -1,12 +1,12 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        4%{?dist}
+Release:        5%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
 Source0:        %{name}-%{version}.tar.xz
 Source1:        source-identity.json
-Source2:        libavb-ba2dec4b.tar.gz
+Source2:        libavb-ba2dec4b.tar.xz
 Source3:        libavb-LICENSE
 BuildArch:      noarch
 BuildRequires:  gcc gcc-c++ binutils openssl-devel openssl json-devel bash jq coreutils findutils diffutils util-linux
@@ -36,7 +36,7 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_MANIFEST_CLI \
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -c \
     src/image/protected-cohort-manifest.cpp -o build/cohort-manifest.o
 mkdir -p build/upstream/libavb
-tar -xzf %{SOURCE2} -C build/upstream/libavb
+tar -xJf %{SOURCE2} -C build/upstream/libavb
 # Compile original upstream C as C, with its portable crypto/POSIX backend.
 # Its unmodified unsupported ML-DSA backend returns failure; Uke accepts only
 # the SHA256_RSA4096 profile and does not replace a verification routine.
@@ -88,6 +88,9 @@ install -pm644 build/native-result.json build/original-tools.txt build/source-sh
 %{_datadir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-5
+- Pin every upstream blob before generating the source archive.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-4
 - Verify the external AVB carrier using original libavb and Fedora avbtool fixtures.
 

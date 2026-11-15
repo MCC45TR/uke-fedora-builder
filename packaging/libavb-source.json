@@ -1,10 +1,226 @@
 {
   "repository": "https://android.googlesource.com/platform/external/avb",
   "commit": "ba2dec4b035b0a3b61c5f8f8a74d86bcd450b1ee",
-  "archive_sha256": "afb2e19128204c6263673574f6900b8cf4cb26d19ca49a0068a2d2d8997f8f2b",
   "license_sha256": "7b64210dc457e50fdcdf49c44d3efa19d78d6f49aa141862592ac31b700c19d2",
   "fedora_avbtool_sha256": "87a5708a7e697c13b6b960c6bb5b695aff2689514d552aee0221b56463b0cef8",
   "backend": "unmodified upstream portable crypto; unsupported ML-DSA fails closed",
   "profile": "AVB 1.0-required SHA256_RSA4096, zero flags, location zero, six descriptors",
-  "source_only_fixture": true
+  "source_only_fixture": true,
+  "files": [
+    {
+      "path": "avb_chain_partition_descriptor.c",
+      "sha256": "68b4e40a117a14ab284ad52ef72a6298573e44b4ad3ec32b91614dfb529d5c90",
+      "git_blob_sha1": "3adfe7db9ee4e870cd3d2e587258f3f163288481"
+    },
+    {
+      "path": "avb_chain_partition_descriptor.h",
+      "sha256": "50d29e5c5ec59b50467cd8e3b372c92c3aff26c1f6fd0ea08e8c0176ae73bcf9",
+      "git_blob_sha1": "2a08afe6b3feeca8174f3c6b8352d44fc677aef0"
+    },
+    {
+      "path": "avb_cmdline.c",
+      "sha256": "da4aa54aa37c7b0ac03f870388b40e0b09321c18aa2f384ca581155e2f954d12",
+      "git_blob_sha1": "c53ae0eddaa71a79ba9cee5f8b7af944c36a44ef"
+    },
+    {
+      "path": "avb_cmdline.h",
+      "sha256": "6bcbcb0c72297c640ac7d6d4435f0e88a8c95e3d562e654c88c27ba036b1b3c9",
+      "git_blob_sha1": "f69031259093df1ac0c5475e23ab462ddd1245e6"
+    },
+    {
+      "path": "avb_crc32.c",
+      "sha256": "ad462629b88a6754e1adee1a17f442c36050789a7082bc981f8fdaa679cec9d9",
+      "git_blob_sha1": "6b703833d2bce066ee3147b173ffb8b1febea9d4"
+    },
+    {
+      "path": "avb_crypto.c",
+      "sha256": "713e144cf7a2458b0eab1861f382a09b59ec3dc414ef4dde027c38b7f479e6a6",
+      "git_blob_sha1": "17f36d3faf0e31d34fb8a9d983640ecf3f9882f4"
+    },
+    {
+      "path": "avb_crypto.h",
+      "sha256": "add3fccc5d31425d0cc49482bad839076f980b134ef42e96080d089ebb10be8a",
+      "git_blob_sha1": "960b855d2fc254529f53cee9e6bf900f0d39f7ae"
+    },
+    {
+      "path": "avb_descriptor.c",
+      "sha256": "9e3f5c6422281e00c5829c2536e451bedcdf23fc71e1594a7b2d675eccdad4ec",
+      "git_blob_sha1": "9a5a482eac0258594dd92318bc815b169a6a4cef"
+    },
+    {
+      "path": "avb_descriptor.h",
+      "sha256": "4ba2c2686c1fe657a51b7d3b683866885b8b038846256357b527e2c327f26797",
+      "git_blob_sha1": "5d0f0c699fe18f68d7504f2f9842a685ae3a53ec"
+    },
+    {
+      "path": "avb_footer.c",
+      "sha256": "5a1e26c38d2880ee43e86f2d4d040c567fb67c9c74262378b861a30644781df1",
+      "git_blob_sha1": "b8b8211501d9d09380ee34c15e25554f90b03a82"
+    },
+    {
+      "path": "avb_footer.h",
+      "sha256": "0704e9e6ef1a20f1bb0a1ba59e54155981f67e6d8889b5c59a034ce50465b900",
+      "git_blob_sha1": "e84826fa8f45fa08986d59a1f7250ef28d5a2bc8"
+    },
+    {
+      "path": "avb_hash_descriptor.c",
+      "sha256": "8f97a0140430725e6cd10ea5b0e680bf54a5d6fe767af09c649995a24512fd53",
+      "git_blob_sha1": "3a6b8c8809118294aa3b7e044d270ed97ee4b4ee"
+    },
+    {
+      "path": "avb_hash_descriptor.h",
+      "sha256": "61811399ac8e4ca0392a87039de9edfcaab72d165a346337e87b5fb5c3a4d602",
+      "git_blob_sha1": "9ee89971235872d5ef81183a3cd0ae45042796b2"
+    },
+    {
+      "path": "avb_hashtree_descriptor.c",
+      "sha256": "97e1496f72750f65c068d785f1803c69e509fdd5581b609768e47c849b31ec7a",
+      "git_blob_sha1": "0822458f84bb9647c4c8d294a48363729bf1a206"
+    },
+    {
+      "path": "avb_hashtree_descriptor.h",
+      "sha256": "9c99a743473108bc12fe7ed1bcc413f138bdeb77ab8d42a7885a813c16f39f2c",
+      "git_blob_sha1": "6595f46ffffe039c021b9c704d2d6d2e466a9dee"
+    },
+    {
+      "path": "avb_kernel_cmdline_descriptor.c",
+      "sha256": "84f794767ece532d377d3b926a340f336820fb53ee21c836c394130ebd14a1a7",
+      "git_blob_sha1": "67521f231ac1f07eb5758e25954e805f4c895167"
+    },
+    {
+      "path": "avb_kernel_cmdline_descriptor.h",
+      "sha256": "e4fd1da0db2f64c88265992225183981a73788de316f8dfdc53b270b9c865ce5",
+      "git_blob_sha1": "6908b3b19dd694e74360bc95e157ea027f635a91"
+    },
+    {
+      "path": "avb_mldsa.c",
+      "sha256": "c42ac7b13d27a25a0b96e03565ff5c532f585591bc0731fc89503f5045c1f66c",
+      "git_blob_sha1": "bfdfd6b0c99f664d4cf631d22b9952b88cf7b27a"
+    },
+    {
+      "path": "avb_mldsa.h",
+      "sha256": "003de7eca2dfcc128c2fd1cc953c984b8106bdfb59b1831aa018a459fca82012",
+      "git_blob_sha1": "5ac4492c9204310f2a94766c84da69052a9ae993"
+    },
+    {
+      "path": "avb_ops.h",
+      "sha256": "7517b7f2885d3bf9c3cb87a3eab6300bfadf92466138ce687d3fc5bcd8500b31",
+      "git_blob_sha1": "f037eae960df448c7486dbf458c4449cfac0dda4"
+    },
+    {
+      "path": "avb_property_descriptor.c",
+      "sha256": "662fe69ebd2993d0b786de00de0fb68d00c2324e087e63b448404e880f5cf20f",
+      "git_blob_sha1": "7eba2c00b070036a08ede9e49a9fe714e6ff1822"
+    },
+    {
+      "path": "avb_property_descriptor.h",
+      "sha256": "44e465e4c1e89bf8a5a660d4b3f6d9bc3bcbc76aa38639bb1e1ae6c9d93770c6",
+      "git_blob_sha1": "85b016372b211ccadda205b01e4b5d5bf93cbe39"
+    },
+    {
+      "path": "avb_rsa.c",
+      "sha256": "cd2d62fe8107bf72632d64d80a95a78c6d93ff4c25ab2b490824c21d21e874d3",
+      "git_blob_sha1": "43eb7d0a97fc102054d3281a5af119227ae3e153"
+    },
+    {
+      "path": "avb_rsa.h",
+      "sha256": "c8b1a8ca9c136536583e4bb469d10af40fadef4f105197832dc34887ae047525",
+      "git_blob_sha1": "55168ced2d29f4cb376187f371ef7303812f766d"
+    },
+    {
+      "path": "avb_sha.h",
+      "sha256": "c233cd3c591483bb23fa44aab4f8d8c3c9b8661bf52f7618ffdcd967d7f4c54d",
+      "git_blob_sha1": "1ee619a87bc6a3b6c82f5da7c4cd5512511c5a84"
+    },
+    {
+      "path": "avb_slot_verify.c",
+      "sha256": "44b9bc1311aeb5a39c44e800f3a74068034bde94dc6e29c77ad173cd570cc72d",
+      "git_blob_sha1": "520e1c7e7d0310654e30a06ac909a8875ef578d4"
+    },
+    {
+      "path": "avb_slot_verify.h",
+      "sha256": "1f6e4dc27cdde842554f1d4c3f903340dafae1cc90c92f81da8a8ab845f2f8cd",
+      "git_blob_sha1": "ee118205763b3c6dbe252f7d345fba42f4ed0adb"
+    },
+    {
+      "path": "avb_sysdeps.h",
+      "sha256": "4686e0cf84b48d6fdc6ef9fee68b65c13c947b154b73916255d75e570b2af081",
+      "git_blob_sha1": "b4a1e991628919f33e825dcb8e54585bc3a07294"
+    },
+    {
+      "path": "avb_sysdeps_posix.c",
+      "sha256": "e22bd99930c51d2134b706ba25ca9dc6ccbe4b3dd472ce244cb0399224dadbb8",
+      "git_blob_sha1": "30eb02979891b36ac4032a6b4f6e53d53420581a"
+    },
+    {
+      "path": "avb_util.c",
+      "sha256": "6b493ab0ed700ee97d29f214c32c90845e5453add9394507316076ad69a6bf89",
+      "git_blob_sha1": "83d526a0057651f51072ebb57aa952eea9c3fd70"
+    },
+    {
+      "path": "avb_util.h",
+      "sha256": "d3469b42b348ce0b39da4b492c677d590f45566e38d66f8aa5c83de5d15e85cf",
+      "git_blob_sha1": "9bb4df3cfa619478a47db7ab8425636fdf2329b2"
+    },
+    {
+      "path": "avb_vbmeta_image.c",
+      "sha256": "7a69b36fb09ddb46a9cd05c810e3bfab6789a33f54a926a4f6d27220dc9b8c1b",
+      "git_blob_sha1": "60a21382ed5110ea9b099a60296f3b9684114a97"
+    },
+    {
+      "path": "avb_vbmeta_image.h",
+      "sha256": "0979deac8902cbcbd0ec1d2f94af6692ab954fe698b1bd2e8b193b7eec3a3607",
+      "git_blob_sha1": "f9cbac447d0941429d813ca0aadef4401e7ec8d7"
+    },
+    {
+      "path": "avb_version.c",
+      "sha256": "4cf6c503c2ec082284ac46e2ba3a93a484764a791b9783345c8d56cc9e8d6a32",
+      "git_blob_sha1": "31f5fa6bf18392963c4bbdfebb6dd5ccd43259d2"
+    },
+    {
+      "path": "avb_version.h",
+      "sha256": "2d044f7a8b7d466b7378adfa395cfde8cf6485d825bb6d2058510928b496b030",
+      "git_blob_sha1": "9557c9df000cd365b665a3fa920dd50b69221a44"
+    },
+    {
+      "path": "boringssl/avb_crypto_ops_impl.h",
+      "sha256": "e31e5d491e4d51ca2625d5c5823cc0fdb4df1aced8eee771d073f0462fd79586",
+      "git_blob_sha1": "cdace5c55c3d87bdbd574ce6decc4e503646ccac"
+    },
+    {
+      "path": "boringssl/mldsa.c",
+      "sha256": "d9d5929a41e71acc03342a545ce5cd9df3bc0a55c9c87529582d7b80a25d1516",
+      "git_blob_sha1": "33349f756e1b166813812ef1a96a3a3363b7e4d6"
+    },
+    {
+      "path": "boringssl/sha.c",
+      "sha256": "f0f09b091623fb3c1b1282c899a480458be1231ae92e0a1bbdbe50d4b697e818",
+      "git_blob_sha1": "25c92cf888019c4e7c6cb840a9728bd61a7c90ab"
+    },
+    {
+      "path": "crypto/avb_crypto_ops_impl.h",
+      "sha256": "89a0bd091c36194182b032b321cda3250e8bdecf4ce5f288ed620a66a24a88b4",
+      "git_blob_sha1": "244ce22aa36dd1b6d36d352a372b629d427c3b11"
+    },
+    {
+      "path": "crypto/mldsa_impl.c",
+      "sha256": "e243f7d60295959191d7feed39b3e97e92d30277f910d5b165008cb76066bf6a",
+      "git_blob_sha1": "ef8404ba34ea75b29b5d5420ceb36d45e50a4fbf"
+    },
+    {
+      "path": "crypto/sha256_impl.c",
+      "sha256": "e09f866709853dc189f08b3cd1c1c3e341ef6943cb7dc7852aa6c44d5c00f4d2",
+      "git_blob_sha1": "eb0236c7dcef42aed695002333bdb9662740e5f6"
+    },
+    {
+      "path": "crypto/sha512_impl.c",
+      "sha256": "c22078011fd279ce5496dcd027a0b3a9c340bf04fefcbfbdcfbaa46325f3dca2",
+      "git_blob_sha1": "fa3bbd018d89a8dd414e7458bbfc6ec6c0e52ca9"
+    },
+    {
+      "path": "libavb.h",
+      "sha256": "9e7aed1519a6ce4fcf1e34250861ad9ea1dede55f7c666bccec33b608f8851f1",
+      "git_blob_sha1": "d51158465330063885ed477ba631f6e68638d6aa"
+    }
+  ]
 }
