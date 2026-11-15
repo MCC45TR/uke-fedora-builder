@@ -21,13 +21,13 @@ if [[ $# == 2 && $1 == --fastboot ]]; then client=$(realpath -e "$2"); shift 2; 
 [[ $# == 0 ]] || { usage >&2; exit 2; }
 [[ -f $archive && ! -L $archive && -x $client && -f $client && ! -L $client ]] ||
     fail 'The ZIP or adjacent qualified fastboot executable is missing.' 'ZIP veya yanındaki doğrulanmış fastboot çalıştırıcısı bulunamadı.'
-for tool in jq sha256sum unzip timeout flock awk sed; do command -v "$tool" >/dev/null ||
+for tool in jq sha256sum unzip timeout flock awk sed df; do command -v "$tool" >/dev/null ||
     fail "Required host tool is missing: $tool" "Gerekli bilgisayar aracı eksik: $tool"; done
 lock=$(dirname "$archive")/.uke-install.lock
 [[ ! -L $lock && ( ! -e $lock || -f $lock ) ]] || exit 1
 exec 9>"$lock"
 flock -n 9 || fail 'Another installation is running from this directory.' 'Bu klasörden başka bir kurulum çalışıyor.'
-work=$(mktemp -d)
+work=$(mktemp -d "$(dirname "$archive")/.uke-install.XXXXXXXX")
 started=$(date +%s)
 cleanup() { find "$work" -depth -delete; }
 trap cleanup EXIT
@@ -39,6 +39,8 @@ unzip -p "$archive" manifest.json > "$work/manifest.json"
 jq -e '.artifact_kind=="ext4-singleboot-fastboot-test" and .destinations==["boot_b","userdata"] and
     .required_current_slot=="b" and .root_raw_bytes==8589934592 and
     .kernel_release=="7.3.3-28-unstable" and (.full_singleboot_goal_complete|not)' "$work/manifest.json" >/dev/null || exit 1
+available=$(df -B1 --output=avail "$work" | tail -n1)
+((available >= 10737418240)) || fail 'Keep at least 10 GiB free beside the ZIP for extraction and reserve.' 'ZIP dosyasının bulunduğu diskte açma ve pay için en az 10 GiB boş alan gerekli.'
 say 'ZIP checksum and test scope verified.' 'ZIP özeti ve test kapsamı doğrulandı.'
 stage 2 'Checking the connected tablet and all ten partition capacities' 'Bağlı tablet ve on bölümün kapasitesi denetleniyor'
 mapfile -t devices < <(timeout 8s "$client" devices | awk '$2=="fastboot"{print $1}')
@@ -76,7 +78,9 @@ log=$(dirname "$archive")/install-last.log
 [[ ! -L $log && ( ! -e $log || -f $log ) ]] || exit 1
 : > "$log"
 set +e
-"$client" -s "$device" update "$archive" 2>&1 | while IFS= read -r line; do
+# Fastboot extracts the sparse image to a temporary file. Keep that growth on
+# the budgeted real filesystem instead of filling a RAM-backed /tmp.
+TMPDIR="$work" "$client" -s "$device" update "$archive" 2>&1 | while IFS= read -r line; do
     # Device serials are unnecessary in a support log.
     [[ $line != 'Serial Number'* ]] || continue
     printf '%s\n' "$line"
