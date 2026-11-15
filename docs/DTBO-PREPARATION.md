@@ -126,6 +126,25 @@ format producer and synthetic fixture, not a new bootable Uke DTBO image.
 
 ## Remaining qualification
 
+The next source-cohort candidate pins 122 unchanged inputs (1,599,532 source
+bytes) from the exact board, camera, display and kernel releases below, plus
+camera-kernel headers at `699fa15a98abd40fbb94f3a6fc00f91723d29d35`.
+The [OEM source record](../packaging/dtbo-oem-source.json) preserves each Git
+blob, digest and any declared SPDX notice. The DMA-heap binding's original
+relative symlink and its in-repository target are retained. Unmarked files
+are recorded as such; a header's license is not silently assigned to a whole
+tree. Original sources and notices accompany the build inputs.
+
+`build-uke-dt-cohort.sh` compiles the four base roots and the selected generic
+and Uke-specific camera/display layers. Generic layers enter the four bases;
+Uke layers merge with the board overlay. It keeps the observed base order
+614/632/643/642, one common v0 DTBO, source board identities and placeholder
+memory. It checks complete overlay application to all four bases, repeated
+merge identity and rejection when the platform camera layer is omitted.
+Compilation remains in COPR. The resulting DTB section is not a complete
+vendor_boot image; no bootloader fixup, once-only kernel transformation,
+hardware or OEM-trust acceptance follows from this candidate.
+
 The board include chain alone is incomplete. Installed entry 0 also contains
 the camera and O82 display layers. The corresponding OEM sources are separate:
 camera DT `57d2135ee6909ffb7d288a7dc4d82c85d95fc10d` and display DT

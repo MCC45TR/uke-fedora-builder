@@ -1,22 +1,25 @@
 Name:           uke-dtbo-tools-source-check
 Version:        1.0
-Release:        3%{?dist}
-Summary:        Native source verification of the Uke DTBO v0 producer
+Release:        4%{?dist}
+Summary:        Native Uke DTBO and vendor DTB source-cohort inputs
 License:        MIT AND Apache-2.0 AND BSD-3-Clause AND BSD-2-Clause AND GPL-2.0-only AND GPL-2.0-or-later
 URL:            https://github.com/MCC45TR/uke-fedora-builder
 Source0:        %{name}-%{version}.tar.xz
 Source1:        source-identity.json
 Source2:        dtbo-upstream.tar.xz
 Source3:        dtbo-merge-upstream.tar.xz
+Source4:        oem-dt-source.tar.xz
 ExclusiveArch:  aarch64
 %global debug_package %{nil}
 BuildRequires:  gcc binutils dtc libfdt-devel bash jq coreutils findutils diffutils util-linux ShellCheck
 
 %description
-Temporary receipts from native AArch64 COPR compilation of the original AOSP
-mkdtimg v0 formatter and public disposable Device Tree fixtures. This package
-contains text receipts and original license notices only. It installs no tool,
-Python, service, firmware or boot hook and establishes no hardware admission.
+Native AArch64 COPR compilation of the original AOSP formatter, Qualcomm merger
+and pinned public Uke board/camera/display Device Tree sources. The package
+retains receipts, original sources/notices, one common DTBO and four vendor DTB
+inputs for subsequent boot-cohort assembly. It installs no tool, Python, service
+or boot hook, includes no private firmware dump and establishes no boot or
+hardware admission. The DTB section is not a complete vendor_boot image.
 
 %prep
 %autosetup
@@ -24,6 +27,8 @@ mkdir upstream
 tar -xJf %{SOURCE2} -C upstream
 mkdir merge-upstream
 tar -xJf %{SOURCE3} -C merge-upstream
+mkdir oem
+tar -xJf %{SOURCE4} -C oem
 test "$(uname -m)" = aarch64
 
 %build
@@ -50,21 +55,28 @@ gcc $CFLAGS -std=c11 -D_GNU_SOURCE -Imerge-upstream -Imerge-upstream/libfdt \
     build/merge-objects/*.o -o build/fdtoverlaymerge $LDFLAGS
 
 # Receipts consumed by %%install must exist before that RPM stage.
-bash -n src/image/inspect-dtbo-reference.sh tests/dtbo-producer.sh tests/dtbo-merge.sh
-shellcheck src/image/inspect-dtbo-reference.sh tests/dtbo-producer.sh tests/dtbo-merge.sh
+bash -n src/image/inspect-dtbo-reference.sh src/image/build-uke-dt-cohort.sh tests/dtbo-producer.sh tests/dtbo-merge.sh
+shellcheck src/image/inspect-dtbo-reference.sh src/image/build-uke-dt-cohort.sh tests/dtbo-producer.sh tests/dtbo-merge.sh
 bash tests/dtbo-producer.sh build/mkdtimg src/image/inspect-dtbo-reference.sh build/native-dtbo.json
 bash tests/dtbo-merge.sh build/fdtoverlaymerge build/mkdtimg build/native-dtbo-merge.json
+bash src/image/build-uke-dt-cohort.sh oem packaging/dtbo-oem-source.json build/mkdtimg build/fdtoverlaymerge build/cohort
+bash src/image/inspect-dtbo-reference.sh build/cohort/dtbo.img build/cohort/vendor-dtbs.img > build/native-oem-dt-inventory.json
 jq -e '.native_architecture=="aarch64" and .version_zero_layout_verified and .malformed_inventory_cases_refused==10' build/native-dtbo.json
-sha256sum src/image/inspect-dtbo-reference.sh tests/dtbo-producer.sh tests/dtbo-merge.sh \
-    packaging/dtbo-tools-source.json packaging/dtbo-merge-source.json packaging/uke-dtbo-tools-source-check.spec > build/project-native-sha256.txt
+sha256sum src/image/inspect-dtbo-reference.sh src/image/build-uke-dt-cohort.sh tests/dtbo-producer.sh tests/dtbo-merge.sh \
+    packaging/dtbo-tools-source.json packaging/dtbo-merge-source.json packaging/dtbo-oem-source.json packaging/uke-dtbo-tools-source-check.spec > build/project-native-sha256.txt
 find upstream -type f -print0 | sort -z | xargs -0 sha256sum > build/upstream-native-sha256.txt
 find merge-upstream -type f -print0 | sort -z | xargs -0 sha256sum > build/merge-upstream-native-sha256.txt
+find oem -type f -print0 | sort -z | xargs -0 sha256sum > build/oem-native-sha256.txt
+find oem -type l -printf '%%P\t%%l\n' | sort > build/oem-native-symlinks.txt
+sha256sum build/cohort/{dtbo.img,vendor-dtbs.img,source-cohort.json} > build/oem-payload-sha256.txt
 rpm -q gcc dtc libfdt libfdt-devel ShellCheck glibc > build/distribution-tools.txt
 # Full original notices, including those embedded in C/header files.
 tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
     -cJf build/upstream-notices.tar.xz -C upstream .
 tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
     -cJf build/merge-upstream-notices.tar.xz -C merge-upstream .
+tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
+    -cJf build/oem-original-sources.tar.xz -C oem .
 
 %check
 jq -e '.version_zero_layout_verified and .payload_bytes_preserved and .repeat_output_identical and .malformed_inventory_cases_refused==10' build/native-dtbo.json
@@ -72,20 +84,31 @@ jq -e '.cross_layer_phandles_resolved and .board_root_metadata_preserved and .mi
 sha256sum -c build/project-native-sha256.txt
 sha256sum -c build/upstream-native-sha256.txt
 sha256sum -c build/merge-upstream-native-sha256.txt
+sha256sum -c build/oem-native-sha256.txt
+sha256sum -c build/oem-payload-sha256.txt
+jq -e '.common_dtbo and .base_count==4 and .overlay_applies_to_all_bases and .missing_camera_platform_refused and (.boot_qualified|not)' build/cohort/source-cohort.json
+jq -e '(.dtbo.entries|length)==1 and (.vendor_dtb_section.bases|length)==4 and .dtbo.entries[0].root.board_id_cells==[8,0]' build/native-oem-dt-inventory.json
 
 %install
 dest=%{buildroot}%{_datadir}/uke-dtbo-tools-source-check
 mkdir -p "$dest"
 install -m0644 build/{native-dtbo.json,native-dtbo-merge.json,project-native-sha256.txt,upstream-native-sha256.txt,merge-upstream-native-sha256.txt,distribution-tools.txt} "$dest/"
+install -m0644 build/{native-oem-dt-inventory.json,oem-native-sha256.txt,oem-native-symlinks.txt,oem-payload-sha256.txt} "$dest/"
+install -m0644 packaging/dtbo-oem-source.json "$dest/oem-source.json"
+mkdir "$dest/cohort"
+install -m0644 build/cohort/{dtbo.img,vendor-dtbs.img,source-cohort.json} "$dest/cohort/"
 install -m0644 %{SOURCE1} "$dest/source-identity.json"
 install -m0644 packaging/dtbo-tools-source.json "$dest/upstream-source.json"
 install -m0644 packaging/dtbo-merge-source.json "$dest/merge-upstream-source.json"
 
 %files
-%license LICENSE build/upstream-notices.tar.xz build/merge-upstream-notices.tar.xz
+%license LICENSE build/upstream-notices.tar.xz build/merge-upstream-notices.tar.xz build/oem-original-sources.tar.xz
 %{_datadir}/uke-dtbo-tools-source-check/
 
 %changelog
+* Sun Nov 15 2026 Uke Linux <uke-linux@users.noreply.github.com> - 1.0-4
+- Compile the complete pinned Uke board, camera and display source cohort.
+
 * Sun Nov 15 2026 Uke Linux <uke-linux@users.noreply.github.com> - 1.0-3
 - Check original Qualcomm overlay merging with cross-layer references.
 
