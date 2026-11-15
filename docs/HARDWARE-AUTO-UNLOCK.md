@@ -148,8 +148,30 @@ Preparation reports that a stored record was used, but cannot itself prove a
 reboot occurred. A separate device procedure must create the record, observe a
 real restart, prepare the same record and remove it. A normal restart must not
 be reported as a power-cycle test. Neither result establishes authenticated
-boot release or encrypted I/O. Native real-file/fault qualification and target
-acceptance of this extension are still pending.
+boot release or encrypted I/O.
+
+The [1.0-13 native record qualification][record-native] passed on Rawhide
+AArch64 in 242 seconds: 30 refusal cases, eight zeroed key-page unmaps,
+cross-process readback, atomic no-replace behavior, short/interrupted I/O,
+precommit cleanup and preservation after an uncertain directory sync. The
+previous 49 HWKM refusal/cleanup cases still pass. All five frontend commands
+refused the non-Uke worker before key or record operations. The actual worker,
+rendered spec, 30 project pins, 27 native project hashes, 43 upstream hashes,
+archive identities and both pinned-key signatures were audited. The temporary
+RPM contains 32 regular files totaling 1,064,507 bytes and the same three
+diagnostic executables; there are no package scripts or Python runtime
+dependencies. These results do not establish physical key generation or
+cross-reboot reuse.
+
+GPG-checked DNF upgraded only the diagnostic on Uke running kernel 26. The
+installed files and frontend digest match the audited RPM. Inspection passed;
+exercise, create-record and prepare-record returned 77 with zero key ioctls
+under the raw-only profile. Cleanup of an absent record passed. The private
+record directory was absent both before and after these commands, all owned
+handles were released and peak RSS stayed at or below 6,312 KiB. System health,
+SELinux Enforcing, automatic staging and the measured preferences remained
+unchanged. This qualifies physical refusal behavior, not hardware generation,
+persistence, encrypted I/O or production release.
 
 `hwkm-probe --inspect` reports only bounded fitted UFS crypto capabilities.
 `--exercise-disposable-key` is a separate explicit diagnostic: it requires the
@@ -228,3 +250,4 @@ be enabled. Source APIs and driver logs do not mark those behaviors complete.
 [ioctl]: https://github.com/gregkh/linux/blob/v7.3.3/block/ioctl.c
 [native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329719/
 [probe-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329763/
+[record-native]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11330057/
