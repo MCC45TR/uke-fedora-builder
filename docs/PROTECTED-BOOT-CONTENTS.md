@@ -135,11 +135,11 @@ This package passed [COPR 11329154][blocks-qualification] in 150 seconds,
 including all four existing native test groups. Its pinned signature, source
 inputs, 22 regular files totaling 514,027 bytes, three added license digests and
 both notice archives were checked. The signed RPM is 256,996 bytes. Executable
-instructions, read-only constants and relocation tables (`.text`, `.rodata`,
+instructions, constants and data tables (`.text`, `.rodata`,
 `.data.rel.ro`) match version `1.0-8` byte for byte; original build providers
 and runtime requirements also match. No C++ or fixture-test code changed.
 
-The test then passed on the actual Uke `7.3.3-26-unstable` kernel through a
+The owned-loop test passed on the actual Uke `7.3.3-26-unstable` kernel through a
 GPG-checked DNF installation. That transaction installed only this diagnostic;
 original Fedora dependencies already satisfied the complete transaction. All
 eight block refusals passed, with three read-only 4-KiB loop inputs, 81,920
@@ -153,6 +153,9 @@ That device execution used version `1.0-8`; the license-only `1.0-9` package
 was not installed on the tablet. The superseded temporary build 11329076 was
 retired after its signed RPM, SRPM, exact sources and runtime receipts were
 retained, with `1.0-9` preserving the unchanged diagnostic implementation.
+The retired build returns HTTP 404 and refreshed repository metadata contains
+no `1.0-8` entry. The retained `1.0-9` native entry matches the audited signed
+RPM digest. Other producers and builds were left intact.
 
 This qualifies the owned-loop block-I/O path, not physical UFS ownership, the
 selected boot slot, the running Image, OEM trust, a boot role or key release.
