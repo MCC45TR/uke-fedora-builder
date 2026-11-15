@@ -52,3 +52,10 @@ Settings/FileChooser/Inhibit/ScreenCast and GNOME Keyring for Secret. Original
 Fedora's GTK portal is included. Upstream advertises no Screenshot portal
 interface; do not report that interface as working. The native screenshot
 utility and ScreenCast remain physical acceptance items.
+
+The hosted unstable entry selects the explicit cumulative `unstable` kernel
+profile as well as the unstable repository. RPM version/release, the suffixed
+ABI, source composition, family and both boot payloads must agree. The first
+compose stopped before root installation because the historical default asked
+for the normal family; the existing qualified selector and its refusal tests
+are now integrated. No replacement kernel is compiled by image assembly.

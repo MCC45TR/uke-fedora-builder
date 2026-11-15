@@ -21,6 +21,16 @@ for channel in stable testing unstable; do
     public_main --build-from-source --channel "$channel" --dry-run > "$work/source"
     if grep -F 'Kernel input: signed' "$work/source"; then exit 1; fi
 done
+public_main --kernel-profile unstable --channel unstable --mode singleboot --kernel-rpm 7.3.3-26.fc46 --dry-run > "$work/cumulative"
+grep -F 'Kernel profile: unstable;' "$work/cumulative" >/dev/null
+grep -F 'Kernel input: signed unstable RPMs (7.3.3-26.fc46)' "$work/cumulative" >/dev/null
+for options in '--channel testing' '--channel stable' '--channel unstable --build-from-source' \
+    '--channel unstable --build kernel' '--channel unstable --release 45' '--channel unstable --reuse-kernel'; do
+    status=0
+    # shellcheck disable=SC2086
+    (public_main --kernel-profile unstable $options --dry-run) > "$work/refused" 2>&1 || status=$?
+    ((status > 0 && status < 90))
+done
 for options in '--kernel-rpm invalid' '--kernel-rpm 7.4-rc1' '--kernel-rpm 7.3.0-1.fc45' '--kernel-rpm 7.3.1-1010.0.fc46' '--kernel-rpm 7.3.1-1010.1.2.fc46' '--kernel-rpm latest --build kernel' '--kernel-rpm latest --build-from-source' '--reuse-kernel' '--kernel 7.3' '--kernel-profile el2-require'; do
     status=0
     # Intentional splitting of fixed fixture option strings.

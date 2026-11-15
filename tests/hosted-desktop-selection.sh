@@ -25,6 +25,7 @@ for desktop in kde gnome cutefish plasma-mobile; do
     PATH="$fixture/bin:$PATH" RUNNER_TEMP=$fixture GITHUB_OUTPUT=$fixture/output GITHUB_RUN_ID=1 IMAGE_DESKTOP=$desktop IMAGE_KERNEL_RPM=7.3.3-28.fc46 bash "$root/scripts/hosted-image.sh" || status=$?
     [[ $status == 77 ]]
     grep -Fx "$desktop" "$fixture/arguments" > /dev/null
+    grep -Fx -- '--kernel-profile' "$fixture/arguments" > /dev/null
     grep -Fx 'unstable' "$fixture/arguments" > /dev/null
     grep -Fx '7.3.3-28.fc46' "$fixture/arguments" > /dev/null
 done
