@@ -99,7 +99,6 @@
     "cutefish-filemanager",
     "cutefish-settings",
     "cutefish-terminal",
-    "xdg-desktop-portal-cutefish",
     "cutefish-system-monitor",
     "cutefish-text-editor",
     "cutefish-video-player",
@@ -110,5 +109,9 @@
   "minimum_catalog_languages": 16,
   "account_setup": "uke-cutefish-firstboot",
   "credentials_included": false,
-  "hardware_tested": false
+  "hardware_tested": false,
+  "upstream_without_standalone_catalogs": [
+    "xdg-desktop-portal-cutefish",
+    "cutefish-qt-plugins"
+  ]
 }

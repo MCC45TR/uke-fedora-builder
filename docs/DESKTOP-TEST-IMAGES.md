@@ -59,3 +59,9 @@ ABI, source composition, family and both boot payloads must agree. The first
 compose stopped before root installation because the historical default asked
 for the normal family; the existing qualified selector and its refusal tests
 are now integrated. No replacement kernel is compiled by image assembly.
+
+The actual signed set contains 224 catalogs: sixteen in each of fourteen
+translated components. The portal and Qt integration plugins supply no separate
+catalogs at the pinned upstream revision. The portal remains a required RPM;
+its nonexistent domain is not a translation sentinel. Complete installed and
+serialized RPM translation checks remain mandatory.

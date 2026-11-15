@@ -463,8 +463,9 @@ systemctl --root="$root" mask debug-shell.service uke-boot-guard.service
 source /builder/src/public/desktop-setup.sh
 public_desktop_setup "$root" "$desktop" /job/artifacts/account-provisioning.json
 mkdir -p "$root/etc/senemos" "$root/etc/uke-control" "$root/etc/dnf" "$root/var/lib/uke-touch"
-printf 'automatic=0\n' > "$root/etc/senemos/kernel-update.conf"
-printf 'automatic=0\n' > "$root/etc/senemos/userdata-update.conf"
+# Fresh-image defaults retain seamless inactive-slot staging on later DNF updates.
+printf 'automatic=1\n' > "$root/etc/senemos/kernel-update.conf"
+printf 'automatic=1\nvrr_min_hz=0\n' > "$root/etc/senemos/userdata-update.conf"
 internal_channel=$channel
 [[ $channel != testing ]] || internal_channel='test'
 printf '%s\n' "$internal_channel" > "$root/etc/uke-control/channel"

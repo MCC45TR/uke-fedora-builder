@@ -103,3 +103,9 @@ public_language_policy "$work/macros"
 export UKE_TEST_LANGUAGE_STUCK=1
 reject public_language_policy "$work/macros"
 echo 'All DEs require complete RPM translations including help/docs; ghost entries alone are exempt; missing catalogs, Qt payloads, docs, locales and surviving host filters reject.'
+
+# The pinned portal has no po tree or gettext installation; keep the RPM
+# mandatory while auditing only real supplied catalog domains.
+jq -e '(.required_packages | index("xdg-desktop-portal-cutefish")) != null and
+  (.translation_domains | index("xdg-desktop-portal-cutefish")) == null and
+  (.translation_domains | length) == 14' "$builder/configs/images/cutefish-rawhide.json" > /dev/null
