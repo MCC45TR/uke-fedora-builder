@@ -5,8 +5,13 @@ set -Eeuo pipefail
 trap 'printf "UKE_COHORT_CONTENT_TEST_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 export LC_ALL=C
 umask 077
-[[ $# == 3 && $(uname -m) == aarch64 && -x $1 && -x $2 && ! -e $3 && ! -L $3 ]]
+[[ ( $# == 3 || $# == 4 ) && $(uname -m) == aarch64 && -x $1 && -x $2 && ! -e $3 && ! -L $3 ]]
 tool=$(realpath "$1") codec=$(realpath "$2") report=$(realpath -m "$3")
+export_fixture=''
+if (( $# == 4 )); then
+    [[ ! -e $4 && ! -L $4 ]]
+    export_fixture=$(realpath -m "$4")
+fi
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck disable=SC1091
 source "$repo/src/image/fastboot-singleboot-layout.sh"
@@ -210,3 +215,15 @@ jq -n --argjson refused "$refused" --slurpfile large streaming.json \
   large_streaming_result:$large[0],physical_block_branch_tested:false,physical_identity_verified:false,
   selected_slot_bound:false,booted_kernel_verified:false,role_admitted:false,
   operating_system_booted:false,storage_or_key_release_executed:false}' > "$report"
+if [[ -n $export_fixture ]]; then
+    # Only public, disposable inputs enter the diagnostic RPM. The private
+    # signing key remains in this owned workdir and is removed by the trap.
+    cp saved-boot boot.img
+    publish
+    mkdir "$export_fixture"
+    cp boot.img vendor_boot.img dtbo.img vbmeta.img "$export_fixture/"
+    jq -n --args '{schema_version:1,scope:"disposable-copr-fixture",arguments:$ARGS.positional}' \
+        "${context[@]}" > "$export_fixture/context.json"
+    (cd "$export_fixture"; sha256sum boot.img vendor_boot.img dtbo.img vbmeta.img context.json > SHA256SUMS)
+    [[ $(find "$export_fixture" -type f | wc -l) == 6 ]]
+fi

@@ -90,6 +90,32 @@ signature, all 18 source-archive project pins, 43 original libavb file pins,
 published spec and licenses matched. No ELF, package script or Python/runtime
 dependency is packaged or installed on either PC or tablet.
 
+## Owned-loop diagnostic
+
+The next `1.0-8` source-check package is an AArch64 diagnostic package rather
+than a text-only receipt. It includes the same inspection frontend, the
+`owned-block-fixture` test and six public disposable fixture files. No private
+signing key, formatter, Python, service or boot hook is included. It is a
+temporary test dependency and must be removed after the block-I/O evidence is
+preserved; it is not the protected admission policy or a production dependency.
+
+The test accepts no device argument. It creates three sparse owned files under
+a private `/var/tmp` directory, then attaches them read-only with original
+util-linux. Every loop must match the backing inode and filesystem device;
+detach repeats those checks and confirms that no backing file remains attached.
+An ownership/cleanup failure preserves the work directory for inspection.
+At least 1 GiB and 1,024 free inodes must remain before allocation, with an
+initial allocated backing limit below 1 MiB. The three loops have 216 MiB of
+combined apparent capacity, without copying a physical image. Whole backing
+hashes must match after the test, and owned cache pages are discarded afterward.
+
+The planned checks exercise exact block capacity and 4-KiB ioctls, both
+requested slot values, and eight refusals: 512-byte sectors, two wrong
+capacities, an alias, a closed descriptor and each of three changed prefixes.
+Slot values and signing keys remain fixture inputs. Passing on the Uke kernel
+would qualify this block-I/O path, not physical UFS ownership, the selected boot
+slot, the running Image, OEM trust, a boot role or key release.
+
 [header]: https://android.googlesource.com/platform/system/tools/mkbootimg/+/4a27dd13adf9846e12d585d6fe99a375ebb58396/include/bootimg/bootimg.h
 [arm64]: https://docs.kernel.org/arch/arm64/booting.html
 [qualification]: https://copr.fedorainfracloud.org/coprs/mcc45tr/uke-linux-test/build/11329047/

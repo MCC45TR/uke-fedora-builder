@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        7%{?dist}
+Release:        8%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -8,16 +8,20 @@ Source0:        %{name}-%{version}.tar.xz
 Source1:        source-identity.json
 Source2:        libavb-ba2dec4b.tar.xz
 Source3:        libavb-LICENSE
-BuildArch:      noarch
+ExclusiveArch:  aarch64
+%global debug_package %{nil}
 BuildRequires:  gcc gcc-c++ binutils openssl-devel openssl json-devel bash jq coreutils findutils diffutils util-linux
 # Upstream Fedora avbtool formats/signs disposable host fixtures only. Never
 # install Python/avbtool or these native inspection executables on the target.
 BuildRequires:  android-tools python3
+Requires:       bash jq coreutils findutils util-linux-core
 
 %description
-Temporary source-check receipts from native AArch64 COPR compilation and
-OpenSSL interoperability. No admission executable or runtime service is packaged.
-This does not qualify an OEM trust anchor, boot, key release or hibernation.
+Temporary source-check receipts and a descriptor inspection executable from
+native AArch64 COPR compilation. Public disposable fixtures support a bounded
+owned-loop block-I/O test without a formatter or Python on the target. The
+executable grants no admission, key release, boot selection or runtime service.
+No physical UFS or OEM trust qualification follows from these test fixtures.
 
 %prep
 %autosetup
@@ -71,10 +75,11 @@ bash tests/protected-cohort-manifest.sh build/cohort-manifest "$PWD/build/manife
 readelf -h build/cohort-vbmeta | grep -E 'Machine:.*AArch64'
 bash tests/protected-cohort-vbmeta.sh build/cohort-vbmeta "$PWD/build/vbmeta-result.json"
 readelf -h build/cohort-content | grep -E 'Machine:.*AArch64'
-bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json"
+bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json" "$PWD/build/content-fixture"
 rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 > build/original-tools.txt
 sha256sum src/image/protected-cohort-{auth,manifest,vbmeta,content}.* tests/protected-cohort-{auth,manifest,vbmeta,content}.sh \
-    src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh src/boot/boot-image.cpp > build/source-sha256.txt
+    src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh src/boot/boot-image.cpp \
+    tests/protected-cohort-blocks.sh > build/source-sha256.txt
 find build/upstream/libavb -type f -print0 | sort -z | xargs -0 sha256sum > build/upstream-sha256.txt
 
 %check
@@ -89,18 +94,29 @@ jq -e '.original_fedora_avbtool_interoperability and .outer_avb_and_inner_pss_ve
 jq -e '.real_signed_metadata_then_fd_content_verification and .refused_cases==31 and
     .partial_duplicate_failure_cleaned_up and .large_streaming_result.peak_rss_kib<65536 and
     (.physical_block_branch_tested|not) and (.role_admitted|not)' build/content-result.json
+(cd build/content-fixture; sha256sum -c SHA256SUMS)
+test "$(find build/content-fixture -type f | wc -l)" = 6
+test ! -e build/content-fixture/key.pem
 
 %install
 install -d %{buildroot}%{_datadir}/%{name}
 install -pm644 build/native-result.json build/original-tools.txt build/source-sha256.txt \
     build/manifest-result.json build/vbmeta-result.json build/content-result.json build/upstream-sha256.txt \
     %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
+install -d %{buildroot}%{_libexecdir}/%{name} %{buildroot}%{_datadir}/%{name}/fixtures
+install -pm755 build/cohort-content %{buildroot}%{_libexecdir}/%{name}/cohort-content-inspect
+install -pm755 tests/protected-cohort-blocks.sh %{buildroot}%{_libexecdir}/%{name}/owned-block-fixture
+install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 
 %files
 %license LICENSE libavb-LICENSE
 %{_datadir}/%{name}/
+%{_libexecdir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-8
+- Supply a temporary native inspection tool and public fixtures for owned-loop qualification.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-7
 - Verify signed boot prefixes and the raw ARM64 kernel slice through owned read-only descriptors.
 

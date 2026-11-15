@@ -30,6 +30,22 @@ was11274289152B with4096-byte logical sectors. This is one512-GB device, not
 actual256-GB geometry, Linux rescue mapping, OS boot or encryption acceptance.
 Private identity receipts omit captured unit identifiers and credentials.
 
+Read-only reinspection on 15 November confirmed that these roles span two
+UFS logical units under the same `1d84000.ufshc` controller. Super and userdata
+are on the current `sda` disk, while both boot/vendor_boot/DTBO/vbmeta sets are
+on `sde`. These names and partition numbers remain observations, never fixed
+selector inputs. A future complete-cohort owner must validate each physical
+partition independently and permit different logical units of that same
+verified controller; requiring every role to share the super disk would reject
+this tablet. The current super selector does not open those other roles.
+
+The running kernel remains `7.3.3-26-unstable` with integrity lockdown. The
+filtered command line/bootconfig/chosen data supplied no explicit slot hint;
+`androidboot.secureboot=1` and `verifiedbootstate=orange` do not identify a slot
+or establish the requested full OEM-to-Linux trust chain. Equal images in both
+slots are an intentional initial-install requirement, so a unique image hash
+cannot be required to distinguish them.
+
 CI also exercises both modes over the existing owned4KiB growth loop using a
 synthetic read-only sysfs/device-tree mount namespace and a capability-free child.
 Two names/partition numbers are accepted;19 malformed, duplicate, foreign,
