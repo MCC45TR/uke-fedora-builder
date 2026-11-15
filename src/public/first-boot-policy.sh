@@ -1,5 +1,26 @@
 #!/usr/bin/env bash
 # Host composition of standard systemd growth and an independent read-only gate.
+public_clock_epoch() {
+    local root=$1 epoch=$2 path clock
+    [[ -d $root && ! -L $root && $root != / &&
+       $epoch =~ ^[1-9][0-9]{9}$ ]] || return 1
+    ((epoch >= 1577836800 && epoch <= $(date -u +%s) + 60)) || return 1
+    for path in var var/lib var/lib/systemd var/lib/systemd/timesync; do
+        [[ ! -L $root/$path && ( ! -e $root/$path || -d $root/$path ) ]] || return 1
+    done
+    clock=$root/var/lib/systemd/timesync/clock
+    [[ ! -L $clock && ( ! -e $clock ||
+       ( -f $clock && ! -s $clock && $(stat -c %h "$clock") == 1 ) ) ]] || return 1
+    # PID1 reads this standard epoch even when chronyd is the NTP provider.
+    # Its mtime supplies a sane offline floor without changing Fedora binaries
+    # or starting a second clock daemon. Preserve any unexpected state instead.
+    mkdir -p "$root/var/lib/systemd/timesync" || return
+    : > "$clock" || return
+    chmod 644 "$clock" || return
+    touch -d "@$epoch" "$clock" || return
+    [[ $(stat -c %Y "$clock") == "$epoch" && ! -s $clock ]]
+}
+
 public_ext4_full_capacity() {
     local capacity=$1 blocks=$2 block_size=$3 filesystem gap
     [[ $capacity =~ ^[1-9][0-9]{0,12}$ && $blocks =~ ^[1-9][0-9]{0,12}$ && $block_size =~ ^[1-9][0-9]{0,4}$ ]] || return 1
@@ -35,10 +56,12 @@ COMMAND
 }
 
 public_first_boot_policy() {
-    local root=$1 receipt=$2 command unit
+    local root=$1 receipt=$2 command unit epoch
     [[ -d $root && ! -L $root && $root != / ]] || return 1
     [[ -x $root/usr/bin/clear && -x $root/usr/bin/uke-control && -x $root/usr/libexec/senemos-uke/uke-install-profile &&
        -x $root/usr/lib/systemd/systemd-growfs && -f $root/usr/lib/systemd/system/systemd-growfs-root.service ]] || return 1
+    epoch=$(date -u +%s)
+    public_clock_epoch "$root" "$epoch" || return
     mkdir -p "$root/etc/systemd/system" "$root/var/lib/uke-control" "$root/etc/systemd/journald.conf.d"
     # One writer only: fstab/generator + the original Fedora root grow service.
     if [[ ! -L $root/etc/systemd/system/uke-root-grow.service || $(readlink "$root/etc/systemd/system/uke-root-grow.service") != /dev/null ]]; then
@@ -104,8 +127,9 @@ UNIT
        $(systemctl --root="$root" is-enabled uke-swap-ready.service) == enabled &&
        $(systemctl --root="$root" is-enabled uke-control.service) == enabled ]]
     systemd-analyze --root="$root" verify uke-root-capacity.service uke-swap-ready.service || return
-    jq -n '{root_growth:"original-systemd-growfs-root",root_selector:"PARTLABEL=userdata",
+    jq -n --argjson epoch "$epoch" '{root_growth:"original-systemd-growfs-root",root_selector:"PARTLABEL=userdata",
         duplicate_grow_service_masked:true,capacity_gate_before_setup:true,swap_policy:"half",
         swap_backend:"existing-uke-control-disk-swap",swap_after_capacity:true,clear_binary_verified:true,
-        persistent_journal:true,hardware_tested:false}' > "$receipt"
+        persistent_journal:true,clock_epoch_provider:"systemd-standard-state-mtime",
+        clock_epoch_seed:$epoch,extra_clock_daemon:false,hardware_tested:false}' > "$receipt"
 }

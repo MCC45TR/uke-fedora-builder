@@ -65,3 +65,10 @@ translated components. The portal and Qt integration plugins supply no separate
 catalogs at the pinned upstream revision. The portal remains a required RPM;
 its nonexistent domain is not a translation sentinel. Complete installed and
 serialized RPM translation checks remain mandatory.
+
+Revision 4 seeds the standard systemd offline clock floor through the mtime of
+`/var/lib/systemd/timesync/clock`. PID1 uses this state before services start;
+chronyd remains the NTP provider. This prevents a stale RTC from making current
+RPM signatures appear to come from the future before network time is available.
+No Fedora binary or additional clock service is introduced. The source fixture
+checks refusal of unexpected state and verifies the mtime in a real EXT4 inode.
