@@ -145,6 +145,13 @@ Compilation remains in COPR. The resulting DTB section is not a complete
 vendor_boot image; no bootloader fixup, once-only kernel transformation,
 hardware or OEM-trust acceptance follows from this candidate.
 
+The first complete source-cohort build, COPR 11330802, reached native
+compilation after both tool fixtures passed, but Fedora DTC rejected the OEM
+warning selector `graph_child_address`. Release 5 removes the downstream
+warning suppression list and uses Fedora's default diagnostics. OEM sources,
+bindings, composition and validation remain unchanged. This failure did not
+produce a DTBO or modify a device.
+
 The board include chain alone is incomplete. Installed entry 0 also contains
 the camera and O82 display layers. The corresponding OEM sources are separate:
 camera DT `57d2135ee6909ffb7d288a7dc4d82c85d95fc10d` and display DT

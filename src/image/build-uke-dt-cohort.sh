@@ -48,9 +48,8 @@ compile() {
  (ulimit -Sv 262144; ulimit -Sf 16384; timeout 30s gcc -E -P -nostdinc -undef -D__DTS__ -x assembler-with-cpp \
   "${includes[@]}" -MMD -MF "$output/preprocessed/$target.d" -o "$output/preprocessed/$target.dts" "$source_root/$owner/$path")
  (ulimit -Sv 262144; ulimit -Sf 16384; timeout 30s dtc -@ -I dts -O dtb -b 0 \
-  -i "$(dirname "$source_root/$owner/$path")" -Wno-unit_address_vs_reg -Wno-avoid_unnecessary_addr_size \
-  -Wno-alias_paths -Wno-graph_child_address -Wno-simple_bus_reg -Wno-unique_unit_address \
-  -Wno-interrupt_provider -o "$output/compiled/$target.dtb" "$output/preprocessed/$target.dts") \
+  -i "$(dirname "$source_root/$owner/$path")" \
+  -o "$output/compiled/$target.dtb" "$output/preprocessed/$target.dts") \
   2> "$output/logs/$target.dtc.log" || { tail -n 50 "$output/logs/$target.dtc.log" >&2; fail "DTC failed: $target"; }
 }
 while IFS=$'\t' read -r owner path target; do
