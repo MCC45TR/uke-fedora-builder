@@ -5,13 +5,14 @@ set -Eeuo pipefail
 trap 'printf "UKE_COHORT_CONTENT_TEST_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 export LC_ALL=C
 umask 077
-[[ ( $# == 3 || $# == 4 ) && $(uname -m) == aarch64 && -x $1 && -x $2 && ! -e $3 && ! -L $3 ]]
+[[ ( $# == 3 || $# == 4 || $# == 5 ) && $(uname -m) == aarch64 && -x $1 && -x $2 && ! -e $3 && ! -L $3 ]]
 tool=$(realpath "$1") codec=$(realpath "$2") report=$(realpath -m "$3")
-export_fixture=''
-if (( $# == 4 )); then
+export_fixture='' physical_tool=''
+if (( $# >= 4 )); then
     [[ ! -e $4 && ! -L $4 ]]
     export_fixture=$(realpath -m "$4")
 fi
+if (( $# == 5 )); then [[ -x $5 ]]; physical_tool=$(realpath "$5"); fi
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)
 # shellcheck disable=SC1091
 source "$repo/src/image/fastboot-singleboot-layout.sh"
@@ -220,10 +221,67 @@ if [[ -n $export_fixture ]]; then
     # signing key remains in this owned workdir and is removed by the trap.
     cp saved-boot boot.img
     publish
+    # A block reader always consumes libavb's entire 64KiB prefix. Explicit
+    # zero padding prevents stale bytes from a previous metadata image.
+    truncate -s65536 vbmeta.img
     mkdir "$export_fixture"
     cp boot.img vendor_boot.img dtbo.img vbmeta.img "$export_fixture/"
     jq -n --args '{schema_version:1,scope:"disposable-copr-fixture",arguments:$ARGS.positional}' \
         "${context[@]}" > "$export_fixture/context.json"
     (cd "$export_fixture"; sha256sum boot.img vendor_boot.img dtbo.img vbmeta.img context.json > SHA256SUMS)
     [[ $(find "$export_fixture" -type f | wc -l) == 6 ]]
+fi
+if [[ -n $physical_tool ]]; then
+    cp "$export_fixture/vbmeta.img" fd-vbmeta
+    truncate -s131072 fd-vbmeta
+    sha256sum fd-vbmeta > fd-original.sha256
+    metadata_fd=6 metadata_capacity=131072
+    fd_invoke() { timeout 8s "$physical_tool" --fixture-vbmeta-fd "$metadata_fd" "$metadata_capacity" "${context[@]}" a 3 4 5; }
+    fd_open() { exec 3<boot.img 4<vendor_boot.img 5<dtbo.img 6<fd-vbmeta; }
+    fd_close() { exec 3<&- 4<&- 5<&- 6<&-; }
+    fd_positive() {
+        fd_open; fd_invoke > fd-positive.json; fd_close
+        jq -e '.metadata_verified and .metadata_prefix_bytes==65536 and .boot_contents_verified and
+         .verified_boot_bytes==81920 and .caller_positions_unchanged and .owned_handles_released and
+         (.metadata_block_input|not) and (.physical_ufs_topology_verified|not) and (.role_admitted|not)' fd-positive.json >/dev/null
+    }
+    fd_refused=0
+    fd_reject_open() {
+        local status=0
+        fd_invoke > fd-refused.json 2> fd-refused.log || status=$?
+        [[ $status == 1 && ! -s fd-refused.json && $(tail -n1 fd-refused.log) == UKE_PHYSICAL_COHORT_REJECTED ]]
+        ((fd_refused+=1))
+    }
+    fd_reject() { fd_open; fd_reject_open; fd_close; }
+    fd_positive
+    for metadata_capacity in 65536 61440 1052672 131073; do fd_reject; done
+    metadata_capacity=131072
+    metadata_fd=99; fd_reject; metadata_fd=0; fd_reject; metadata_fd=6
+    exec 3<boot.img 4<vendor_boot.img 5<dtbo.img 6<>fd-vbmeta; fd_reject_open; fd_close
+    exec 3<boot.img 4<vendor_boot.img 5<dtbo.img 6</dev/null; fd_reject_open; fd_close
+    exec 3<boot.img 4<vendor_boot.img 5<dtbo.img 6< <(printf x); fd_reject_open; fd_close
+    truncate -s131071 fd-vbmeta; fd_reject; truncate -s131072 fd-vbmeta
+    flip fd-vbmeta 0; fd_reject; flip fd-vbmeta 0
+    flip fd-vbmeta 65535; fd_reject; flip fd-vbmeta 65535
+    context[0]=$hash; fd_reject; context[0]=$avb_pin
+    (ulimit -n 10; fd_open; fd_invoke) > fd-exhausted.json 2> fd-exhausted.log && exit 1
+    [[ ! -s fd-exhausted.json && $(tail -n1 fd-exhausted.log) == UKE_PHYSICAL_COHORT_REJECTED ]]
+    ((fd_refused+=1))
+    # Bytes beyond the 64KiB metadata limit are not part of this input.
+    flip fd-vbmeta 70000; fd_positive; flip fd-vbmeta 70000
+    fd_open
+    read -r -N1 first <&6; [[ $first == A ]]
+    mv fd-vbmeta pinned-vbmeta
+    cp pinned-vbmeta fd-vbmeta; flip fd-vbmeta 0
+    fd_invoke > fd-pinned.json
+    read -r -N1 second <&6; [[ $second == V ]]
+    fd_close
+    unlink fd-vbmeta; mv pinned-vbmeta fd-vbmeta
+    sha256sum -c fd-original.sha256 > fd-unchanged.log
+    [[ $fd_refused == 14 ]]
+    jq --argjson refused "$fd_refused" '. + {vbmeta_fd_refused_cases:$refused,
+      vbmeta_fd_snapshot_and_signatures_verified:true,vbmeta_fd_offsets_and_path_pinning_verified:true,
+      vbmeta_prefix_bytes:65536,vbmeta_beyond_prefix_ignored:true,vbmeta_fd_handles_released:true}' \
+        "$report" > fd-report.json
+    mv fd-report.json "$report"
 fi

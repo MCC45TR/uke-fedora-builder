@@ -1,9 +1,16 @@
 // SPDX-License-Identifier: MIT
 #include "protected-cohort-vbmeta.hpp"
 #include <libavb/libavb.h>
+#include <linux/fs.h>
 #include <openssl/evp.h>
+#include <sys/ioctl.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
 #include <algorithm>
 #include <array>
+#include <cerrno>
+#include <chrono>
 #include <cstring>
 #include <stdexcept>
 #include <string_view>
@@ -16,6 +23,10 @@
 #endif
 
 namespace uke::protected_boot {
+struct OwnedVbmetaDescriptor {
+    int value = -1;
+    ~OwnedVbmetaDescriptor() { if (value >= 0) close(value); }
+};
 namespace {
 static_assert(!std::is_default_constructible_v<VerifiedVbmetaCohort>);
 static_assert(!std::is_aggregate_v<VerifiedVbmetaCohort>);
@@ -111,6 +122,34 @@ bool collect(const AvbDescriptor* descriptor, void* data) noexcept {
         return true;
     } catch (...) { return false; }
 }
+struct FdState {
+    struct stat value{};
+    int flags = 0;
+    bool block = false;
+    bool operator==(const FdState& other) const {
+        const auto& x = value; const auto& y = other.value;
+        return flags == other.flags && block == other.block && x.st_dev == y.st_dev &&
+            x.st_ino == y.st_ino && x.st_rdev == y.st_rdev && x.st_mode == y.st_mode &&
+            x.st_size == y.st_size && x.st_mtim.tv_sec == y.st_mtim.tv_sec &&
+            x.st_mtim.tv_nsec == y.st_mtim.tv_nsec && x.st_ctim.tv_sec == y.st_ctim.tv_sec &&
+            x.st_ctim.tv_nsec == y.st_ctim.tv_nsec;
+    }
+};
+FdState fd_state(int fd, uint64_t capacity) {
+    FdState out;
+    out.flags = fcntl(fd, F_GETFL);
+    if (fd < 3 || out.flags < 0 || (out.flags & O_ACCMODE) != O_RDONLY ||
+        (out.flags & (O_PATH | O_DIRECT)) || fstat(fd, &out.value)) refuse();
+    out.block = S_ISBLK(out.value.st_mode);
+    if (out.block) {
+        unsigned long long bytes = 0;
+        int sector = 0;
+        if (ioctl(fd, BLKGETSIZE64, &bytes) || bytes != capacity ||
+            ioctl(fd, BLKSSZGET, &sector) || sector != 4096) refuse();
+    } else if (!S_ISREG(out.value.st_mode) || out.value.st_size < 0 ||
+               static_cast<uint64_t>(out.value.st_size) != capacity) refuse();
+    return out;
+}
 }
 
 VerifiedVbmetaCohort verify_vbmeta_cohort_bytes(std::span<const unsigned char> candidate,
@@ -156,6 +195,37 @@ VerifiedVbmetaCohort verify_vbmeta_cohort_bytes(std::span<const unsigned char> c
         if (sizes[i] != descriptors.hashes[i].image_bytes) refuse();
     return {std::move(manifest), std::move(descriptors.hashes), observed,
             sha256({bytes.data(), static_cast<size_t>(end)}), header.rollback_index};
+}
+
+VerifiedVbmetaFd::VerifiedVbmetaFd(VerifiedVbmetaCohort cohort,
+    std::unique_ptr<OwnedVbmetaDescriptor> descriptor, bool block)
+    : cohort_(std::move(cohort)), descriptor_(std::move(descriptor)), block_(block) {}
+VerifiedVbmetaFd::~VerifiedVbmetaFd() = default;
+VerifiedVbmetaFd::VerifiedVbmetaFd(VerifiedVbmetaFd&&) noexcept = default;
+VerifiedVbmetaFd& VerifiedVbmetaFd::operator=(VerifiedVbmetaFd&&) noexcept = default;
+
+VerifiedVbmetaFd verify_vbmeta_cohort_fd(int fd, uint64_t capacity, const VbmetaTrustPins& trusted,
+                                        const ImmutableKernelContext& expected,
+                                        const ObservedBootGeometry& observed) {
+    static_assert(!std::is_default_constructible_v<VerifiedVbmetaFd>);
+    if (capacity < maximum_vbmeta || capacity > 1048576 || capacity % 4096) refuse();
+    const auto initial = fd_state(fd, capacity);
+    auto owned = std::make_unique<OwnedVbmetaDescriptor>();
+    owned->value = fcntl(fd, F_DUPFD_CLOEXEC, 3);
+    if (owned->value < 0 || !(initial == fd_state(owned->value, capacity))) refuse();
+    std::array<unsigned char, maximum_vbmeta> bytes{};
+    const auto until = std::chrono::steady_clock::now() + std::chrono::seconds(10);
+    size_t have = 0;
+    while (have < bytes.size()) {
+        if (std::chrono::steady_clock::now() >= until) refuse();
+        const auto count = pread(owned->value, bytes.data() + have, bytes.size() - have, static_cast<off_t>(have));
+        if (count < 0 && errno == EINTR) continue;
+        if (count <= 0) refuse();
+        have += static_cast<size_t>(count);
+    }
+    auto cohort = verify_vbmeta_cohort_bytes(bytes, trusted, expected, observed);
+    if (std::chrono::steady_clock::now() >= until || !(initial == fd_state(owned->value, capacity))) refuse();
+    return {std::move(cohort), std::move(owned), initial.block};
 }
 }
 

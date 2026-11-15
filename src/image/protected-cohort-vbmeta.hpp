@@ -3,6 +3,7 @@
 #include "protected-cohort-manifest.hpp"
 #include <array>
 #include <cstdint>
+#include <memory>
 #include <span>
 #include <string>
 #include <utility>
@@ -53,4 +54,30 @@ VerifiedVbmetaCohort verify_vbmeta_cohort_bytes(std::span<const unsigned char> c
                                               const VbmetaTrustPins& trusted,
                                               const ImmutableKernelContext& expected,
                                               const ObservedBootGeometry& observed);
+
+struct OwnedVbmetaDescriptor;
+class VerifiedVbmetaFd {
+public:
+    ~VerifiedVbmetaFd();
+    VerifiedVbmetaFd(VerifiedVbmetaFd&&) noexcept;
+    VerifiedVbmetaFd& operator=(VerifiedVbmetaFd&&) noexcept;
+    VerifiedVbmetaFd(const VerifiedVbmetaFd&) = delete;
+    VerifiedVbmetaFd& operator=(const VerifiedVbmetaFd&) = delete;
+    const VerifiedVbmetaCohort& cohort() const noexcept { return cohort_; }
+    bool block_input() const noexcept { return block_; }
+private:
+    VerifiedVbmetaFd(VerifiedVbmetaCohort, std::unique_ptr<OwnedVbmetaDescriptor>, bool);
+    VerifiedVbmetaCohort cohort_;
+    std::unique_ptr<OwnedVbmetaDescriptor> descriptor_;
+    bool block_;
+    friend VerifiedVbmetaFd verify_vbmeta_cohort_fd(int, uint64_t, const VbmetaTrustPins&,
+                                                   const ImmutableKernelContext&, const ObservedBootGeometry&);
+};
+// Reads exactly the first 64KiB through a retained RO duplicate. Capacity is
+// independently observed by the physical owner; regular files are fixtures.
+// Uses pread, rechecks identity/status/capacity, and never opens a pathname.
+// The remainder of a larger partition is outside libavb's 64KiB input limit.
+VerifiedVbmetaFd verify_vbmeta_cohort_fd(int fd, uint64_t capacity,
+                                        const VbmetaTrustPins&, const ImmutableKernelContext&,
+                                        const ObservedBootGeometry&);
 }
