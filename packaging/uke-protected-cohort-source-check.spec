@@ -1,6 +1,6 @@
 Name:           uke-protected-cohort-source-check
 Version:        1.0
-Release:        8%{?dist}
+Release:        9%{?dist}
 Summary:        Native source verification of Uke AVB and signed cohort constraints
 License:        MIT AND BSD-3-Clause
 URL:            https://github.com/MCC45TR/uke-fedora-builder
@@ -10,9 +10,11 @@ Source2:        libavb-ba2dec4b.tar.xz
 Source3:        libavb-LICENSE
 ExclusiveArch:  aarch64
 %global debug_package %{nil}
-BuildRequires:  gcc gcc-c++ binutils openssl-devel openssl json-devel bash jq coreutils findutils diffutils util-linux
-# Upstream Fedora avbtool formats/signs disposable host fixtures only. Never
-# install Python/avbtool or these native inspection executables on the target.
+BuildRequires:  gcc gcc-c++ binutils openssl-devel openssl bash jq coreutils findutils diffutils util-linux
+BuildRequires:  json-devel = 3.12.0
+# Upstream Fedora avbtool formats/signs disposable COPR-host fixtures only.
+# Python and avbtool are never target payloads; the descriptor inspection
+# frontend is an explicit temporary diagnostic, never an admission policy.
 BuildRequires:  android-tools python3
 Requires:       bash jq coreutils findutils util-linux-core
 
@@ -26,6 +28,8 @@ No physical UFS or OEM trust qualification follows from these test fixtures.
 %prep
 %autosetup
 cp %{SOURCE3} libavb-LICENSE
+cp /usr/share/licenses/json-devel/LICENSE.MIT nlohmann-json-LICENSE.MIT
+echo '46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603  nlohmann-json-LICENSE.MIT' | sha256sum -c -
 test "$(uname -m)" = aarch64
 
 %build
@@ -42,6 +46,7 @@ g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -c \
     src/image/protected-cohort-manifest.cpp -o build/cohort-manifest.o
 mkdir -p build/upstream/libavb
 tar -xJf %{SOURCE2} -C build/upstream/libavb
+touch build/libavb-license-inputs.txt
 # Compile original upstream C as C, with its portable crypto/POSIX backend.
 # Its unmodified unsupported ML-DSA backend returns failure; Uke accepts only
 # the SHA256_RSA4096 profile and does not replace a verification routine.
@@ -51,7 +56,22 @@ for source in avb_crypto avb_descriptor avb_hash_descriptor avb_mldsa \
     gcc $CFLAGS -std=c11 -D_GNU_SOURCE -DAVB_COMPILATION \
         -Ibuild/upstream/libavb -Ibuild/upstream/libavb/crypto \
         -c "build/upstream/libavb/$source.c" -o "build/avb-${source//\//-}.o"
+    printf '%%s.c\n' "$source" >> build/libavb-license-inputs.txt
 done
+# Retain the original copyright/permission notices, including the embedded
+# Chromium/Olivier Gay routines and the JSON headers' internal attributions.
+# These small original-source archives avoid truncating a multi-part notice.
+find build/upstream/libavb -type f -name '*.h' -printf '%%P\n' >> build/libavb-license-inputs.txt
+sort -u -o build/libavb-license-inputs.txt build/libavb-license-inputs.txt
+test "$(grep -c '[.]c$' build/libavb-license-inputs.txt)" = 13
+if grep -Fx avb_crc32.c build/libavb-license-inputs.txt; then exit 1; fi
+tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
+    -cJf build/libavb-notices.tar.xz -C build/upstream/libavb -T "$PWD/build/libavb-license-inputs.txt"
+test -z "$(find /usr/include/nlohmann -type l -print -quit)"
+tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
+    -cJf build/json-header-notices.tar.xz -C /usr/include nlohmann
+sha256sum nlohmann-json-LICENSE.MIT build/{libavb-notices,json-header-notices}.tar.xz \
+    > build/third-party-license-sha256.txt
 ar rcs build/libavb.a build/avb-*.o
 g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_VBMETA_CLI \
     -Ibuild/upstream src/image/protected-cohort-{auth,manifest,vbmeta}.cpp \
@@ -102,6 +122,7 @@ test ! -e build/content-fixture/key.pem
 install -d %{buildroot}%{_datadir}/%{name}
 install -pm644 build/native-result.json build/original-tools.txt build/source-sha256.txt \
     build/manifest-result.json build/vbmeta-result.json build/content-result.json build/upstream-sha256.txt \
+    build/third-party-license-sha256.txt \
     %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
 install -d %{buildroot}%{_libexecdir}/%{name} %{buildroot}%{_datadir}/%{name}/fixtures
 install -pm755 build/cohort-content %{buildroot}%{_libexecdir}/%{name}/cohort-content-inspect
@@ -109,11 +130,14 @@ install -pm755 tests/protected-cohort-blocks.sh %{buildroot}%{_libexecdir}/%{nam
 install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
 
 %files
-%license LICENSE libavb-LICENSE
+%license LICENSE libavb-LICENSE nlohmann-json-LICENSE.MIT build/libavb-notices.tar.xz build/json-header-notices.tar.xz
 %{_datadir}/%{name}/
 %{_libexecdir}/%{name}/
 
 %changelog
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-9
+- Retain original JSON and libavb source copyright and permission notices in the diagnostic RPM.
+
 * Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-8
 - Supply a temporary native inspection tool and public fixtures for owned-loop qualification.
 
