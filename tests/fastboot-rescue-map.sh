@@ -73,7 +73,7 @@ case ${1:-} in
         if bash "$helper" "$device" > "$work/refused.json" 2> "$work/refused.log"; then exit 1; fi
         grep -q 'already occupied' "$work/refused.log"
         [[ $(dmsetup info -c --noheadings -o uuid uke-rescue | tr -d '[:space:]') == "$occupied_uuid" ]]
-        dmsetup --noudevsync remove uke-rescue
+        dmsetup --noudevsync remove --retry uke-rescue
         # Change a private alternate node only after the helper has opened it.
         # Mapping identity must follow that descriptor, not a second path lookup.
         alias_node=$work/owned-loop-alias
@@ -104,7 +104,7 @@ SH
         after=$(sha256sum "$device" | cut -d ' ' -f1)
         [[ $before == "$after" ]]
         cp "$work/mapping.json" "$fixture/mapping-result.json"
-        dmsetup --noudevsync remove uke-rescue
+        dmsetup --noudevsync remove --retry uke-rescue
         # Change only this owned loop fixture, then exercise post-create failure
         # cleanup: a valid liblp layout must not admit the wrong filesystem label.
         start=$(jq -er '.partitions[1].start_byte / 512' "$fixture/layout.json")
@@ -113,7 +113,9 @@ SH
             dmsetup --noudevsync create --uuid "$payload_uuid" uke-rescue-test-payload
         dmsetup mknodes uke-rescue-test-payload
         e2label /dev/mapper/uke-rescue-test-payload WRONG_RESCUE
-        dmsetup --noudevsync remove uke-rescue-test-payload
+        # Host udev may briefly open this owned mapper after e2label. Use the
+        # original tool's bounded retry; never defer removal or ignore failure.
+        dmsetup --noudevsync remove --retry uke-rescue-test-payload
         if bash "$helper" "$device" > "$work/refused.json" 2> "$work/refused.log"; then exit 1; fi
         grep -q 'not provisioned EXT4' "$work/refused.log"
         if dmsetup info uke-rescue >/dev/null 2>&1; then echo 'Failed helper left its own mapper active' >&2; exit 1; fi
