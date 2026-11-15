@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <span>
 
@@ -26,6 +27,7 @@ private:
     Lifetime lifetime_;
     friend WrappedKey generate_v2(int);
     friend WrappedKey load_long_term_v2(std::span<const unsigned char>);
+    friend WrappedKey read_long_term_v2(int, std::uint64_t);
     friend WrappedKey prepare_v2(int, WrappedKey&&);
 };
 // Borrow an already admitted O_RDONLY 4-KiB block FD; pin a CLOEXEC duplicate
@@ -35,6 +37,9 @@ WrappedKey generate_v2(int block_fd);
 // Copies a long-term wrapped blob into locked memory. This is parsing, not
 // firmware authentication, a password check or authorization to use the blob.
 WrappedKey load_long_term_v2(std::span<const unsigned char>);
+// Reads exactly one blob from a pinned read-only regular FD directly into
+// locked memory. The enclosing metadata layer owns format/UID/role admission.
+WrappedKey read_long_term_v2(int file_fd, std::uint64_t offset);
 // Consumes and clears the long-term input on success AND failure. Persist it
 // durably through the enclosing transaction before calling this operation.
 WrappedKey prepare_v2(int block_fd, WrappedKey&& long_term);

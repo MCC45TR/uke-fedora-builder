@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
-// Disposable diagnostic only. No storage key is persisted or admitted for use.
+// Disposable diagnostic only. A private test record is never a volume key
+// or authorization for production key release, mapping or boot policy.
 #include "hwkm-wrapped-key.hpp"
+#include "hwkm-disposable-record.hpp"
 #include "protected-physical-cohort.hpp"
 #include <nlohmann/json.hpp>
 #include <linux/fs.h>
@@ -20,6 +22,7 @@
 #include <iostream>
 #include <optional>
 #include <stdexcept>
+#include <string>
 #include <system_error>
 #include <string_view>
 #include <utility>
@@ -92,26 +95,54 @@ Caps capabilities(int sys, const PhysicalPartitionFacts& part) {
         supported(attribute(sys, path + "raw_keys")),
         xts && (number(xts, 16) & 4096), slots};
 }
-std::pair<nlohmann::json, int> probe(bool exercise) {
+enum class Mode { Inspect, Exercise, CreateRecord, PrepareRecord, RemoveRecord };
+// The fixed root-owned directory contains only this diagnostic's disposable
+// record. Never accept a caller-supplied key path or follow a parent symlink.
+int record_directory(bool create) {
+    if (geteuid() != 0) reject();
+    Fd root(open("/", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
+    Fd parent(beneath(root.fd, "var/lib"));
+    struct stat st{};
+    if (fstat(parent.fd, &st) || !S_ISDIR(st.st_mode) || st.st_uid != 0 || (st.st_mode & 0022)) reject();
+    if (create && mkdirat(parent.fd, "uke-hwkm-probe", 0700) < 0 && errno != EEXIST) reject();
+    const int result = openat(parent.fd, "uke-hwkm-probe", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW);
+    if (result < 0 && !create && errno == ENOENT) return -1;
+    if (result < 0) reject();
+    if (create && fsync(parent.fd) < 0) { close(result); reject(); }
+    return result;
+}
+std::pair<nlohmann::json, int> probe(Mode mode) {
     auto devices = open_physical_boot_devices();
     const auto& part = devices.partitions()[static_cast<size_t>(PhysicalRole::Userdata)];
     Fd sys(open("/sys", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
     struct statfs fs{};
     if (fstatfs(sys.fd, &fs) || fs.f_type != SYSFS_MAGIC) reject();
     const auto before = capabilities(sys.fd, part);
+    const bool exercise = mode == Mode::Exercise;
+    const bool key_operation = exercise || mode == Mode::CreateRecord || mode == Mode::PrepareRecord;
     auto report = nlohmann::json{{"schema_version", 1}, {"physical_ufs_topology_verified", true},
         {"hardware_wrapped_keys_advertised", before.wrapped}, {"raw_keys_advertised", before.raw},
         {"aes_256_xts_4096_advertised", before.xts_4k}, {"num_keyslots", before.slots},
         {"exercise_requested", exercise}, {"key_ioctl_attempts", 0},
         {"disposable_hardware_key_generated", false}, {"prepared_twice", false},
         {"altered_blob_refused", false}, {"key_persisted", false}, {"volume_or_mapping_written", false},
+        {"disposable_record_written", false}, {"disposable_record_removed", false},
+        {"prepared_from_persistent_record", false},
         {"module_parameter_changed", false}, {"cold_boot_reuse_proved", false},
         {"encrypted_io_proved", false}, {"boot_policy_admitted", false}, {"automatic_unlock_proved", false}};
     int status = 0;
-    if (exercise && (!before.wrapped || before.raw || !before.xts_4k)) {
+    if (key_operation && (!before.wrapped || before.raw || !before.xts_4k)) {
         report["result"] = "requires-wrapped-only-early-profile";
         status = 77;
-    } else if (exercise) {
+    } else if (mode == Mode::RemoveRecord) {
+        const int directory = record_directory(false);
+        if (directory >= 0) {
+            Fd parent(directory);
+            hwkm::disposable::Record record(parent.fd);
+            report["disposable_record_removed"] = record.remove();
+        }
+        report["result"] = "disposable-record-cleanup-complete";
+    } else if (key_operation) {
         Fd dev(open("/dev", O_RDONLY | O_DIRECTORY | O_CLOEXEC | O_NOFOLLOW));
         Fd block(beneath(dev.fd, part.name));
         struct stat st{};
@@ -122,34 +153,58 @@ std::pair<nlohmann::json, int> probe(bool exercise) {
             ioctl(block.fd, BLKGETDISKSEQ, &sequence) || sequence != part.disk_sequence ||
             ioctl(block.fd, BLKSSZGET, &logical) || logical != 4096) reject();
         devices.revalidate();
-        report["key_ioctl_attempts"] = 1;
-        auto generated = hwkm::generate_v2(block.fd);
-        report["disposable_hardware_key_generated"] = true;
-        auto again = hwkm::load_long_term_v2(generated.bytes());
-        auto damaged = hwkm::load_long_term_v2(generated.bytes());
-        {
-            report["key_ioctl_attempts"] = 2;
-            auto first = hwkm::prepare_v2(block.fd, std::move(generated));
-            report["key_ioctl_attempts"] = 3;
-            auto second = hwkm::prepare_v2(block.fd, std::move(again));
-            if (first.lifetime() != hwkm::Lifetime::PerBoot || second.lifetime() != hwkm::Lifetime::PerBoot) reject();
-            report["prepared_twice"] = true;
+        if (!exercise) {
+            Fd parent(record_directory(mode == Mode::CreateRecord));
+            hwkm::disposable::Record record(parent.fd);
+            if (mode == Mode::CreateRecord) {
+                // Refuse an existing record before requesting a new key. An
+                // uncertain durable commit must never silently regenerate it.
+                if (record.exists()) reject();
+                report["key_ioctl_attempts"] = 1;
+                auto key = hwkm::generate_v2(block.fd);
+                report["disposable_hardware_key_generated"] = true;
+                record.create(key);
+                report["key_persisted"] = true;
+                report["disposable_record_written"] = true;
+                report["result"] = "disposable-record-created";
+            } else {
+                auto key = record.read();
+                report["key_ioctl_attempts"] = 1;
+                auto prepared = hwkm::prepare_v2(block.fd, std::move(key));
+                if (prepared.lifetime() != hwkm::Lifetime::PerBoot) reject();
+                report["prepared_from_persistent_record"] = true;
+                report["result"] = "disposable-record-prepared";
+            }
+        } else {
+            report["key_ioctl_attempts"] = 1;
+            auto generated = hwkm::generate_v2(block.fd);
+            report["disposable_hardware_key_generated"] = true;
+            auto again = hwkm::load_long_term_v2(generated.bytes());
+            auto damaged = hwkm::load_long_term_v2(generated.bytes());
+            {
+                report["key_ioctl_attempts"] = 2;
+                auto first = hwkm::prepare_v2(block.fd, std::move(generated));
+                report["key_ioctl_attempts"] = 3;
+                auto second = hwkm::prepare_v2(block.fd, std::move(again));
+                if (first.lifetime() != hwkm::Lifetime::PerBoot || second.lifetime() != hwkm::Lifetime::PerBoot) reject();
+                report["prepared_twice"] = true;
+            }
+            // Alter only the disposable copy, inside its locked allocation. No
+            // real volume key, key file, import ioctl or firmware state setter.
+            auto* bytes = const_cast<unsigned char*>(damaged.bytes().data());
+            bytes[hwkm::wrapped_key_bytes / 2] ^= 0x80;
+            report["key_ioctl_attempts"] = 4;
+            try { (void)hwkm::prepare_v2(block.fd, std::move(damaged)); }
+            catch (const std::system_error& error) {
+                // An unrelated transport/interruption/unsupported error is not
+                // proof of blob authentication. Require a malformed-key error.
+                if (error.code().value() != EINVAL && error.code().value() != EBADMSG &&
+                    error.code().value() != EKEYREJECTED) throw;
+                report["altered_blob_refused"] = true;
+            }
+            if (!report["altered_blob_refused"].get<bool>()) reject();
+            report["result"] = "disposable-key-lifecycle-passed";
         }
-        // Alter only the disposable copy, inside its locked allocation. No
-        // real volume key, key file, import ioctl or firmware state setter.
-        auto* bytes = const_cast<unsigned char*>(damaged.bytes().data());
-        bytes[hwkm::wrapped_key_bytes / 2] ^= 0x80;
-        report["key_ioctl_attempts"] = 4;
-        try { (void)hwkm::prepare_v2(block.fd, std::move(damaged)); }
-        catch (const std::system_error& error) {
-            // An unrelated transport/interruption/unsupported error is not
-            // proof of blob authentication. Require a malformed-key error.
-            if (error.code().value() != EINVAL && error.code().value() != EBADMSG &&
-                error.code().value() != EKEYREJECTED) throw;
-            report["altered_blob_refused"] = true;
-        }
-        if (!report["altered_blob_refused"].get<bool>()) reject();
-        report["result"] = "disposable-key-lifecycle-passed";
     } else report["result"] = "capability-inspection-only";
     devices.revalidate();
     if (before != capabilities(sys.fd, part)) reject();
@@ -159,10 +214,17 @@ std::pair<nlohmann::json, int> probe(bool exercise) {
 int main(int argc, char** argv) {
     if (argc != 2) return 2;
     const std::string_view mode(argv[1]);
-    if (mode != "--inspect" && mode != "--exercise-disposable-key") return 2;
+    Mode action;
+    if (mode == "--inspect") action = Mode::Inspect;
+    else if (mode == "--exercise-disposable-key") action = Mode::Exercise;
+    else if (mode == "--create-disposable-key-record") action = Mode::CreateRecord;
+    else if (mode == "--prepare-disposable-key-record") action = Mode::PrepareRecord;
+    else if (mode == "--remove-disposable-key-record") action = Mode::RemoveRecord;
+    else return 2;
     try {
         const auto initial = descriptor_count();
-        auto [report, status] = probe(mode == "--exercise-disposable-key");
+        auto [report, status] = probe(action);
+        report["mode"] = std::string(mode);
         if (descriptor_count() != initial) reject();
         struct rusage usage{};
         if (getrusage(RUSAGE_SELF, &usage)) reject();

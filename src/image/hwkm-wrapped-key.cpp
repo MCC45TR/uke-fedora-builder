@@ -113,6 +113,30 @@ WrappedKey load_long_term_v2(std::span<const unsigned char> blob) {
     std::memcpy(memory->data, blob.data(), blob.size());
     return WrappedKey(std::move(memory), Lifetime::LongTerm);
 }
+WrappedKey read_long_term_v2(int file_fd, std::uint64_t offset) {
+    if (offset > INT64_MAX - wrapped_key_bytes)
+        throw std::runtime_error("Invalid wrapped-key offset");
+    struct Close { int fd; ~Close() { if (fd >= 0) close(fd); } };
+    Close input{fcntl(file_fd, F_DUPFD_CLOEXEC, 3)};
+    if (input.fd < 0) failed("Pin wrapped-key record");
+    struct stat st{};
+    const int flags = fcntl(input.fd, F_GETFL);
+    if (fstat(input.fd, &st) < 0 || flags < 0) failed("Inspect wrapped-key record");
+    if (!S_ISREG(st.st_mode) || (flags & O_ACCMODE) != O_RDONLY || (flags & O_PATH) ||
+        st.st_size < 0 || static_cast<uint64_t>(st.st_size) < offset + wrapped_key_bytes)
+        throw std::runtime_error("Invalid wrapped-key record descriptor");
+    auto memory = std::make_unique<KeyMemory>();
+    size_t done = 0;
+    while (done < wrapped_key_bytes) {
+        const auto count = pread(input.fd, memory->data + done, wrapped_key_bytes - done,
+                                 static_cast<off_t>(offset + done));
+        if (count < 0 && errno == EINTR) continue;
+        if (count < 0) failed("Read wrapped-key record");
+        if (!count) throw std::runtime_error("Truncated wrapped-key record");
+        done += static_cast<size_t>(count);
+    }
+    return WrappedKey(std::move(memory), Lifetime::LongTerm);
+}
 WrappedKey prepare_v2(int block_fd, WrappedKey&& long_term) {
     // Move before validation so even an invalid descriptor consumes the input.
     WrappedKey input(std::move(long_term));

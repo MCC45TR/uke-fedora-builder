@@ -125,6 +125,32 @@ the mechanism still requires the caller's prior hardware/boot admission.
 
 ### Physical and boot qualification
 
+The disposable record commands are a separate test-only extension:
+`--create-disposable-key-record`, `--prepare-disposable-key-record` and
+`--remove-disposable-key-record`. Create/prepare require the same fitted
+wrapped-only profile before opening the private record directory or making a
+key call. They never accept a key path or key bytes in arguments. One fixed
+root-owned 0700 directory holds a 0600, single-link, 128-byte versioned record
+containing only the disposable long-term wrapped blob. The actual wrapping
+key remains hardware-managed; this record is not an export of that key.
+
+An exclusive directory lock and atomic no-replace rename prevent overwriting
+an existing test key. File and directory synchronization precede success.
+Failed uncommitted writes remove only the owned temporary inode; an uncertain
+directory-sync result preserves the committed record rather than generating a
+replacement. Stored bytes are read directly into the existing locked key
+allocation. Header, length, permissions, ownership, symlink and hardlink checks
+apply before use or cleanup. No raw block or mapping is written. This helper
+is a disposable diagnostic format, not the production FDE metadata or sealing
+policy.
+
+Preparation reports that a stored record was used, but cannot itself prove a
+reboot occurred. A separate device procedure must create the record, observe a
+real restart, prepare the same record and remove it. A normal restart must not
+be reported as a power-cycle test. Neither result establishes authenticated
+boot release or encrypted I/O. Native real-file/fault qualification and target
+acceptance of this extension are still pending.
+
 `hwkm-probe --inspect` reports only bounded fitted UFS crypto capabilities.
 `--exercise-disposable-key` is a separate explicit diagnostic: it requires the
 existing real-Uke ten-role owner, revalidates the userdata descriptor and UFS
