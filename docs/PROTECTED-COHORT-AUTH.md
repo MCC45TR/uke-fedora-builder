@@ -15,12 +15,15 @@ by a nonempty payload. Exact signed bytes are bounded to 64 KiB, public PEM
 to 8 KiB and the detached signature to 512 bytes. Keys must use exponent
 65537. The PEM parser rejects additional keys, trailing non-whitespace and
 password requests. Signature parameters are fixed rather than inferred from
-candidate data. The final semantic manifest format remains an integration
-dependency; a signature over arbitrary bytes is not role admission.
+candidate data. The separate [typed manifest consumer](PROTECTED-COHORT-MANIFEST.md)
+adds schema, immutable kernel context and exact capacity checks; its new native
+qualification is pending. A signature over arbitrary bytes is not role admission.
 
 The byte-span API accepts snapshots directly from a descriptor-owning physical
 selector. It returns an owned copy of the verified bytes for later parsing;
 the caller must not reopen the original path and parse different bytes.
+The snapshot has a private constructor and exposes only const byte/hash access;
+callers cannot fill a public structure or mutate its data after verification.
 The inspection wrapper uses `openat2` without symlink or magic-link traversal,
 rejects special files before reading, bounds regular files and checks file
 identity, size and timestamps around the read. It has no weaker path fallback,

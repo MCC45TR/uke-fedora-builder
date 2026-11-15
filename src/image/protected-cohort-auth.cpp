@@ -148,8 +148,8 @@ int main(int argc, char** argv) {
     if (argc != 5) return 2;
     try {
         const auto result = uke::protected_boot::verify_cohort_signature(argv[1], argv[2], argv[3], argv[4]);
-        std::cout << "{\"signature_verified\":true,\"payload_sha256\":\"" << result.payload_sha256
-                  << "\",\"signer_spki_sha256\":\"" << result.signer_spki_sha256
+        std::cout << "{\"signature_verified\":true,\"payload_sha256\":\"" << result.payload_sha256()
+                  << "\",\"signer_spki_sha256\":\"" << result.signer_spki_sha256()
                   << "\",\"manifest_semantics_admitted\":false,\"role_admitted\":false,"
                      "\"snapshot_authenticated\":false,\"hardware_trust_qualified\":false}\n";
         return 0;
