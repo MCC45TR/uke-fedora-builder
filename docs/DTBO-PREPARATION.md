@@ -74,6 +74,27 @@ native execution is still required to establish whether this explains the
 observed failure. PC inspection decompiled public input and checked text
 placement only, without compiling any DTS.
 
+Source10/COPR11332281 passes all complete-content, boot CPU and four applied
+tree comparisons, plus all three refusal fixtures. Its report RPM SHA256 is
+`3425e152118e0a7a8fbcb87e58ed1a869b818abeeb5d02d907d0e8c6405698ef`;
+both signatures verify against the pinned test-project key. The rebuilt
+overlay is591697bytes, SHA256
+`f6e2bb9f5bb4a93f4513552412b902b761f3295900b35ac953aeb9af7b2848eb`.
+Fresh PC application of that exact signed overlay to each actual installed
+base also matches the working graph, including all ordinary numeric cells,
+seven root properties and five refusal controls per base. This is a data
+comparison, not a physical boot result.
+
+`copr-dtbo-recovered.sh` prepares the existing `uke-senemos-dtbo` runtime name
+from this complete recovered DTS, repeating every native content check and
+the original AOSP formatter fixtures. It uses the actual new payload length,
+checks deterministic output and independent inventory, and packages no public
+base DTB as vendor_boot. Its recovered-source origin and incomplete original
+OEM source closure remain explicit. This data RPM has no partition-writing
+hook; coordinated A/B updates, native build, signed delivery and physical
+acceptance are still required. The earlier123-file incomplete candidate is
+not an input to this producer.
+
 Original Fedora fdtoverlay applies both the installed and public overlay to
 each exact installed base. A bounded private PC data analysis resolves only
 the byte offsets declared in `__local_fixups__` and `__fixups__`, using actual

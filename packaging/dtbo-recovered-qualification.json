@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "date": "2026-11-16",
+  "roundtrip_build": 11332281,
+  "roundtrip_source_commit": "d3703bd0daabd418cf5fb8a8a3450789100ab17a",
+  "signed_report_sha256": "3425e152118e0a7a8fbcb87e58ed1a869b818abeeb5d02d907d0e8c6405698ef",
+  "signer_fingerprint": "dafc3c5a881fb49c7167ee2d6f772e3d487bd13e",
+  "recovered_overlay_bytes": 591697,
+  "recovered_overlay_sha256": "f6e2bb9f5bb4a93f4513552412b902b761f3295900b35ac953aeb9af7b2848eb",
+  "scope": "Complete DTS recovered from the pinned public flattened overlay; original OEM source closure remains incomplete",
+  "native_full_canonical_content_and_boot_cpu_qualified": true,
+  "native_all_four_public_applied_trees_qualified": true,
+  "private_pc_actual_base_graph_comparison_required": true,
+  "private_pc_actual_four_base_graphs_equivalent": true,
+  "private_pc_refusal_controls_per_base": 5,
+  "original_oem_source_reproduction": false,
+  "public_bases_replace_installed_vendor_boot": false,
+  "partition_write_hook": false,
+  "physical_boot_qualified": false
+}
