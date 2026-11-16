@@ -116,10 +116,11 @@ cmp "$work/root.raw" "$work/readback.raw"
 cp --reflink=auto "$input/boot.img" "$output/boot.img"
 cp "$input/manifest.json" "$output/receipts/base-manifest.json"
 jq --arg raw "$(cut -d' ' -f1 "$work/final-raw.sha256")" \
+ --arg kernel_hash "$(sha256sum "$work/root.Image" | cut -d' ' -f1)" \
  --arg sparse "$(sha256sum "$output/userdata.img" | cut -d' ' -f1)" \
  --arg preparer "$(git -c safe.directory="$repo" -C "$repo" rev-parse HEAD)" '
  .+{artifact_kind:"full-singleboot-desktop-input",test_preparer_commit:$preparer,
- root_raw_sha256:$raw,root_sparse_sha256:$sparse,automatic_kernel_activation:true,
+ root_raw_sha256:$raw,root_sparse_sha256:$sparse,root_kernel_image_sha256:$kernel_hash,automatic_kernel_activation:true,
  userdata_automatic_activation:true,vrr_min_hz:0,control_super_and_swap_capabilities_verified:true,
  setup_cdc_reboot_capability_verified:true,temporary_assembly_files_removed:true,
  post_policy_independent_readback:true,policy_selinux_labels_preserved:true,

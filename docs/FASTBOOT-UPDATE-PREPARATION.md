@@ -285,3 +285,22 @@ This yields a separate test input with native automatic staging enabled, while
 the standard release-composition defaults and eligibility checks stay intact.
 An older Control without the fixed reboot interface is refused before policy
 writes. The resulting input is not a full ZIP or a rescue/security acceptance.
+
+`scripts/compose-full-fastboot-test.sh COMPONENTS.json NEW_DIRECTORY DDMMYY`
+combines that prepared desktop, matching super/rescue cohort, native A/B and
+rescue boot files, qualified DTBO and an explicitly hashed local vendor_boot.
+Its private component contract contains `desktop_directory`, `super_directory`,
+`boot_directory`, and `dtbo` / `vendor_boot` objects with `file` and `sha256`.
+The complete input paths are not copied to the archive. All three embedded
+kernel Images must hash to the independently read-back desktop kernel. The
+normal wrappers must name their actual A/B destination and the seed4 profile;
+the rescue wrapper must keep its separate role. Each Image keeps four MiB of
+capacity reserve. Payload and manifest checksums and full archive CRCs are
+checked without opening hardware.
+
+The result intentionally fails its product requirement until the connected
+device preparer replaces only the measurement metadata. Both tools preserve
+GPT geometry, and neither automatically flashes. The local working vendor_boot
+and unqualified recovery/security features prevent a redistribution or Secure
+Boot claim. Native image policy preparation, composition, measured preparation,
+physical normal boot and usable rescue remain separate results.
