@@ -65,6 +65,15 @@ Recovered DTS is distinct from the missing original OEM source closure.
 Neither diagnostic admits installed vendor_boot replacement, OEM verification
 or a physical write. Only public references are uploaded.
 
+Source9/COPR11332218 failed without a useful stage report. Inspection found
+that its negative reservation fixture inserted `/memreserve/` before the
+overlay's `/plugin/` header. Source10 places it before the root, after both
+headers, and reports the failing stage and bounded compiler diagnostics.
+The complete-content assertions and all three refusals remain mandatory;
+native execution is still required to establish whether this explains the
+observed failure. PC inspection decompiled public input and checked text
+placement only, without compiling any DTS.
+
 Original Fedora fdtoverlay applies both the installed and public overlay to
 each exact installed base. A bounded private PC data analysis resolves only
 the byte offsets declared in `__local_fixups__` and `__fixups__`, using actual

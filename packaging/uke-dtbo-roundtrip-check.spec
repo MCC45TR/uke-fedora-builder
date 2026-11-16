@@ -1,6 +1,6 @@
 Name: uke-dtbo-tools-source-check
 Version: 1.0
-Release: 9%{?dist}
+Release: 10%{?dist}
 Summary: Native recovery of complete public Uke flattened Device Tree sources
 License: MIT AND LicenseRef-Proprietary
 Source0: public-dt-reference.tar.xz
@@ -39,5 +39,8 @@ install -m644 %{SOURCE2} %{buildroot}%{_datadir}/%{name}/reference.json
 %{_datadir}/%{name}
 
 %changelog
+* Mon Nov 16 2026 Uke contributors - 1.0-10
+- Place the reservation refusal fixture after plugin headers and report the failing native stage.
+
 * Mon Nov 16 2026 Uke contributors - 1.0-9
 - Compare full flattened content and boot CPU; report serialization differences without producing a DTBO transport.
