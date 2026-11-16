@@ -2,6 +2,7 @@
 # Original Fedora tools on an already qualified, independently owned loop.
 # No swapon, host RAM use, real UFS, firmware or tablet access.
 set -Eeuo pipefail
+trap 'printf "UKE_SWAP_FIXTURE_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 export LC_ALL=C
 umask 077
 [[ $# == 3 && $(id -u) == 0 && $1 =~ ^/dev/loop[0-9]+$ && -b $1 && -d $2 && ! -e $3 && ! -L $3 ]]
@@ -15,6 +16,7 @@ bash "$root/src/image/inspect-fastboot-super.sh" --block "$device" > /dev/null
 devno=$(lsblk -dnro MAJ:MIN "$device")
 uuid=UKE-SWAP-v1-${devno/:/-}
 occupied=UKE-SWAP-FIXTURE-v1-${devno/:/-}
+if dmsetup info linux_swap >/dev/null 2>&1;then echo 'Fixture swap mapper name already exists' >&2;exit 1;fi
 work=$(mktemp -d "$fixture/swap-map.XXXXXXXX")
 cleanup() {
     local status=$? actual
@@ -28,7 +30,6 @@ cleanup() {
     exit "$status"
 }
 trap cleanup EXIT
-! dmsetup info linux_swap >/dev/null 2>&1
 before=$(sha256sum "$device" | cut -d ' ' -f1)
 refused() {
     local reason=$1;shift
@@ -42,7 +43,7 @@ printf '0 8 linear %s 0\n' "$devno" | dmsetup --noudevsync create --uuid "$occup
 refused 'already occupied' "$device"
 refused 'ownership differs' --verify "$device"
 [[ $(dmsetup info -c --noheadings -o uuid linux_swap | tr -d '[:space:]') == "$occupied" ]]
-dmsetup --noudevsync remove linux_swap
+dmsetup --noudevsync remove --retry linux_swap
 bash "$helper" "$device" > "$work/mapped.json"
 bash "$helper" --verify "$device" > "$work/verified.json"
 jq -e '.existing_mapping_verified and .writable_linear_mapping and .three_slot_topology_verified and
@@ -54,24 +55,24 @@ dd if=/dev/mapper/linux_swap of="$work/header" bs=4096 count=1 status=none
 swaplabel -L fixture_wrong /dev/mapper/linux_swap
 refused 'signature and label' --verify "$device"
 dd if="$work/header" of=/dev/mapper/linux_swap bs=4096 count=1 conv=notrunc status=none
-dmsetup --noudevsync remove linux_swap
+dmsetup --noudevsync remove --retry linux_swap
 printf '%s\n' "$table" | dmsetup --noudevsync create --readonly --uuid "$uuid" linux_swap
 refused 'not writable' --verify "$device"
 [[ $(blockdev --getro /dev/mapper/linux_swap) == 1 ]]
-dmsetup --noudevsync remove linux_swap
+dmsetup --noudevsync remove --retry linux_swap
 printf '%s\n' "$table" | dmsetup --noudevsync create --uuid "$occupied" linux_swap
 dmsetup mknodes linux_swap
 mkswap --quiet --pagesize 4096 --label linux_swap /dev/mapper/linux_swap 1024
-dmsetup --noudevsync remove linux_swap
+dmsetup --noudevsync remove --retry linux_swap
 refused 'does not cover its logical allocation' "$device"
-! dmsetup info linux_swap >/dev/null 2>&1
+if dmsetup info linux_swap >/dev/null 2>&1;then echo 'Failed new mapper was retained' >&2;exit 1;fi
 printf '%s\n' "$table" | dmsetup --noudevsync create --uuid "$occupied" linux_swap
 dmsetup mknodes linux_swap
 dd if="$work/header" of=/dev/mapper/linux_swap bs=4096 count=1 conv=notrunc status=none
-dmsetup --noudevsync remove linux_swap
+dmsetup --noudevsync remove --retry linux_swap
 bash "$helper" "$device" > "$work/final.json"
 bash "$helper" --verify "$device" > /dev/null
-dmsetup --noudevsync remove linux_swap
+dmsetup --noudevsync remove --retry linux_swap
 [[ $(sha256sum "$device" | cut -d ' ' -f1) == "$before" ]]
 jq -n --slurpfile mapping "$work/final.json" --arg hash "$before" '
  {schema_version:1,owned_loop_only:true,original_tools_used:true,mapping:$mapping[0],
