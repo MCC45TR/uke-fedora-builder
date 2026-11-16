@@ -31,7 +31,7 @@ bytes=$(jq -er .raw_bytes "$composition")
 # Check a fixed allowlist instead of executing paths supplied by a receipt.
 expected=$(mktemp)
 trap 'unlink "$expected"' EXIT
-sha256sum "$repo/src/image/"{compose-fedora-rescue,configure-fedora-rescue}.sh \
+sha256sum "$repo/src/image/"{compose-fedora-rescue,configure-fedora-rescue,rescue-seed-manifest,fastboot-singleboot-layout}.sh \
     "$repo/src/public/"{repository-tools,repository-kernel,cohort,root-transaction}.sh \
     "$repo/src/audit/check-target-payload.sh" "$repo/configs/images/rescue-rawhide.json" |
     sed "s|  $repo/|  /builder/|" > "$expected"

@@ -145,6 +145,9 @@ minimum=$(jq -er .minimum_image_mib "$policy")
 maximum=$(jq -er .maximum_image_mib "$policy")
 ((image_mib >= minimum)) || image_mib=$minimum
 ((image_mib <= maximum)) || fail 'populated rescue exceeds its bounded image policy'
+# This immutable public record survives filesystem growth and interrupted
+# metadata transitions. It grants no repair, key or resume authority.
+bash "$repo/src/image/rescue-seed-manifest.sh" "$root" "$((image_mib*1048576))" "$info" 6442450944
 image=$out/rescue.ext4
 chmod 0755 "$root"
 truncate -s "${image_mib}M" "$image"
@@ -156,10 +159,12 @@ contexts=$root/etc/selinux/targeted/contexts/files/file_contexts
 e2fsck -fn "$image" > "$out/filesystem-audit.txt" 2>&1
 debugfs -R "dump /etc/fstab $work/readback-fstab" "$image" >/dev/null 2>&1
 cmp "$root/etc/fstab" "$work/readback-fstab"
+debugfs -R "dump /usr/share/uke-rescue/seed-layout.json $work/readback-seed-layout.json" "$image" >/dev/null 2>&1
+cmp "$root/usr/share/uke-rescue/seed-layout.json" "$work/readback-seed-layout.json"
 debugfs -R "dump /usr/lib/systemd/systemd $work/readback-systemd" "$image" >/dev/null 2>&1
 cmp "$root/usr/lib/systemd/systemd" "$work/readback-systemd"
 cp "$info" "$out/kernel-info.json"
-sha256sum "$repo/src/image/"{compose-fedora-rescue,configure-fedora-rescue}.sh \
+sha256sum "$repo/src/image/"{compose-fedora-rescue,configure-fedora-rescue,rescue-seed-manifest,fastboot-singleboot-layout}.sh \
     "$repo/src/public/"{repository-tools,repository-kernel,cohort,root-transaction}.sh \
     "$repo/src/audit/check-target-payload.sh" "$policy" > "$out/source-sha256.txt"
 jq -n --slurpfile kernel "$info" --argjson bytes "$((image_mib*1048576))" --arg hash "$(sha256sum "$image" | cut -d ' ' -f1)" \
