@@ -274,3 +274,14 @@ cryptographic protection. The Linux `include/linux/swap.h` layout and util-linux
 `disk-utils/mkswap.c` page-count convention are its upstream format references.
 The original rescue mapper remains unchanged. Real owned-loop negative controls
 are distinct from tablet boot and runtime activation acceptance.
+
+The `prepare_full_test_input_run_id` workflow consumes a completed signed-package
+desktop producer. It checks the new native Control swap and CDC reboot interfaces
+inside an isolated ARM64 appliance, without network or target devices. Only the
+two fresh-test update policies change. Temporary assembly files are removed;
+the matching kernel Image, SELinux contexts, independent filesystem readback,
+EXT4 check and both sparse decoders must pass. The base image stays unchanged.
+This yields a separate test input with native automatic staging enabled, while
+the standard release-composition defaults and eligibility checks stay intact.
+An older Control without the fixed reboot interface is refused before policy
+writes. The resulting input is not a full ZIP or a rescue/security acceptance.

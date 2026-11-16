@@ -16,6 +16,10 @@ on:
         description: Completed successful test-image run to package as the measured B-slot EXT4 test ZIP
         type: string
         default: ''
+      prepare_full_test_input_run_id:
+        description: Enable guarded seamless defaults on a completed fresh desktop input with the fixed CDC and logical swap interfaces
+        type: string
+        default: ''
       build_rescue:
         description: Assemble an unqualified native AArch64 Fedora rescue filesystem
         type: boolean
@@ -52,9 +56,71 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: image-source-contracts-${{ github.ref }}-${{ inputs.build_test_image && 'test-image' || inputs.package_test_input_run_id != '' && 'package-test' || 'contracts' }}
+  group: image-source-contracts-${{ github.ref }}-${{ inputs.build_test_image && 'test-image' || inputs.package_test_input_run_id != '' && 'package-test' || inputs.prepare_full_test_input_run_id != '' && 'full-test-input' || 'contracts' }}
   cancel-in-progress: false
 jobs:
+  full-test-input:
+    if: github.event_name == 'workflow_dispatch' && inputs.prepare_full_test_input_run_id != ''
+    needs: [source, logical-container]
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify the completed original signed-package image producer
+        id: producer
+        env:
+          INPUT_RUN: ${{ inputs.prepare_full_test_input_run_id }}
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $INPUT_RUN =~ ^[1-9][0-9]{0,19}$ && $(uname -m) == aarch64 ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$INPUT_RUN" > "$RUNNER_TEMP/full-test-producer.json"
+          jq -e '.status=="completed" and .conclusion=="success" and .event=="workflow_dispatch" and .path==".github/workflows/source-contracts.yml"' "$RUNNER_TEMP/full-test-producer.json"
+          producer=$(jq -er .head_sha "$RUNNER_TEMP/full-test-producer.json")
+          [[ $producer =~ ^[a-f0-9]{40}$ ]]
+          printf 'commit=%s\n' "$producer" >> "$GITHUB_OUTPUT"
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: ext4-plasma-test-input
+          path: ${{ runner.temp }}/uke-full-test-input/input
+          run-id: ${{ inputs.prepare_full_test_input_run_id }}
+          github-token: ${{ github.token }}
+      - name: Check native interfaces and update only the fresh test policies
+        env:
+          INPUT_PRODUCER: ${{ steps.producer.outputs.commit }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
+          [[ $image =~ ^registry\.fedoraproject\.org/fedora@sha256:[a-f0-9]{64}$ ]]
+          docker build --build-arg "BASE_IMAGE=$image" -f configs/Containerfile.public-unstable -t uke-full-test-input configs
+          job="$RUNNER_TEMP/uke-full-test-input"
+          docker run --rm --cpus=2 --memory=3g --pids-limit=512 \
+            --security-opt apparmor=unconfined \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$job,target=/job" \
+            uke-full-test-input bash /builder/src/image/prepare-full-test-input.sh \
+              /job/input /job/result "$INPUT_PRODUCER"
+          sudo chown -R "$(id -u):$(id -g)" "$job/result"
+          echo 'Fresh test input: fixed CDC and logical swap interfaces, matching kernel Image, native seamless defaults, SELinux contexts, independent readback and sparse roundtrips verified. Full ZIP, boot, rescue and storage-security acceptance remain separate.' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-singleboot-desktop-input
+          path: ${{ runner.temp }}/uke-full-test-input/result
+          compression-level: 3
+          if-no-files-found: error
+          retention-days: 7
+      - name: Retain bounded test policy diagnostics
+        if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: full-singleboot-policy-diagnostics
+          path: ${{ runner.temp }}/uke-full-test-input/result/receipts
+          if-no-files-found: ignore
+          retention-days: 7
   package-test:
     if: github.event_name == 'workflow_dispatch' && inputs.package_test_input_run_id != ''
     needs: [source, logical-container]
@@ -374,6 +440,7 @@ jobs:
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
           shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
           shellcheck src/image/test-fastboot-profile.sh src/image/package-ext4-fastboot-test.sh scripts/install-fastboot-test.sh
+          shellcheck src/image/prepare-full-test-input.sh
           shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh src/image/rescue-seed-manifest.sh tests/rescue-seed-manifest.sh
           shellcheck src/image/compose-fastboot-super-seed.sh
           shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh
