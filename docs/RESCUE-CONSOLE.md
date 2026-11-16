@@ -1,65 +1,66 @@
 # Minimal installed-account rescue console
 
-The rescue root keeps the original Fedora packages and matching signed kernel
-cohort. Its global root account stays locked; network listeners remain disabled.
+The rescue root keeps original Fedora packages and the matching signed kernel
+cohort. Its disk root account stays locked and network listeners stay disabled.
 No desktop, generic password, persistent credential or model is added.
 
-For the explicit `senemos.role=rescue` profile, original modprobe loads the
-already signed `g_serial` module. It offers a standard CDC ACM endpoint and
-refuses a busy gadget controller. The console waits for the host carrier with
-a blocking TTY open. It does not poll hardware or alter Type-C ownership rules.
+The explicit `senemos.role=rescue` profile loads the already signed original
+`g_serial` module. Its CDC ACM endpoint retains normal gadget ownership guards.
+The terminal uses sane flags without imposing a UART baud rate: the live Uke
+TTY kept 9600 and rejected a forced 115200 setting. Original sulogin handles
+terminal input; the project glue does not poll hardware or receive passwords.
 
-A private mount namespace selects the unique physical Uke UFS userdata partition
-and mounts a provisioned EXT4 filesystem read-only without journal replay. The
-primary installed account (UID1000) must be enabled and in wheel. Account
-databases must be bounded, regular, unlinked, root-owned and non-writable by
-other accounts. Duplicate identities and malformed or locked hashes refuse.
+Before login, a private mount namespace selects the unique physical Uke UFS
+userdata partition and mounts a provisioned EXT4 filesystem read-only without
+journal replay. The enabled UID1000 primary account must belong to wheel.
+Account databases must be bounded, regular, unlinked, root-owned and protected
+against other-account writes. Duplicate or malformed identities and locked
+hashes refuse. The installed filesystem is released before authentication.
 
-Only in that namespace, a volatile shadow entry supplies this administrator's
-existing hash to original Fedora sulogin. The temporary file keeps the original
-shadow SELinux context. Password input and crypt verification remain in sulogin;
-the shell never receives the password. There is no `--force` fallback or disk
-copy of a credential. Authentication opens a standard root rescue shell, with
-`UKE_RESCUE_INSTALLED_ROOT` identifying the read-only installed system. Original
-mount, filesystem and chroot tools provide explicit repair; no repair or writable
-userdata mount is automatic.
+A root-private systemd runtime directory holds a copy of the original rescue
+`/etc`, preserving labels and relative links, with only its root shadow entry
+replaced by the captured administrator hash. The copy is limited to 64 MiB;
+free tmpfs must cover two copies plus a 32-MiB reserve. No credential goes to
+disk. PID1 binds the directory read-only only for the original sulogin process.
+Sulogin runs directly from systemd, retaining Fedora's normal login transition;
+no custom SELinux allow rule, process-context override or force option is used.
+A stop helper removes the labeled RAM files and systemd removes the empty
+runtime directory. The persistent rescue account remains locked.
 
-The initial method requires a readable installed EXT4 account database and the
-enabled primary administrator. It does not provide access to an unmountable or
-still-encrypted root. Separate recovery credentials and secure unlock require
-their own provisioning and validation; they must not be replaced by an open
-root console. Other terminal reboot targets and a reliable one-shot return path
-also remain separate from this console setup.
+This division addresses two live SELinux refusals: a generic wrapper service
+could authenticate but could not transition to the login shell; binding a file
+onto `shadow_t` from PID1 was also denied. Binding the bounded labeled directory
+uses Fedora's existing directory policy. Global `/etc` is unchanged.
 
-The fake-database tests cover the actual admission function, including primary
-and supplementary wheel membership, duplicates, UID bounds, locked hashes,
-symlinks, hard links, ownership, writable files and input bounds. They do not
-test a password. Native module metadata on the running 7.3.4-4 confirms the
-chosen original parameters. Image assembly, SELinux enforcement, actual USB
-carrier/authentication, idle behavior and chroot still require validation.
+After authentication, original filesystem, mount and chroot tools support
+explicit repair. Userdata is initially unmounted in the rescue login namespace.
+For a healthy EXT4 filesystem, an administrator can create `/mnt/installed` and
+mount `/dev/disk/by-partlabel/userdata` there read-only with `ro,noload` before
+inspection. Writable repair, API-filesystem bind mounts and chroot are explicit
+administrator actions. Do not run filesystem repair against a mounted volume.
 
-A bounded check on the running 7.3.4-4 system used original Fedora sulogin and
-a private mount namespace with the temporary shadow on tmpfs. An incorrect
-password was refused; the existing administrator password opened a UID0 shell
-with global SELinux enforcement retained. Exit removed the private mount and
-temporary files; the global root account remained locked. The shell never
-received or saved either password. This validates the volatile-shadow and
-original crypt/TTY path in an SSH session. It does not validate the rescue
-image, USB carrier, service SELinux domain or installed-filesystem mount.
+The initial identity method requires a readable plain EXT4 account database and
+an enabled primary administrator. It does not unlock encrypted or unmountable
+userdata. Independent recovery credentials, secure unlock, terminal rescue entry
+and a reliable return path remain separate qualification work.
+
+On running 7.3.4-4, a bounded USB service fixture refused an incorrect password,
+accepted the existing administrator password and opened a UID0 maintenance shell
+with SELinux Enforcing. The temporary `/etc` mount was read-only and private.
+Exit removed the runtime tree; the global account stayed locked and the normal
+Wayland session stayed active. The current system's `/etc` copy was about23 MB.
+The fixture used a read-only bind of the already running userdata filesystem
+because a second raw EXT4 mount cannot change its live superblock's RO state.
+This validates actual CDC transport, password handling, service login transition
+and cleanup, not independent rescue OS boot, offline userdata mount or chroot.
 
 Before full-ZIP composition, `scripts/verify-rescue-console.sh` independently
-reads the regular rescue EXT4 file with read-only debugfs. It matches the file
-hash and size to the native composition record, compares all three helpers,
-both units and the module options with reviewed sources, and checks installed
-permissions, the locked root account, absence of human accounts and activation
-links. A second complete image hash verifies that inspection changed nothing.
-When inspecting the expanded filesystem extracted from super, supply its native
-`super-composition.json` as the fourth argument. The verifier retains the
-original source hash and requires the exact canonical seed geometry, independent
-decode/byte-match proof and actual expanded payload hash and size. The full
-composer binds this receipt to both the source composition and the actual super
-payload. An older locked-console-only seed is refused.
-
-Synthetic filesystem fixtures accept the exact sources and locked account;
-wrong executable permissions, an unlocked root and a changed unit refuse.
-This is source/file admission, not password, USB, boot or chroot acceptance.
+reads the regular rescue EXT4 file with read-only debugfs. It compares all three
+helpers, both units and module options with reviewed sources and checks root
+ownership, executable/data permissions, the locked account, absence of human
+accounts and activation links. A second whole-image hash proves no change.
+For a resized filesystem extracted from super, the fourth argument supplies
+its native super composition: canonical seed geometry, independent decode,
+byte-match proof and actual expanded payload hash must pass. The full composer
+binds both source and expanded hashes to the actual sparse super payload.
+Source/file readback does not establish USB, password, boot or chroot acceptance.

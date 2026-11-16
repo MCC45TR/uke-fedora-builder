@@ -56,7 +56,7 @@ permissions:
   contents: read
   actions: read
 concurrency:
-  group: image-source-contracts-${{ github.ref }}-${{ inputs.build_test_image && 'test-image' || inputs.package_test_input_run_id != '' && 'package-test' || inputs.prepare_full_test_input_run_id != '' && 'full-test-input' || 'contracts' }}
+  group: image-source-contracts-${{ github.ref }}-${{ inputs.build_test_image && 'test-image' || inputs.package_test_input_run_id != '' && 'package-test' || inputs.prepare_full_test_input_run_id != '' && 'full-test-input' || (inputs.build_rescue || inputs.build_super_seed || inputs.build_rescue_verity) && 'rescue-root' || 'contracts' }}
   cancel-in-progress: false
 jobs:
   full-test-input:
