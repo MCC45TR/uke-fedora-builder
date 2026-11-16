@@ -170,6 +170,7 @@ cp "$info" "$out/kernel-info.json"
 sha256sum "$repo/src/image/"{compose-fedora-rescue,configure-fedora-rescue,rescue-seed-manifest,fastboot-singleboot-layout}.sh \
     "$repo/src/image/"{rescue-console-login,rescue-admin-policy,select-uke-userdata}.sh \
     "$repo/src/image/"uke-rescue-{usb,console}.service "$repo/src/image/40-uke-rescue-serial.conf" \
+    "$repo/scripts/verify-rescue-console.sh" \
     "$repo/src/public/"{repository-tools,repository-kernel,cohort,root-transaction}.sh \
     "$repo/src/audit/check-target-payload.sh" "$policy" > "$out/source-sha256.txt"
 jq -n --slurpfile kernel "$info" --argjson bytes "$((image_mib*1048576))" --arg hash "$(sha256sum "$image" | cut -d ' ' -f1)" \

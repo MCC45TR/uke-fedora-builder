@@ -11,7 +11,7 @@ output=$(realpath -m "$3")
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 composition=$input/rescue-composition.json
 image=$input/rescue.ext4
-for file in "$composition" "$image" "$input/kernel-info.json" "$input/source-sha256.txt"; do
+for file in "$composition" "$image" "$input/kernel-info.json" "$input/source-sha256.txt" "$input/rescue-console-readback.json"; do
     [[ -f $file && ! -L $file ]]
 done
 jq -e '.artifact_kind=="unqualified-fedora-rescue-root" and .architecture=="aarch64" and
@@ -28,10 +28,17 @@ bytes=$(jq -er .raw_bytes "$composition")
 [[ $(stat -c %s "$image") == "$bytes" &&
    $(sha256sum "$image" | cut -d ' ' -f1) == "$(jq -er .sha256 "$composition")" ]]
 [[ $(blkid -p -s TYPE -o value "$image") == ext4 && $(blkid -p -s LABEL -o value "$image") == FEDORA_RESCUE ]]
+jq -e --arg hash "$(jq -er .sha256 "$composition")" '
+ .artifact_kind=="uke-rescue-console-source-readback" and .rescue_raw_sha256==$hash and
+ .source_scripts_verified and .unit_files_verified and .locked_root_verified and
+ .human_account_absent and .activation_links_verified and .inspection_read_only' "$input/rescue-console-readback.json" >/dev/null
 # Check a fixed allowlist instead of executing paths supplied by a receipt.
 expected=$(mktemp)
 trap 'unlink "$expected"' EXIT
 sha256sum "$repo/src/image/"{compose-fedora-rescue,configure-fedora-rescue,rescue-seed-manifest,fastboot-singleboot-layout}.sh \
+    "$repo/src/image/"{rescue-console-login,rescue-admin-policy,select-uke-userdata}.sh \
+    "$repo/src/image/"uke-rescue-{usb,console}.service "$repo/src/image/40-uke-rescue-serial.conf" \
+    "$repo/scripts/verify-rescue-console.sh" \
     "$repo/src/public/"{repository-tools,repository-kernel,cohort,root-transaction}.sh \
     "$repo/src/audit/check-target-payload.sh" "$repo/configs/images/rescue-rawhide.json" |
     sed "s|  $repo/|  /builder/|" > "$expected"
@@ -44,6 +51,7 @@ layout_file=$(mktemp)
 trap 'unlink "$expected"; unlink "$layout_file"' EXIT
 jq -M . <<< "$layout" > "$layout_file"
 bash "$repo/src/image/build-fastboot-super.sh" "$layout_file" "$image" "$output"
+cp "$input/rescue-console-readback.json" "$output/"
 mkdir "$output/rescue-source"
 for file in rescue-composition.json kernel-info.json source-sha256.txt packages.tsv installed-nevras.txt \
     python-audit.txt selinux-audit.txt units-audit.txt filesystem-audit.txt kernel-payload-audit.txt; do
