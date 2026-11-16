@@ -10,8 +10,14 @@ trap 'find "$work" -depth -delete' EXIT
 capability=1
 capability_version=1
 capability_flags='='
+reboot_capability=1
 rpm() {
- [[ $# == 7 && $1 == --root && $3 == -q && $4 == --whatprovides && $5 == 'uke-control(setup-cdc-v1)' && $6 == --qf && $7 == '[%{PROVIDENAME}\t%{PROVIDEFLAGS:depflags}\t%{PROVIDEVERSION}\n]' ]] || return 1
+ [[ $# == 7 && $1 == --root && $3 == -q && $4 == --whatprovides && $6 == --qf && $7 == '[%{PROVIDENAME}\t%{PROVIDEFLAGS:depflags}\t%{PROVIDEVERSION}\n]' ]] || return 1
+ if [[ $5 == 'uke-control(setup-cdc-reboot-v1)' ]];then
+  ((reboot_capability==1)) || return 1
+  printf 'uke-control(setup-cdc-reboot-v1)\t=\t1\n';return 0
+ fi
+ [[ $5 == 'uke-control(setup-cdc-v1)' ]] || return 1
  ((capability==1)) || return 1
  printf 'unrelated-capability\t=\t99\nuke-control(setup-cdc-v1)\t%s\t%s\n' "$capability_flags" "$capability_version"
 }
@@ -44,6 +50,12 @@ capability=0
 reject "$work/old"
 [[ ! -e $work/old/etc/uke-control/first-setup-cdc ]]
 capability=1
+reboot_capability=0
+new_root "$work/old-reboot"
+reject "$work/old-reboot"
+grep -Fq 'lacks the fixed reboot command capability' "$work/refused"
+[[ ! -e $work/old-reboot/etc/uke-control/first-setup-cdc ]]
+reboot_capability=1
 for capability_version in 0 '' 2;do
  new_root "$work/version-${capability_version:-unversioned}"
  reject "$work/version-${capability_version:-unversioned}"

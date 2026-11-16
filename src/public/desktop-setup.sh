@@ -10,6 +10,8 @@ public_plasma_setup_cdc() {
     # Check the actual header's exact v1 interface before changing image policy.
     capabilities=$(rpm --root "$root" -q --whatprovides 'uke-control(setup-cdc-v1)' --qf '[%{PROVIDENAME}\t%{PROVIDEFLAGS:depflags}\t%{PROVIDEVERSION}\n]') || { echo 'First-setup USB: installed Control lacks the setup-cdc-v1 capability.' >&2;return 1; }
     grep -Fxq $'uke-control(setup-cdc-v1)\t=\t1' <<< "$capabilities" || { echo 'First-setup USB: Control must provide the exact setup-cdc-v1 = 1 interface.' >&2;return 1; }
+    capabilities=$(rpm --root "$root" -q --whatprovides 'uke-control(setup-cdc-reboot-v1)' --qf '[%{PROVIDENAME}\t%{PROVIDEFLAGS:depflags}\t%{PROVIDEVERSION}\n]') || { echo 'First-setup USB: installed Control lacks the fixed reboot command capability.' >&2;return 1; }
+    grep -Fxq $'uke-control(setup-cdc-reboot-v1)\t=\t1' <<< "$capabilities" || { echo 'First-setup USB: Control must provide the exact setup-cdc-reboot-v1 = 1 interface.' >&2;return 1; }
     [[ -x $root/usr/bin/uke-control && ! -L $root/usr/bin/uke-control ]] || { echo 'First-setup USB: Control executable is missing or linked.' >&2;return 1; }
     for unit in uke-control-setup-cdc.service uke-control-setup-console.service uke-control-setup-cdc-finish.service uke-control-setup-cdc-finish.path; do
         [[ -f $root/usr/lib/systemd/system/$unit && ! -L $root/usr/lib/systemd/system/$unit ]] || { printf 'First-setup USB: required unit is missing or linked: %s\n' "$unit" >&2;return 1; }
