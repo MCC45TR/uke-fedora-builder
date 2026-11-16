@@ -443,6 +443,7 @@ jobs:
           shellcheck src/image/prepare-full-test-input.sh
           shellcheck scripts/compose-full-fastboot-test.sh
           shellcheck src/image/configure-fedora-rescue.sh src/image/compose-fedora-rescue.sh src/image/rescue-seed-manifest.sh tests/rescue-seed-manifest.sh
+          shellcheck src/image/rescue-admin-policy.sh src/image/rescue-console-login.sh src/image/select-uke-userdata.sh tests/rescue-admin-policy.sh
           shellcheck src/image/compose-fastboot-super-seed.sh
           shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh
           shellcheck src/image/select-uke-super.sh tests/fastboot-physical-super.sh
@@ -542,6 +543,7 @@ jobs:
               mkdir -m700 /fixture/result
               rpm -q android-tools e2fsprogs util-linux jq coreutils systemd systemd-udev > /fixture/result/original-tools.txt
               bash /source/tests/early-super-policy.sh
+              bash /source/tests/rescue-admin-policy.sh
               bash /source/tests/early-super-units.sh
               bash /source/tests/protected-initrd-barriers.sh /fixture/result/protected-initrd-barriers.json
               bash /source/tests/rescue-verity.sh /fixture/result/rescue-verity.json

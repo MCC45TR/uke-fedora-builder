@@ -4,6 +4,7 @@ set -Eeuo pipefail
 trap 'printf "UKE_RESCUE_CONFIG_FAILED: line=%s status=%s\n" "$LINENO" "$?" >&2' ERR
 [[ $# == 1 && $(id -u) == 0 && -d $1 && ! -L $1 ]]
 root=$(realpath "$1")
+here=$(cd -- "$(dirname -- "$0")" && pwd)
 [[ $root != / && -f $root/usr/lib/os-release && -x $root/usr/bin/systemctl && -f $root/etc/shadow ]]
 [[ -z $(find "$root/proc" -mindepth 1 -maxdepth 1 -print -quit) ]]
 mkdir -p "$root/etc/systemd/system" "$root/etc/systemd/system-generators" "$root/etc/systemd/journald.conf.d" "$root/etc/ssh/sshd_config.d"
@@ -39,6 +40,52 @@ ln -sfn /usr/lib/systemd/system/rescue.target "$root/etc/systemd/system/default.
 # Original systemd/sulogin remains the console boundary. No unauthenticated
 # force shell, persistent credential, automatic repair or plaintext unlock key.
 chroot "$root" /usr/sbin/usermod --lock root
+# A dedicated USB rescue console authenticates the installed primary wheel
+# administrator through original sulogin in a private mount namespace. The
+# rescue disk's root account stays locked and network services stay disabled.
+install -Dm755 "$here/rescue-console-login.sh" "$root/usr/libexec/uke-rescue/console-login"
+install -m644 "$here/rescue-admin-policy.sh" "$here/select-uke-userdata.sh" "$root/usr/libexec/uke-rescue/"
+mkdir -p "$root/etc/modprobe.d" "$root/etc/systemd/system/rescue.target.wants"
+printf 'options g_serial use_acm=1 idVendor=0x1d6b idProduct=0x0104 iManufacturer=Senemos iProduct=Uke_Rescue\n' > "$root/etc/modprobe.d/40-uke-rescue-serial.conf"
+cat > "$root/etc/systemd/system/uke-rescue-usb.service" <<'UNIT'
+[Unit]
+Description=Offer the signed kernel CDC serial function for explicit Uke rescue
+ConditionKernelCommandLine=senemos.role=rescue
+ConditionFirmware=device-tree-compatible(xiaomi,uke)
+After=systemd-udevd.service
+Before=uke-rescue-console.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/modprobe g_serial
+RemainAfterExit=yes
+
+[Install]
+WantedBy=rescue.target
+UNIT
+cat > "$root/etc/systemd/system/uke-rescue-console.service" <<'UNIT'
+[Unit]
+Description=Authenticate the installed primary administrator for Uke USB rescue
+ConditionKernelCommandLine=senemos.role=rescue
+ConditionFirmware=device-tree-compatible(xiaomi,uke)
+Wants=uke-rescue-usb.service
+After=uke-rescue-usb.service dev-ttyGS0.device
+BindsTo=dev-ttyGS0.device
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/setsid --fork --wait /usr/bin/unshare --mount --propagation private /usr/libexec/uke-rescue/console-login
+Restart=always
+RestartSec=1
+KillMode=control-group
+TimeoutStopSec=10
+Environment=HISTFILE=/dev/null
+
+[Install]
+WantedBy=rescue.target
+UNIT
+ln -s ../uke-rescue-usb.service "$root/etc/systemd/system/rescue.target.wants/uke-rescue-usb.service"
+ln -s ../uke-rescue-console.service "$root/etc/systemd/system/rescue.target.wants/uke-rescue-console.service"
 printf 'uke-rescue\n' > "$root/etc/hostname"
 : > "$root/etc/machine-id"
 [[ ! -L $root/var/lib/dbus/machine-id ]] || unlink "$root/var/lib/dbus/machine-id"

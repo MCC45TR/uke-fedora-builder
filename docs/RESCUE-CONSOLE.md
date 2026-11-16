@@ -1,0 +1,39 @@
+# Minimal installed-account rescue console
+
+The rescue root keeps the original Fedora packages and matching signed kernel
+cohort. Its global root account stays locked; network listeners remain disabled.
+No desktop, generic password, persistent credential or model is added.
+
+For the explicit `senemos.role=rescue` profile, original modprobe loads the
+already signed `g_serial` module. It offers a standard CDC ACM endpoint and
+refuses a busy gadget controller. The console waits for the host carrier with
+a blocking TTY open. It does not poll hardware or alter Type-C ownership rules.
+
+A private mount namespace selects the unique physical Uke UFS userdata partition
+and mounts a provisioned EXT4 filesystem read-only without journal replay. The
+primary installed account (UID1000) must be enabled and in wheel. Account
+databases must be bounded, regular, unlinked, root-owned and non-writable by
+other accounts. Duplicate identities and malformed or locked hashes refuse.
+
+Only in that namespace, a volatile shadow entry supplies this administrator's
+existing hash to original Fedora sulogin. The temporary file keeps the original
+shadow SELinux context. Password input and crypt verification remain in sulogin;
+the shell never receives the password. There is no `--force` fallback or disk
+copy of a credential. Authentication opens a standard root rescue shell, with
+`UKE_RESCUE_INSTALLED_ROOT` identifying the read-only installed system. Original
+mount, filesystem and chroot tools provide explicit repair; no repair or writable
+userdata mount is automatic.
+
+The initial method requires a readable installed EXT4 account database and the
+enabled primary administrator. It does not provide access to an unmountable or
+still-encrypted root. Separate recovery credentials and secure unlock require
+their own provisioning and validation; they must not be replaced by an open
+root console. Other terminal reboot targets and a reliable one-shot return path
+also remain separate from this console setup.
+
+The fake-database tests cover the actual admission function, including primary
+and supplementary wheel membership, duplicates, UID bounds, locked hashes,
+symlinks, hard links, ownership, writable files and input bounds. They do not
+test a password. Native module metadata on the running 7.3.4-4 confirms the
+chosen original parameters. Image assembly, SELinux enforcement, actual USB
+carrier/authentication, idle behavior and chroot still require validation.
