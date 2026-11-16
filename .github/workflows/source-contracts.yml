@@ -367,6 +367,8 @@ jobs:
           chmod +x "$guard/refuse-build"
           for tool in gcc g++ cc c++ clang clang++ as ld rpmbuild; do ln -s refuse-build "$guard/$tool"; done
           export PATH="$guard:$PATH"
+          shellcheck scripts/prepare-fastboot-update.sh tests/prepare-fastboot-update.sh
+          bash tests/prepare-fastboot-update.sh
           shellcheck src/image/fastboot-singleboot-layout.sh src/image/plan-fastboot-update.sh src/image/build-fastboot-super.sh scripts/check-fastboot-super-layout.sh scripts/probe-inlinecrypt-readonly.sh scripts/probe-ext4-reencrypt-scratch.sh tests/fastboot-singleboot-layout.sh tests/fastboot-super-composition.sh
           shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh

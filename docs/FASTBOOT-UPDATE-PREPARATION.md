@@ -237,3 +237,24 @@ This image selection does not itself qualify rescue, encryption or secure boot.
 - [Trusted keys](https://docs.kernel.org/security/keys/trusted-encrypted.html)
 - [Hardware-wrapped keys](https://source.android.com/docs/security/features/encryption/hw-wrapped-keys)
 - [cryptsetup reencryption](https://man7.org/linux/man-pages/man8/cryptsetup-reencrypt.8.html)
+# Preparing a payload bundle for measured capacities
+
+`scripts/prepare-fastboot-update.sh PAYLOAD_ZIP NEW_DEVICE_ZIP` prepares the new
+full-test bundle format. It verifies archive paths, every payload hash, expanded
+Android sparse extents, the exact flash task list and the internal checksum file.
+It then reads the connected bootloader's product, slots, snapshot state and every
+destination capacity. No device write or slot selection occurs in this command.
+
+The prepared ZIP keeps the compressed payload entries unchanged and records exact
+measured requirements in `android-info.txt`, with a refreshed internal checksum
+file and an external ZIP digest. Install that output with ordinary
+`fastboot update NEW_DEVICE_ZIP`. This allows one payload bundle to serve capacity
+variants without inventing a 256 GB partition table or deleting size checks.
+The helper refuses insufficient destinations before creating an installable
+output. It does not change GPT, enroll keys or invoke a flash/relock command.
+
+The source fixture covers two synthetic capacities, sparse extents, preservation
+of all payloads and checksum readback, plus wrong-device, fastbootd, snapshot,
+small/missing/ambiguous-capacity and tampered-content refusals. These are host
+tests. Actual 256 GB hardware and complete installation acceptance remain open;
+the full-test payload bundle itself still requires qualified producer inputs.
