@@ -1,5 +1,5 @@
 #!/usr/bin/bash
-# Synthetic nonbootable ZIP and read-only fake fastboot. No compiler/device.
+# Synthetic nonbootable ZIP and a protocol-only fake fastboot. No compiler/device.
 set -Eeuo pipefail
 root=$(cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d)
@@ -29,6 +29,18 @@ jq -n --arg flat "$(sha256sum "$work/files/boot_a.img" | cut -d' ' -f1)" \
 cat > "$work/bin/fastboot" <<'MOCK'
 #!/usr/bin/bash
 set -Eeuo pipefail
+if [[ $# == 1 && $1 == devices ]];then
+ printf '%s\n' "$*" >> "$UKE_FIXTURE_COMMANDS"
+ printf 'fixture-device\tfastboot\n';exit 0
+fi
+if [[ $# == 5 && $1 == -s && $2 == fixture-device && $3 == --skip-reboot && $4 == update ]];then
+ printf '%s\n' "$*" >> "$UKE_FIXTURE_COMMANDS"
+ [[ $UKE_FIXTURE_CASE != write-refused ]] || { printf 'synthetic transport refusal\n' >&2;exit 23; }
+ printf 'Synthetic update acknowledged; no device exists.\n';exit 0
+fi
+if [[ $# == 3 && $1 == -s && $2 == fixture-device && $3 == reboot ]];then
+ printf '%s\n' "$*" >> "$UKE_FIXTURE_COMMANDS";exit 0
+fi
 [[ $# == 2 && $1 == getvar ]]
 printf '%s\n' "$*" >> "$UKE_FIXTURE_COMMANDS"
 case $2 in
@@ -79,3 +91,29 @@ if bash "$root/scripts/prepare-fastboot-update.sh" "$work/tampered.zip" "$work/b
 [[ ! -e $work/bad.zip ]]
 if grep -v '^getvar ' "$work/commands";then exit 1;fi
 echo 'PASS: measured ZIP preparation; two synthetic capacities, sparse extents, unchanged payloads/checksums, wrong identity/snapshot/size/ambiguous/missing/tampered refusals; getvar only.'
+# The full installer must keep check-only read-only, reject a changed outer ZIP
+# before USB access, and never reboot after a failed update. All traffic goes
+# exclusively to the fake executable above, whose exact hash is in the fixture.
+(cd "$work";sha256sum input.zip > input.zip.sha256)
+: > "$work/commands"
+export UKE_FIXTURE_CASE=synthetic-256
+bash "$root/scripts/install-full-fastboot-test.sh" --check "$work/input.zip" > "$work/install-check.log" 2>&1 || { cat "$work/install-check.log";exit 1; }
+if grep -Ev '^(getvar |devices$)' "$work/commands";then exit 1;fi
+cp "$work/input.zip.sha256" "$work/valid.sha256"
+printf '%064d  input.zip\n' 0 > "$work/input.zip.sha256"
+: > "$work/commands"
+if bash "$root/scripts/install-full-fastboot-test.sh" --install "$work/input.zip" > "$work/install-hash.log" 2>&1;then exit 1;fi
+[[ ! -s $work/commands ]]
+cp "$work/valid.sha256" "$work/input.zip.sha256"
+export UKE_FIXTURE_CASE=write-refused
+: > "$work/commands"
+if bash "$root/scripts/install-full-fastboot-test.sh" --install "$work/input.zip" > "$work/install-refused.log" 2>&1;then exit 1;fi
+[[ $(grep -c -- '--skip-reboot update ' "$work/commands") == 1 ]]
+if grep -q -- '-s fixture-device reboot' "$work/commands";then exit 1;fi
+export UKE_FIXTURE_CASE=synthetic-256
+: > "$work/commands"
+bash "$root/scripts/install-full-fastboot-test.sh" --install "$work/input.zip" > "$work/install-success.log" 2>&1 || { cat "$work/install-success.log";exit 1; }
+[[ $(grep -c -- '--skip-reboot update ' "$work/commands") == 1 &&
+   $(grep -c -- '-s fixture-device reboot' "$work/commands") == 1 ]]
+tail -n1 "$work/commands" | grep -Fxq -- '-s fixture-device reboot'
+echo 'PASS: protocol-only installer check, outer-hash refusal before USB, no reboot after update refusal, and one explicit reboot after update success. No physical device or boot qualification.'

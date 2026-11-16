@@ -304,3 +304,21 @@ GPT geometry, and neither automatically flashes. The local working vendor_boot
 and unqualified recovery/security features prevent a redistribution or Secure
 Boot claim. Native image policy preparation, composition, measured preparation,
 physical normal boot and usable rescue remain separate results.
+
+`scripts/install-full-fastboot-test.sh --check|--install ARCHIVE` provides the
+five-stage English/Turkish host flow for this full archive. Keep the measured
+preparer beside the script, and the qualified fastboot and its receipts beside
+the archive (or select the qualified executable with `--fastboot`). A regular
+single-line `ARCHIVE.sha256` receipt is required. The installer reruns complete
+payload checks and actual capacity measurement with the existing preparer;
+it also verifies that the single connected device stayed the same. It does
+not carry the earlier B-slot-only installer's fixed geometry or kernel version.
+
+Check mode requests no flash or reboot. Install mode uses `--skip-reboot update`
+and requests one explicit reboot only after a successful update. A failed
+transport or compatibility check prints a stage-specific explanation and
+leaves the device available for diagnosis. Extraction stays on the budgeted
+host filesystem; the support log is bounded and omits the serial-number header.
+Protocol-only fixtures verify checksum refusal before USB, read-only checks,
+no reboot after update refusal and the successful update/reboot sequence. They
+do not qualify physical flashing or OS startup.
