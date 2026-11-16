@@ -24,7 +24,9 @@ source "$here/select-uke-userdata.sh"
 # shellcheck source=rescue-admin-policy.sh
 # shellcheck disable=SC1091
 source "$here/rescue-admin-policy.sh"
+uke_userdata_devno=''
 uke_open_physical_userdata
+[[ $uke_userdata_devno =~ ^[0-9]+:[0-9]+$ ]] || fail 'physical userdata selection did not provide a device identity'
 [[ $(blkid -p -s TYPE -o value /proc/self/fd/3) == ext4 ]] || fail 'a mountable installed EXT4 root is required; no automatic unlock or filesystem repair is performed'
 work=$(mktemp -d /run/uke-rescue-auth.XXXXXXXX)
 mkdir -m700 "$work/installed"
