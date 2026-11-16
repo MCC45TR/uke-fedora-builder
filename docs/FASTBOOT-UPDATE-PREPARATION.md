@@ -245,10 +245,17 @@ Android sparse extents, the exact flash task list and the internal checksum file
 It then reads the connected bootloader's product, slots, snapshot state and every
 destination capacity. No device write or slot selection occurs in this command.
 
+Use the existing qualified adjacent host `fastboot` and its receipts, or select
+that client with `--fastboot EXECUTABLE`. The original Fedora37 client still
+refuses this bootloader's padded capacity replies; changing the ZIP's literal
+options cannot repair that parser behavior. The preparer verifies the qualified
+client's hash and positive/refusal evidence before contacting the device. It
+preserves the system's original Fedora executable.
+
 The prepared ZIP keeps the compressed payload entries unchanged and records exact
 measured requirements in `android-info.txt`, with a refreshed internal checksum
 file and an external ZIP digest. Install that output with ordinary
-`fastboot update NEW_DEVICE_ZIP`. This allows one payload bundle to serve capacity
+the printed qualified-client `update NEW_DEVICE_ZIP` command. This allows one payload bundle to serve capacity
 variants without inventing a 256 GB partition table or deleting size checks.
 The helper refuses insufficient destinations before creating an installable
 output. It does not change GPT, enroll keys or invoke a flash/relock command.

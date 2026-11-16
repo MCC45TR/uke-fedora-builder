@@ -4,10 +4,20 @@ set -Eeuo pipefail
 export LC_ALL=C
 umask 077
 fail() { printf 'UKE_FASTBOOT_PREPARE_FAILED: %s\n' "$*" >&2; exit 1; }
-[[ $# == 2 ]] || fail 'usage: prepare-fastboot-update.sh PAYLOAD_ZIP NEW_DEVICE_ZIP'
+[[ $# == 2 || ( $# == 4 && $3 == --fastboot ) ]] || fail 'usage: prepare-fastboot-update.sh PAYLOAD_ZIP NEW_DEVICE_ZIP [--fastboot EXECUTABLE]'
 archive=$(realpath "$1");output=$(realpath -m "$2")
 [[ -f $archive && ! -L $1 && ! -e $output && ! -L $2 && -d ${output%/*} ]] || fail 'regular input and new output required'
-for tool in fastboot timeout unzip zip jq sha256sum od stat cp;do command -v "$tool" >/dev/null || fail "missing original host tool: $tool";done
+client=${archive%/*}/fastboot
+[[ $# != 4 ]] || client=$4
+[[ -f $client && -x $client && ! -L $client ]] || fail 'qualified adjacent fastboot missing; supply --fastboot EXECUTABLE'
+client=$(realpath "$client")
+for tool in timeout unzip zip jq sha256sum od stat cp;do command -v "$tool" >/dev/null || fail "missing original host tool: $tool";done
+qualification=${client%/*}/receipts/host-fastboot-qualification.json
+checksums=${client%/*}/receipts/host-fastboot-SHA256SUMS
+[[ -f $qualification && ! -L $qualification && -f $checksums && ! -L $checksums ]] || fail 'host fastboot qualification receipts are missing'
+jq -e '.loopback_only and .partition_size_response_whitespace_normalized and .padded_wrong_capacity_and_malformed_values_refused' "$qualification" >/dev/null || fail 'fastboot has not passed the whitespace and capacity refusal tests'
+read -r expected_client client_name < "$checksums"
+[[ $expected_client =~ ^[a-f0-9]{64}$ && $client_name == fastboot && $(sha256sum "$client" | cut -d' ' -f1) == "$expected_client" ]] || fail 'fastboot bytes differ from the qualified client'
 [[ $(uname -m) == x86_64 || $(uname -m) == aarch64 ]] || fail 'little-endian x86_64 or AArch64 host required'
 work=$(mktemp -d "${output%/*}/.uke-fastboot-prepare.XXXXXXXX")
 trap 'find "$work" -depth -delete' EXIT
@@ -72,7 +82,7 @@ unzip -p "$archive" SHA256SUMS | sort > "$work/original.sha256"
 sort "$work/actual.sha256" | cmp - "$work/original.sha256" || fail 'archive checksums differ or contain unknown entries'
 getvar() {
  local key=$1 response line value='' count=0
- response=$(timeout --kill-after=2s 10s fastboot getvar "$key" 2>&1) || fail "device did not provide $key; connect one Uke in bootloader mode"
+ response=$(timeout --kill-after=2s 10s "$client" getvar "$key" 2>&1) || fail "device did not provide $key; connect one Uke in bootloader mode"
  [[ ${#response} -le 4096 ]] || fail "oversized device response: $key"
  while IFS= read -r line;do
   line=${line//$'\r'/};line=${line#'(bootloader) '}
@@ -116,4 +126,4 @@ awk -v hash="$hash" '$2=="android-info.txt"{$1=hash;print $1"  "$2;next}{print}'
 (cd "$work";zip -q device.zip android-info.txt SHA256SUMS)
 mv "$work/device.zip" "$output"
 sha256sum "$output" > "$output.sha256"
-printf 'Prepared %s\nNo slot selection, flash, erase, reboot, relock or key operation was performed.\nRun: fastboot update %q\n' "$output" "$output"
+printf 'Prepared %s\nNo slot selection, flash, erase, reboot, relock or key operation was performed.\nRun: %q update %q\n' "$output" "$client" "$output"

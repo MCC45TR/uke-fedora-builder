@@ -51,6 +51,10 @@ printf '(bootloader) %s: %s\nFinished. Total time: 0.001s\n' "$2" "$value" >&2
 if [[ $UKE_FIXTURE_CASE == duplicate && $2 == product ]];then printf 'product: uke\n' >&2;fi
 MOCK
 chmod 755 "$work/bin/fastboot"
+cp "$work/bin/fastboot" "$work/fastboot"
+mkdir "$work/receipts"
+printf '{"loopback_only":true,"partition_size_response_whitespace_normalized":true,"padded_wrong_capacity_and_malformed_values_refused":true}\n' > "$work/receipts/host-fastboot-qualification.json"
+(cd "$work";sha256sum fastboot > receipts/host-fastboot-SHA256SUMS)
 export PATH="$work/bin:$PATH" UKE_FIXTURE_COMMANDS="$work/commands"
 for scenario in synthetic-256 large;do
  export UKE_FIXTURE_CASE=$scenario
