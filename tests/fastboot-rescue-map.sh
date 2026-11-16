@@ -72,8 +72,13 @@ case ${1:-} in
         printf '0 8 linear %s 0\n' "$devno" | dmsetup --noudevsync create --uuid "$occupied_uuid" uke-rescue
         if bash "$helper" "$device" > "$work/refused.json" 2> "$work/refused.log"; then exit 1; fi
         grep -q 'already occupied' "$work/refused.log"
+        if bash "$helper" --verify "$device" > "$work/refused.json" 2> "$work/refused.log";then exit 1;fi
+        grep -q 'ownership differs' "$work/refused.log"
         [[ $(dmsetup info -c --noheadings -o uuid uke-rescue | tr -d '[:space:]') == "$occupied_uuid" ]]
         dmsetup --noudevsync remove --retry uke-rescue
+        if bash "$helper" --verify "$device" > "$work/refused.json" 2> "$work/refused.log";then exit 1;fi
+        grep -q 'unavailable for verification' "$work/refused.log"
+        if dmsetup info uke-rescue >/dev/null 2>&1;then exit 1;fi
         # Change a private alternate node only after the helper has opened it.
         # Mapping identity must follow that descriptor, not a second path lookup.
         alias_node=$work/owned-loop-alias
@@ -96,6 +101,8 @@ SH
             .ext4_label_and_full_capacity_verified and .rescue_bytes == 858783744 and
             (.root_switch_executed | not) and (.metadata_authenticity_verified | not)' "$work/mapping.json" >/dev/null
         [[ $(blockdev --getro /dev/mapper/uke-rescue) == 1 ]]
+        bash "$helper" --verify "$device" > "$work/verified.json"
+        jq -e '.existing_mapping_verified and .readonly_linear_mapping and .ext4_label_and_full_capacity_verified' "$work/verified.json" >/dev/null
         debugfs -R "dump /sentinel.txt $work/sentinel.txt" /dev/mapper/uke-rescue >/dev/null 2>&1
         cmp "$fixture/sentinel.txt" "$work/sentinel.txt"
         if dd if=/dev/zero of=/dev/mapper/uke-rescue bs=4096 count=1 conv=notrunc status=none > "$work/write.log" 2>&1; then
@@ -124,6 +131,7 @@ SH
               independent_ext4_file_readback:true,write_to_readonly_mapping_refused:true,
               backing_sha256_before:$before,backing_sha256_after:$after,
               occupied_mapping_preserved:true,wrong_label_refused_and_own_mapper_removed:true,
+              existing_mapping_reverified_without_creation:true,foreign_and_absent_verification_refused:true,
               mapping_identity_pinned_across_path_replacement:true,
               userdata_dependency:false,physical_ufs_tested:false,rescue_os_boot_tested:false,
               secure_boot_tested:false,encryption_tested:false}' > "$report"

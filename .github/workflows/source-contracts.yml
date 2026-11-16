@@ -376,6 +376,9 @@ jobs:
           shellcheck src/image/compose-fastboot-super-seed.sh
           shellcheck src/image/dracut/95uke-super-tools/module-setup.sh src/image/qualify-super-runtime.sh tests/fastboot-super-runtime.sh
           shellcheck src/image/select-uke-super.sh tests/fastboot-physical-super.sh
+          shellcheck src/image/early-super-policy.sh src/image/prepare-early-super.sh src/image/guard-early-rescue.sh src/image/dracut/96uke-super-boot/module-setup.sh tests/early-super-policy.sh tests/early-super-units.sh
+          bash tests/early-super-policy.sh
+          bash tests/early-super-units.sh
           shellcheck src/image/dracut/96uke-protected-boot/module-setup.sh tests/protected-initrd-barriers.sh
           shellcheck src/image/rescue-verity-layout.sh src/image/build-rescue-verity.sh src/image/qualify-fedora-rescue-verity.sh tests/rescue-verity.sh
           shellcheck tests/rescue-verity-map.sh

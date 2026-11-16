@@ -169,6 +169,8 @@ SH
             (.rescue_payload_relocated|not) and (.userdata_modified|not)' "$work/completed.json" >/dev/null
         prefix "$work/ready-prefix"
         bash "$root/src/image/map-fastboot-rescue.sh" "$device" > "$work/mapped.json"
+        bash "$root/src/image/map-fastboot-rescue.sh" --verify "$device" > "$work/mapped-verified.json"
+        jq -e '.existing_mapping_verified and .readonly_linear_mapping and .three_slot_topology_verified' "$work/mapped-verified.json" >/dev/null
         actual_fedora=false
         if [[ -f $fixture/actual-rescue.json && ! -L $fixture/actual-rescue.json ]]; then
             release=$(jq -er .kernel_release "$fixture/actual-rescue.json")
@@ -212,6 +214,7 @@ SH
             '{schema_version:1,owned_loop_only:true,seed_bytes:$seed,actual_super_bytes:8589934592,
               actual_fedora_root_readback_tested:$fedora,extra_fixture_files_in_actual_rescue:false,
               original_tools_used:true,real_ext4_growth_and_swap_initialization:true,
+              existing_rescue_mapping_independently_reverified:true,
               rescue_file_preserved_without_relocation:true,active_holder_refused_before_write:true,
               alternate_node_holder_refused_before_write:true,writer_pinned_across_path_replacement:true,
               old_saved_image_signature_refused_before_write:true,

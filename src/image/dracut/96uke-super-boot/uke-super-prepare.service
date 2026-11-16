@@ -1,0 +1,15 @@
+[Unit]
+Description=Prepare the explicitly selected Uke super seed before root admission
+DefaultDependencies=no
+ConditionKernelCommandLine=senemos.super=seed4-v1
+After=systemd-udev-trigger.service
+Before=uke-root-guard.service sysroot.mount
+OnFailure=emergency.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/libexec/uke-super/prepare-early-super.sh
+TimeoutStartSec=240
+RemainAfterExit=yes
+StandardOutput=journal+console
+StandardError=journal+console

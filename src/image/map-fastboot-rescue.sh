@@ -7,7 +7,9 @@ set -Eeuo pipefail
 export LC_ALL=C
 umask 077
 fail() { printf 'UKE_RESCUE_REJECTED: %s\n' "$*" >&2; exit 1; }
-[[ $# == 1 && $(id -u) == 0 ]] || fail 'run as root with one super block device'
+verify=false
+if [[ $# == 2 && $1 == --verify ]];then verify=true;shift;fi
+[[ $# == 1 && $(id -u) == 0 ]] || fail 'run as root with [--verify] and one super block device'
 here=$(cd -- "$(dirname -- "$0")" && pwd)
 [[ -b $1 ]] || fail 'input is not a block device'
 exec 3< "$1"
@@ -47,7 +49,11 @@ cleanup() {
 trap cleanup EXIT
 trap 'exit 130' INT
 trap 'exit 143' TERM
-if dmsetup info "$name" >/dev/null 2>&1; then fail 'rescue mapping name is already occupied'; fi
+if dmsetup info "$name" >/dev/null 2>&1; then
+    [[ $verify == true ]] || fail 'rescue mapping name is already occupied'
+else
+    [[ $verify == false ]] || fail 'rescue mapping is unavailable for verification'
+fi
 TMPDIR="$work" bash "$here/inspect-fastboot-super.sh" --block /proc/self/fd/3 > "$work/plan.json"
 [[ $(jq -er .layout.super_bytes "$work/plan.json") == "$capacity" ]]
 start=$(jq -er '.mappings[] | select(.role == "rescue") | .start_sector' "$work/plan.json")
@@ -56,12 +62,15 @@ sectors=$(jq -er '.mappings[] | select(.role == "rescue") | .sectors' "$work/pla
 printf '0 %s linear %s %s\n' "$sectors" "$devno" "$start" > "$work/table"
 # Set ownership before invoking dmsetup so interrupted create is cleaned only
 # if the resulting UUID matches this attempt's independently checked device.
-owned=1
-if ! dmsetup --noudevsync create --readonly --uuid "$uuid" "$name" < "$work/table"; then
-    if ! dmsetup info "$name" >/dev/null 2>&1; then owned=0; fi
-    fail 'cannot create read-only rescue mapping'
+if [[ $verify == false ]];then
+    owned=1
+    if ! dmsetup --noudevsync create --readonly --uuid "$uuid" "$name" < "$work/table"; then
+        if ! dmsetup info "$name" >/dev/null 2>&1; then owned=0; fi
+        fail 'cannot create read-only rescue mapping'
+    fi
+    dmsetup mknodes "$name"
 fi
-dmsetup mknodes "$name"
+[[ $(dmsetup info -c --noheadings -o uuid "$name" | tr -d '[:space:]') == "$uuid" ]] || fail 'rescue mapping ownership differs'
 mapped=/dev/mapper/$name
 [[ -b $mapped && $(blockdev --getro "$mapped") == 1 ]] || fail 'rescue mapping is not read-only'
 [[ $(blockdev --getsize64 "$mapped") == "$((sectors * 512))" ]] || fail 'mapped capacity differs'
@@ -77,8 +86,9 @@ block_size=$(awk '/^Block size:/ {print $3}' "$work/superblock")
 # Recheck metadata before making the mapper available to the caller.
 TMPDIR="$work" bash "$here/inspect-fastboot-super.sh" --block /proc/self/fd/3 > "$work/rechecked.json"
 cmp "$work/plan.json" "$work/rechecked.json" || fail 'super topology changed while mapping'
-jq -M -n --arg path "$mapped" --arg uuid "$uuid" --argjson capacity "$((sectors * 512))" \
+jq -M -n --arg path "$mapped" --arg uuid "$uuid" --argjson capacity "$((sectors * 512))" --argjson verify "$verify" \
     '{schema_version:1,rescue_device:$path,dm_uuid:$uuid,rescue_bytes:$capacity,
+      existing_mapping_verified:$verify,
       readonly_linear_mapping:true,three_slot_topology_verified:true,
       ext4_label_and_full_capacity_verified:true,partition_write_executed:false,
       physical_ufs_selection_verified:false,metadata_authenticity_verified:false,
