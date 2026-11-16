@@ -370,7 +370,7 @@ jobs:
           shellcheck scripts/prepare-fastboot-update.sh tests/prepare-fastboot-update.sh
           bash tests/prepare-fastboot-update.sh
           shellcheck src/image/fastboot-singleboot-layout.sh src/image/plan-fastboot-update.sh src/image/build-fastboot-super.sh scripts/check-fastboot-super-layout.sh scripts/probe-inlinecrypt-readonly.sh scripts/probe-ext4-reencrypt-scratch.sh tests/fastboot-singleboot-layout.sh tests/fastboot-super-composition.sh
-          shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh
+          shellcheck src/image/inspect-fastboot-super.sh src/image/map-fastboot-rescue.sh src/image/map-fastboot-swap.sh tests/fastboot-super-inspection.sh tests/fastboot-rescue-map.sh tests/fastboot-swap-map.sh
           shellcheck src/image/plan-super-provision.sh src/image/provision-fastboot-super.sh tests/fastboot-super-provision-plan.sh tests/fastboot-super-grow.sh
           shellcheck src/image/fastboot-requirements.sh tests/fastboot-tcp-peer.sh tests/fastboot-update-parser.sh
           shellcheck src/image/test-fastboot-profile.sh src/image/package-ext4-fastboot-test.sh scripts/install-fastboot-test.sh
@@ -447,10 +447,12 @@ jobs:
             trap - EXIT
             if [[ -n $loop ]]; then
               devno=$(lsblk -dnro MAJ:MIN "$loop")
-              for name in uke-verity-fixture-root uke-verity-fixture-data uke-rescue uke-rescue-test-payload uke-super-grow-rescue uke-super-grow-swap uke-super-grow-oldswap uke-super-test-busy; do
+              for name in linux_swap uke-verity-fixture-root uke-verity-fixture-data uke-rescue uke-rescue-test-payload uke-super-grow-rescue uke-super-grow-swap uke-super-grow-oldswap uke-super-test-busy; do
                 uuid=$(sudo dmsetup info -c --noheadings -o uuid "$name" 2>/dev/null | tr -d '[:space:]') || uuid=''
                 case $uuid in
                   "UKE-RESCUE-v1-${devno/:/-}"|"UKE-FIXTURE-RESCUE-occupied-${devno/:/-}"|"UKE-FIXTURE-RESCUE-payload-${devno/:/-}")
+                    sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
+                  "UKE-SWAP-v1-${devno/:/-}"|"UKE-SWAP-FIXTURE-v1-${devno/:/-}")
                     sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
                   "UKE-GROW-v1-${devno/:/-}-rescue"|"UKE-GROW-v1-${devno/:/-}-swap"|"UKE-GROW-v1-${devno/:/-}-oldswap"|"UKE-GROW-TEST-v1-${devno/:/-}")
                     sudo dmsetup --noudevsync remove --retry "$name" || status=1;;
@@ -527,6 +529,8 @@ jobs:
             "$image" bash -Eeuo pipefail -c '
               dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux device-mapper jq coreutils findutils diffutils
               bash /source/tests/fastboot-super-grow.sh run "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json
+              bash /source/tests/fastboot-swap-map.sh "$1" /fixture/super-grow /fixture/result/swap-mapper-fixture.json
+              sha256sum /source/src/image/map-fastboot-swap.sh /source/tests/fastboot-swap-map.sh >> /fixture/result/source-sha256.txt
               bash /source/tests/fastboot-physical-super.sh "$1" /fixture/super-grow /fixture/result/super-grow-fixture.json /fixture/result/physical-selection-fixture.json
               cp /fixture/super-grow/provision-{result,noop}.json /fixture/result/
             ' bash "$loop"

@@ -265,3 +265,12 @@ of all payloads and checksum readback, plus wrong-device, fastbootd, snapshot,
 small/missing/ambiguous-capacity and tampered-content refusals. These are host
 tests. Actual 256 GB hardware and complete installation acceptance remain open;
 the full-test payload bundle itself still requires qualified producer inputs.
+
+The separate demand-only swap mapper admits the same ready three-slot geometry,
+then requires an owned writable linear DM table, `linux_swap` v1 signature and
+label, 4096-byte pages, zero bad-page entries and a header covering the complete
+logical allocation. It does not format, activate swap, enable resume or claim
+cryptographic protection. The Linux `include/linux/swap.h` layout and util-linux
+`disk-utils/mkswap.c` page-count convention are its upstream format references.
+The original rescue mapper remains unchanged. Real owned-loop negative controls
+are distinct from tablet boot and runtime activation acceptance.
