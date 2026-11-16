@@ -8,9 +8,12 @@ source "$builder/src/public/desktop-setup.sh"
 work=$(mktemp -d)
 trap 'find "$work" -depth -delete' EXIT
 capability=1
+capability_version=1
+capability_flags='='
 rpm() {
- [[ $# == 5 && $1 == --root && $3 == -q && $4 == --whatprovides && $5 == 'uke-control(setup-cdc-v1) >= 1' ]]
- ((capability==1))
+ [[ $# == 7 && $1 == --root && $3 == -q && $4 == --whatprovides && $5 == 'uke-control(setup-cdc-v1)' && $6 == --qf && $7 == '[%{PROVIDENAME}\t%{PROVIDEFLAGS:depflags}\t%{PROVIDEVERSION}\n]' ]] || return 1
+ ((capability==1)) || return 1
+ printf 'unrelated-capability\t=\t99\nuke-control(setup-cdc-v1)\t%s\t%s\n' "$capability_flags" "$capability_version"
 }
 new_root() {
  local root=$1 unit
@@ -41,6 +44,18 @@ capability=0
 reject "$work/old"
 [[ ! -e $work/old/etc/uke-control/first-setup-cdc ]]
 capability=1
+for capability_version in 0 '' 2;do
+ new_root "$work/version-${capability_version:-unversioned}"
+ reject "$work/version-${capability_version:-unversioned}"
+ grep -Fq 'exact setup-cdc-v1 = 1 interface' "$work/refused"
+ [[ ! -e $work/version-${capability_version:-unversioned}/etc/uke-control/first-setup-cdc ]]
+done
+capability_version=1
+capability_flags='>'
+new_root "$work/inequality"
+reject "$work/inequality"
+[[ ! -e $work/inequality/etc/uke-control/first-setup-cdc ]]
+capability_flags='='
 new_root "$work/linked"
 ln -s "$work/fresh/etc/uke-control" "$work/linked/etc/uke-control"
 reject "$work/linked"
@@ -58,6 +73,7 @@ reject "$work/foreign"
 new_root "$work/missing"
 unlink "$work/missing/usr/lib/systemd/system/uke-control-setup-console.service"
 reject "$work/missing"
+grep -Fq 'required unit is missing or linked: uke-control-setup-console.service' "$work/refused"
 [[ ! -e $work/missing/etc/uke-control/first-setup-cdc ]]
 reject /
-echo 'Offline setup image: original systemctl enables only marked setup access; repeat preserves marker; completed, old, linked, writable, foreign and incomplete roots refuse.'
+echo 'Offline setup image: named RPM capability and exact version required; original systemctl enables only marked setup access; repeat preserves marker; completed, old, wrong-version, linked, writable, foreign and incomplete roots refuse with diagnostics.'

@@ -1,41 +1,44 @@
 #!/usr/bin/env bash
 # Runs in the disposable assembly worker, targeting its new root only.
 public_plasma_setup_cdc() {
-    local root=$1 path unit marker uid mode
-    [[ -d $root && ! -L $root && $root != / ]] || return 1
+    local root=$1 path unit marker uid mode capabilities
+    [[ -d $root && ! -L $root && $root != / ]] || { echo 'First-setup USB: expected a separate image root.' >&2;return 1; }
     root=$(realpath "$root") || return
-    [[ $root != / && ! -e $root/etc/plasma-setup-done && ! -L $root/etc/plasma-setup-done ]] || return 1
+    [[ $root != / && ! -e $root/etc/plasma-setup-done && ! -L $root/etc/plasma-setup-done ]] || { echo 'First-setup USB: image already has a setup-completion marker.' >&2;return 1; }
     uid=$(id -u)
-    # Reject an old Control package before changing the new image's policy.
-    rpm --root "$root" -q --whatprovides 'uke-control(setup-cdc-v1) >= 1' >/dev/null || return
-    [[ -x $root/usr/bin/uke-control && ! -L $root/usr/bin/uke-control ]] || return 1
+    # rpm --whatprovides takes a capability name, not DNF's version expression.
+    # Check the actual header's exact v1 interface before changing image policy.
+    capabilities=$(rpm --root "$root" -q --whatprovides 'uke-control(setup-cdc-v1)' --qf '[%{PROVIDENAME}\t%{PROVIDEFLAGS:depflags}\t%{PROVIDEVERSION}\n]') || { echo 'First-setup USB: installed Control lacks the setup-cdc-v1 capability.' >&2;return 1; }
+    grep -Fxq $'uke-control(setup-cdc-v1)\t=\t1' <<< "$capabilities" || { echo 'First-setup USB: Control must provide the exact setup-cdc-v1 = 1 interface.' >&2;return 1; }
+    [[ -x $root/usr/bin/uke-control && ! -L $root/usr/bin/uke-control ]] || { echo 'First-setup USB: Control executable is missing or linked.' >&2;return 1; }
     for unit in uke-control-setup-cdc.service uke-control-setup-console.service uke-control-setup-cdc-finish.service uke-control-setup-cdc-finish.path; do
-        [[ -f $root/usr/lib/systemd/system/$unit && ! -L $root/usr/lib/systemd/system/$unit ]] || return 1
+        [[ -f $root/usr/lib/systemd/system/$unit && ! -L $root/usr/lib/systemd/system/$unit ]] || { printf 'First-setup USB: required unit is missing or linked: %s\n' "$unit" >&2;return 1; }
     done
     for path in usr/lib/udev/rules.d/91-uke-control-setup-cdc.rules usr/lib/systemd/system-preset/81-uke-control-setup-cdc.preset; do
-        [[ -f $root/$path && ! -L $root/$path ]] || return 1
+        [[ -f $root/$path && ! -L $root/$path ]] || { printf 'First-setup USB: required policy file is missing or linked: %s\n' "$path" >&2;return 1; }
     done
     for path in etc etc/uke-control etc/systemd etc/systemd/system; do
-        [[ ! -L $root/$path && ( ! -e $root/$path || -d $root/$path ) ]] || return 1
+        [[ ! -L $root/$path && ( ! -e $root/$path || -d $root/$path ) ]] || { printf 'First-setup USB: unsafe configuration directory: %s\n' "$path" >&2;return 1; }
         if [[ -e $root/$path ]]; then
-            [[ $(stat -c %u "$root/$path") == "$uid" ]] || return 1
+            [[ $(stat -c %u "$root/$path") == "$uid" ]] || { printf 'First-setup USB: wrong configuration owner: %s\n' "$path" >&2;return 1; }
             mode=$(stat -c %a "$root/$path")
-            (( (8#$mode & 0022) == 0 )) || return 1
+            (( (8#$mode & 0022) == 0 )) || { printf 'First-setup USB: configuration directory is writable by another account: %s\n' "$path" >&2;return 1; }
         fi
     done
     marker=$root/etc/uke-control/first-setup-cdc
     if [[ -e $marker || -L $marker ]]; then
-        [[ -f $marker && ! -L $marker && $(stat -c %h "$marker") == 1 && $(stat -c %u "$marker") == "$uid" && $(stat -c %a "$marker") == 600 ]] || return 1
-        printf 'v1\n' | cmp - "$marker" || return
+        [[ -f $marker && ! -L $marker && $(stat -c %h "$marker") == 1 && $(stat -c %u "$marker") == "$uid" && $(stat -c %a "$marker") == 600 ]] || { echo 'First-setup USB: existing activation marker has unsafe metadata.' >&2;return 1; }
+        printf 'v1\n' | cmp - "$marker" || { echo 'First-setup USB: existing activation marker has an unknown format.' >&2;return 1; }
     else
         mkdir -p "$root/etc/uke-control" || return
         (umask 077;set -o noclobber;printf 'v1\n' > "$marker") || return
     fi
     systemctl --root="$root" enable uke-control-setup-cdc.service uke-control-setup-cdc-finish.path || return
     for unit in uke-control-setup-cdc.service uke-control-setup-cdc-finish.path; do
-        [[ $(systemctl --root="$root" is-enabled "$unit") == enabled ]] || return 1
+        [[ $(systemctl --root="$root" is-enabled "$unit") == enabled ]] || { printf 'First-setup USB: offline unit activation did not persist: %s\n' "$unit" >&2;return 1; }
     done
     # The saved CDC preference belongs to Control and is never written here.
+    echo 'First-setup USB: temporary console enabled until Plasma setup completes; saved USB preference preserved.'
     return 0
 }
 
