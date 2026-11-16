@@ -1,0 +1,20 @@
+{
+  "schema_version": 1,
+  "repository": "https://github.com/Xiaomi-Pad-7-Pro-Resources/android_device_xiaomi_uke-kernel",
+  "commit": "0d2b9c42b8e1873e6c7b61326b35c94c991ab713",
+  "scope": "Recover DTS from complete public flattened references and require byte-exact native recompilation; not original OEM source reproduction",
+  "reference_license": "LicenseRef-Proprietary",
+  "notice": "Public reference repository has no top-level license; original author/source and redistribution review remain separate",
+  "physical_admission": false,
+  "public_bases_replace_installed_bases": false,
+  "inputs": [
+    {"name":"dtbo.img","path":"dtbo.img","bytes":593920,"sha256":"fa7224e7876e81f889fc40e9e34fea7ca703e712a363973d8d5f39b6a426d68c"},
+    {"name":"base-0.dtb","path":"dtbs/01_dtbdump_Qualcomm_Technologies,_Inc._Cliffs_SoC.dtb","bytes":475414,"sha256":"8009b42ee66b6b3fd5c5472423adfa2d2cf1e8298111225121f7340ecf006ee7"},
+    {"name":"base-1.dtb","path":"dtbs/02_dtbdump_Qualcomm_Technologies,_Inc._Cliffs_7_SoC.dtb","bytes":474863,"sha256":"017218673574791f6730f8408c5e2653925b2268aec8a38bb71c2059f8559717"},
+    {"name":"base-2.dtb","path":"dtbs/03_dtbdump_Qualcomm_Technologies,_Inc._Cliffs7P_SoC.dtb","bytes":467678,"sha256":"733320ab63ca7a6d12a10236b284de3b1450ac0d56ae88c9c005c93830172c39"},
+    {"name":"base-3.dtb","path":"dtbs/04_dtbdump_Qualcomm_Technologies,_Inc._CliffsP_SoC.dtb","bytes":467958,"sha256":"c65e2ff5090ce33854f70382d667ca898a5afa742a8e4821613ed0b1041ce1eb"}
+  ],
+  "overlay_offset": 64,
+  "overlay_bytes": 591793,
+  "overlay_sha256": "59b5a643dd0a50be879b1903de0667b5f026e9c754b65af5a1680d01bdedeb3e"
+}
