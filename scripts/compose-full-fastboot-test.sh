@@ -42,6 +42,21 @@ jq -e --arg hash "$(jq -er .rescue_raw_sha256 "$super/super-composition.json")" 
  .seed_super_sparse_sha256==$super_hash and .source_scripts_verified and .unit_files_verified and
  .locked_root_verified and .human_account_absent and .activation_links_verified and
  .inspection_read_only' "$super/rescue-console-readback.json" > /dev/null || fail 'rescue lacks the independent console-source readback'
+sources=$(cd -- "$(dirname -- "$0")/../src/image" && pwd)
+jq -e '(.files|length)==6 and
+ ([.files[].path]|sort)==["/etc/modprobe.d/40-uke-rescue-serial.conf",
+ "/etc/systemd/system/uke-rescue-console.service","/etc/systemd/system/uke-rescue-usb.service",
+ "/usr/libexec/uke-rescue/console-login","/usr/libexec/uke-rescue/rescue-admin-policy.sh",
+ "/usr/libexec/uke-rescue/select-uke-userdata.sh"] and
+ all(.files[];(.sha256|test("^[a-f0-9]{64}$")))' "$super/rescue-console-readback.json" >/dev/null || fail 'rescue source receipt file set differs'
+while IFS=$'\t' read -r path hash;do
+ case $path in
+  /usr/libexec/uke-rescue/console-login) name=rescue-console-login.sh;;
+  /usr/libexec/uke-rescue/rescue-admin-policy.sh|/usr/libexec/uke-rescue/select-uke-userdata.sh|/etc/systemd/system/uke-rescue-console.service|/etc/systemd/system/uke-rescue-usb.service|/etc/modprobe.d/40-uke-rescue-serial.conf) name=${path##*/};;
+  *) fail 'unknown rescue source path';;
+ esac
+ [[ $(sha256sum "$sources/$name" | cut -d' ' -f1) == "$hash" ]] || fail "rescue receipt belongs to an older source: $name"
+done < <(jq -r '.files[]|[.path,.sha256]|@tsv' "$super/rescue-console-readback.json")
 [[ $(jq -Sc .layout "$super/super-composition.json") == "$(jq -Sc .seed_layout "$super/super-seed.json")" &&
  $(jq -er .super_sparse_sha256 "$super/super-composition.json") == "$(sha256sum "$super/super.img" | cut -d' ' -f1)" ]] || fail 'super composition and payload differ'
 [[ $(sha256sum "$desktop/userdata.img" | cut -d' ' -f1) == "$(jq -er .root_sparse_sha256 "$desktop/manifest.json")" ]] || fail 'desktop payload hash differs'
