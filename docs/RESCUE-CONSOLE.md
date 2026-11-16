@@ -37,3 +37,25 @@ symlinks, hard links, ownership, writable files and input bounds. They do not
 test a password. Native module metadata on the running 7.3.4-4 confirms the
 chosen original parameters. Image assembly, SELinux enforcement, actual USB
 carrier/authentication, idle behavior and chroot still require validation.
+
+A bounded check on the running 7.3.4-4 system used original Fedora sulogin and
+a private mount namespace with the temporary shadow on tmpfs. An incorrect
+password was refused; the existing administrator password opened a UID0 shell
+with global SELinux enforcement retained. Exit removed the private mount and
+temporary files; the global root account remained locked. The shell never
+received or saved either password. This validates the volatile-shadow and
+original crypt/TTY path in an SSH session. It does not validate the rescue
+image, USB carrier, service SELinux domain or installed-filesystem mount.
+
+Before full-ZIP composition, `scripts/verify-rescue-console.sh` independently
+reads the regular rescue EXT4 file with read-only debugfs. It matches the file
+hash and size to the native composition record, compares all three helpers,
+both units and the module options with reviewed sources, and checks installed
+permissions, the locked root account, absence of human accounts and activation
+links. A second complete image hash verifies that inspection changed nothing.
+The full composer requires this receipt to name the same rescue filesystem
+hash as the super seed. An older locked-console-only seed is refused.
+
+Synthetic filesystem fixtures accept the exact sources and locked account;
+wrong executable permissions, an unlocked root and a changed unit refuse.
+This is source/file admission, not password, USB, boot or chroot acceptance.

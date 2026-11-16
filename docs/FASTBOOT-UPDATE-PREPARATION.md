@@ -291,6 +291,12 @@ combines that prepared desktop, matching super/rescue cohort, native A/B and
 rescue boot files, qualified DTBO and an explicitly hashed local vendor_boot.
 Its private component contract contains `desktop_directory`, `super_directory`,
 `boot_directory`, and `dtbo` / `vendor_boot` objects with `file` and `sha256`.
+The super directory also needs `rescue-console-readback.json`, produced by
+`scripts/verify-rescue-console.sh RESCUE_EXT4 COMPOSITION_JSON NEW_RECEIPT`.
+The receipt must match the super seed's exact rescue filesystem hash. This
+prevents an older image without the authenticated console sources from being
+used merely because its kernel cohort matches; physical console acceptance
+remains a separate step.
 The complete input paths are not copied to the archive. All three embedded
 kernel Images must hash to the independently read-back desktop kernel. The
 normal wrappers must name their actual A/B destination and the seed4 profile;

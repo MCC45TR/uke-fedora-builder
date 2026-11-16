@@ -168,6 +168,8 @@ debugfs -R "dump /usr/lib/systemd/systemd $work/readback-systemd" "$image" >/dev
 cmp "$root/usr/lib/systemd/systemd" "$work/readback-systemd"
 cp "$info" "$out/kernel-info.json"
 sha256sum "$repo/src/image/"{compose-fedora-rescue,configure-fedora-rescue,rescue-seed-manifest,fastboot-singleboot-layout}.sh \
+    "$repo/src/image/"{rescue-console-login,rescue-admin-policy,select-uke-userdata}.sh \
+    "$repo/src/image/"uke-rescue-{usb,console}.service "$repo/src/image/40-uke-rescue-serial.conf" \
     "$repo/src/public/"{repository-tools,repository-kernel,cohort,root-transaction}.sh \
     "$repo/src/audit/check-target-payload.sh" "$policy" > "$out/source-sha256.txt"
 jq -n --slurpfile kernel "$info" --argjson bytes "$((image_mib*1048576))" --arg hash "$(sha256sum "$image" | cut -d ' ' -f1)" \
@@ -180,4 +182,5 @@ jq -n --slurpfile kernel "$info" --argjson bytes "$((image_mib*1048576))" --arg 
       root_password_locked:true,automatic_repair:false,source_compiled_here:false,
       firmware_or_gpt_written:false,operating_system_boot_tested:false,physical_ufs_tested:false,
       secure_boot_qualified:false,encryption_qualified:false}' > "$out/rescue-composition.json"
+bash "$repo/scripts/verify-rescue-console.sh" "$image" "$out/rescue-composition.json" "$out/rescue-console-readback.json"
 printf 'Original Fedora rescue filesystem composed; protected boot, authenticated repair and physical acceptance remain open.\n'

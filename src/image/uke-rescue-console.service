@@ -1,0 +1,19 @@
+[Unit]
+Description=Authenticate the installed primary administrator for Uke USB rescue
+ConditionKernelCommandLine=senemos.role=rescue
+ConditionFirmware=device-tree-compatible(xiaomi,uke)
+Wants=uke-rescue-usb.service
+After=uke-rescue-usb.service dev-ttyGS0.device
+BindsTo=dev-ttyGS0.device
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/setsid --fork --wait /usr/bin/unshare --mount --propagation private /usr/libexec/uke-rescue/console-login
+Restart=always
+RestartSec=1
+KillMode=control-group
+TimeoutStopSec=10
+Environment=HISTFILE=/dev/null
+
+[Install]
+WantedBy=rescue.target

@@ -17,7 +17,7 @@ super=$(realpath "$(jq -er .super_directory "$contract")")
 boots=$(realpath "$(jq -er .boot_directory "$contract")")
 dtbo=$(realpath "$(jq -er .dtbo.file "$contract")")
 vendor=$(realpath "$(jq -er .vendor_boot.file "$contract")")
-for file in "$desktop/manifest.json" "$desktop/userdata.img" "$super/super-seed.json" "$super/super.img" "$super/SHA256SUMS" "$boots/SHA256SUMS" "$boots/boot_a.img" "$boots/boot_b.img" "$boots/rescue-boot.img" "$dtbo" "$vendor";do
+for file in "$desktop/manifest.json" "$desktop/userdata.img" "$super/super-seed.json" "$super/rescue-console-readback.json" "$super/super.img" "$super/SHA256SUMS" "$boots/SHA256SUMS" "$boots/boot_a.img" "$boots/boot_b.img" "$boots/rescue-boot.img" "$dtbo" "$vendor";do
  [[ -f $file && ! -L $file ]] || fail "missing regular input: ${file##*/}"
 done
 jq -e '.artifact_kind=="full-singleboot-desktop-input" and .device=="uke" and .filesystem=="ext4" and
@@ -34,6 +34,11 @@ jq -e --arg release "$release" --arg commit "$commit" '
  .seed_layout.phase=="seed" and .seed_layout.super_bytes==4294967296 and
  (.seed_layout.partition_table_changes|not) and (.seed_layout.opt_partition|not) and
  ([.seed_layout.partitions[]|{name,percentage}]|sort_by(.name))==[{name:"system_a",percentage:80},{name:"system_b",percentage:20}]' "$super/super-seed.json" > /dev/null || fail 'rescue kernel cohort or super layout differs'
+jq -e --arg hash "$(jq -er .rescue_input.sha256 "$super/super-seed.json")" '
+ .schema_version==1 and .artifact_kind=="uke-rescue-console-source-readback" and
+ .rescue_raw_sha256==$hash and .source_scripts_verified and .unit_files_verified and
+ .locked_root_verified and .human_account_absent and .activation_links_verified and
+ .inspection_read_only' "$super/rescue-console-readback.json" > /dev/null || fail 'rescue lacks the independent console-source readback'
 [[ $(sha256sum "$desktop/userdata.img" | cut -d' ' -f1) == "$(jq -er .root_sparse_sha256 "$desktop/manifest.json")" ]] || fail 'desktop payload hash differs'
 [[ $(sha256sum "$dtbo" | cut -d' ' -f1) == "$(jq -er .dtbo.sha256 "$contract")" ]] || fail 'DTBO hash differs'
 [[ $(sha256sum "$vendor" | cut -d' ' -f1) == "$(jq -er .vendor_boot.sha256 "$contract")" ]] || fail 'vendor_boot hash differs'
@@ -91,6 +96,7 @@ jq -n --slurpfile payloads "$work/payloads.jsonl" --arg release "$release" --arg
  geometry_policy:"measure-before-write",kernel_release:$release,kernel_source_commit:$commit,payloads:$payloads,
  rescue_boot:{file:"rescue-boot.img",stored_bytes:100663296,expanded_bytes:100663296,sha256:$rescue},
  super_policy:{seed_bytes:4294967296,swap_percent:80,rescue_percent:20,opt:false,gpt_geometry_changed:false},
+ rescue_console_source_verified:true,
  local_working_vendor_boot_input:true,redistribution_qualified:false,replaces_existing_userdata:true,
  physical_boot_tested:false,common_256_512_qualified:false,secure_boot_qualified:false,
  hardware_auto_unlock_qualified:false,encrypted_swap_qualified:false,hibernate_qualified:false,

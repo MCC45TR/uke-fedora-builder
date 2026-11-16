@@ -1,0 +1,14 @@
+[Unit]
+Description=Offer the signed kernel CDC serial function for explicit Uke rescue
+ConditionKernelCommandLine=senemos.role=rescue
+ConditionFirmware=device-tree-compatible(xiaomi,uke)
+After=systemd-udevd.service
+Before=uke-rescue-console.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/sbin/modprobe g_serial
+RemainAfterExit=yes
+
+[Install]
+WantedBy=rescue.target
