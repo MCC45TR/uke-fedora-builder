@@ -53,8 +53,12 @@ hash and size to the native composition record, compares all three helpers,
 both units and the module options with reviewed sources, and checks installed
 permissions, the locked root account, absence of human accounts and activation
 links. A second complete image hash verifies that inspection changed nothing.
-The full composer requires this receipt to name the same rescue filesystem
-hash as the super seed. An older locked-console-only seed is refused.
+When inspecting the expanded filesystem extracted from super, supply its native
+`super-composition.json` as the fourth argument. The verifier retains the
+original source hash and requires the exact canonical seed geometry, independent
+decode/byte-match proof and actual expanded payload hash and size. The full
+composer binds this receipt to both the source composition and the actual super
+payload. An older locked-console-only seed is refused.
 
 Synthetic filesystem fixtures accept the exact sources and locked account;
 wrong executable permissions, an unlocked root and a changed unit refuse.

@@ -39,6 +39,30 @@ reject(){
 composition
 verify "$work/valid.json"
 jq -e '.source_scripts_verified and .unit_files_verified and .locked_root_verified and (.operating_system_boot_tested|not)' "$work/valid.json" >/dev/null
+# Seed assembly grows EXT4 before embedding it. Verify that distinct payload
+# against its independently decoded native hash while retaining source identity.
+# shellcheck source=../src/image/fastboot-singleboot-layout.sh
+# shellcheck disable=SC1091
+source "$repo/src/image/fastboot-singleboot-layout.sh"
+layout=$(fastboot_super_layout 4294967296 seed)
+expanded=$(jq -er '.partitions[]|select(.role=="fedora-live-rescue")|.bytes' <<< "$layout")
+cp --sparse=always "$work/rescue.ext4" "$work/grown.ext4"
+truncate -s "$expanded" "$work/grown.ext4"
+resize2fs "$work/grown.ext4" > "$work/resize.log" 2>&1
+jq -n --arg hash "$(sha256sum "$work/grown.ext4" | cut -d' ' -f1)" --argjson layout "$layout" '
+ {liblp_three_slot_readback:true,independent_aosp_decode:true,both_logical_payloads_byte_matched:true,
+ rescue_full_capacity:true,layout:$layout,rescue_raw_sha256:$hash,
+ super_sparse_sha256:"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}' > "$work/super-composition.json"
+bash "$repo/scripts/verify-rescue-console.sh" "$work/grown.ext4" "$work/composition.json" "$work/expanded.json" "$work/super-composition.json"
+jq -e --arg source_hash "$(jq -er .sha256 "$work/composition.json")" '.source_rescue_raw_sha256==$source_hash and .rescue_raw_sha256!=$source_hash' "$work/expanded.json" >/dev/null
+jq '.rescue_raw_sha256="bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"' "$work/super-composition.json" > "$work/wrong-expanded.json"
+if bash "$repo/scripts/verify-rescue-console.sh" "$work/grown.ext4" "$work/composition.json" "$work/wrong-receipt.json" "$work/wrong-expanded.json" > "$work/refused.log" 2>&1;then exit 1;fi
+[[ ! -e $work/wrong-receipt.json ]]
+unlink "$work/grown.ext4"
+debugfs -w -R 'set_inode_field /etc/systemd/system/uke-rescue-usb.service mode 0100600' "$work/rescue.ext4" > "$work/edit.log" 2>&1
+composition
+verify "$work/private-unit.json"
+debugfs -w -R 'set_inode_field /etc/systemd/system/uke-rescue-usb.service mode 0100644' "$work/rescue.ext4" > "$work/edit.log" 2>&1
 debugfs -w -R 'set_inode_field /usr/libexec/uke-rescue/console-login mode 0100644' "$work/rescue.ext4" > "$work/edit.log" 2>&1
 reject
 debugfs -w -R 'set_inode_field /usr/libexec/uke-rescue/console-login mode 0100755' "$work/rescue.ext4" > "$work/edit.log" 2>&1
@@ -52,4 +76,4 @@ printf '[Unit]\nDescription=Wrong fixture unit\n' > "$work/changed"
 printf 'rm /etc/systemd/system/uke-rescue-usb.service\nwrite %s /etc/systemd/system/uke-rescue-usb.service\nset_inode_field /etc/systemd/system/uke-rescue-usb.service uid 0\nset_inode_field /etc/systemd/system/uke-rescue-usb.service gid 0\n' "$work/changed" > "$work/edit"
 debugfs -w -f "$work/edit" "$work/rescue.ext4" > "$work/edit.log" 2>&1
 reject
-echo 'Rescue filesystem readback: exact sources and locked account accepted; wrong executable mode, unlocked root and changed unit refused. Synthetic files only; no USB/authentication/OS boot claim.'
+echo 'Rescue filesystem readback: exact sources, locked account and native-hash-bound EXT4 growth accepted; wrong expanded hash, executable mode, unlocked root and changed unit refused. Synthetic files only; no USB/authentication/OS boot claim.'

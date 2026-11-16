@@ -50,8 +50,7 @@ layout=$(fastboot_seed_layout "$bytes" "$minimum")
 layout_file=$(mktemp)
 trap 'unlink "$expected"; unlink "$layout_file"' EXIT
 jq -M . <<< "$layout" > "$layout_file"
-bash "$repo/src/image/build-fastboot-super.sh" "$layout_file" "$image" "$output"
-cp "$input/rescue-console-readback.json" "$output/"
+bash "$repo/src/image/build-fastboot-super.sh" "$layout_file" "$image" "$output" "$composition"
 mkdir "$output/rescue-source"
 for file in rescue-composition.json kernel-info.json source-sha256.txt packages.tsv installed-nevras.txt \
     python-audit.txt selinux-audit.txt units-audit.txt filesystem-audit.txt kernel-payload-audit.txt; do

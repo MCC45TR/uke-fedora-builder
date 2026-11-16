@@ -4,8 +4,8 @@
 set -Eeuo pipefail
 export LC_ALL=C
 umask 077
-[[ $# == 3 ]] || {
-    printf 'Usage: %s SUPER_LAYOUT_JSON RESCUE_RAW_EXT4 NEW_OUTPUT\n' "${0##*/}" >&2
+[[ $# == 3 || $# == 4 ]] || {
+    printf 'Usage: %s SUPER_LAYOUT_JSON RESCUE_RAW_EXT4 NEW_OUTPUT [RESCUE_COMPOSITION_JSON]\n' "${0##*/}" >&2
     exit 2
 }
 root=$(cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -133,5 +133,8 @@ jq -M -n --arg hash "$(sha256sum "$output/super.img" | cut -d ' ' -f1)" \
       both_logical_payloads_byte_matched:true,rescue_full_capacity:true,swap_full_capacity:true,
       container_assembled:true,installable_archive_created:false,
       rescue_os_qualified:false,secure_boot_qualified:false,device_write_executed:false}' > "$output/super-composition.json"
+if [[ $# == 4 ]];then
+    bash "$root/scripts/verify-rescue-console.sh" "$work/extracted/system_b.img" "$4" "$output/rescue-console-readback.json" "$output/super-composition.json"
+fi
 (cd "$output"; sha256sum super.img super-layout.json super-topology.json super-composition.json lp-slot-?.json > SHA256SUMS)
 printf 'Constructed and decoded %s with full-size swap/rescue payload byte checks; boot/OS/security admission remains separate.\n' "$output/super.img"
