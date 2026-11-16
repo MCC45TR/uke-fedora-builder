@@ -469,6 +469,8 @@ jobs:
               dnf -y --setopt=install_weak_deps=False install android-tools e2fsprogs util-linux jq coreutils findutils diffutils socat zip git-core strace systemd systemd-udev veritysetup
               mkdir -m700 /fixture/result
               rpm -q android-tools e2fsprogs util-linux jq coreutils systemd systemd-udev > /fixture/result/original-tools.txt
+              bash /source/tests/early-super-policy.sh
+              bash /source/tests/early-super-units.sh
               bash /source/tests/protected-initrd-barriers.sh /fixture/result/protected-initrd-barriers.json
               bash /source/tests/rescue-verity.sh /fixture/result/rescue-verity.json
               bash /source/tests/rescue-verity-map.sh prepare /fixture/verity-map
@@ -488,6 +490,7 @@ jobs:
               bash /source/tests/fastboot-super-grow.sh prepare /fixture/super-grow
               sha256sum /source/src/image/{build-fastboot-super,inspect-fastboot-super,map-fastboot-rescue,fastboot-singleboot-layout,plan-super-provision,provision-fastboot-super,fastboot-requirements,plan-fastboot-update,select-uke-super}.sh /source/tests/fastboot-{super-composition,super-inspection,rescue-map,super-provision-plan,super-grow,update-parser,tcp-peer,physical-super}.sh > /fixture/result/source-sha256.txt
               sha256sum /source/src/image/dracut/96uke-protected-boot/* /source/tests/protected-initrd-barriers.sh >> /fixture/result/source-sha256.txt
+              sha256sum /source/src/image/{early-super-policy,prepare-early-super,guard-early-rescue}.sh /source/src/image/dracut/96uke-super-boot/* /source/tests/early-super-{policy,units}.sh >> /fixture/result/source-sha256.txt
               sha256sum /source/src/image/rescue-verity-layout.sh /source/src/image/build-rescue-verity.sh /source/src/image/qualify-fedora-rescue-verity.sh /source/tests/rescue-verity.sh >> /fixture/result/source-sha256.txt
               sha256sum /source/tests/rescue-verity-map.sh >> /fixture/result/source-sha256.txt
             '

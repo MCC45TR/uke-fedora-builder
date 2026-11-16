@@ -8,7 +8,9 @@ install() {
     local script
     # This plaintext seed/rescue profile must not replace protected-root policy.
     [[ ! -e $initdir/usr/libexec/uke-protected-boot-policy &&
-       ! -e $initdir$systemdsystemunitdir/uke-protected-role.service ]] || return 1
+       ! -L $initdir/usr/libexec/uke-protected-boot-policy &&
+       ! -e $initdir$systemdsystemunitdir/uke-protected-role.service &&
+       ! -L $initdir$systemdsystemunitdir/uke-protected-role.service ]] || return 1
     inst_multiple udevadm
     for script in early-super-policy prepare-early-super guard-early-rescue;do
         inst_simple "$moddir/$script.sh" "/usr/libexec/uke-super/$script.sh"
