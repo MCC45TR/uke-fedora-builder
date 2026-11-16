@@ -2,7 +2,7 @@
   "schema_version": 1,
   "repository": "https://github.com/Xiaomi-Pad-7-Pro-Resources/android_device_xiaomi_uke-kernel",
   "commit": "0d2b9c42b8e1873e6c7b61326b35c94c991ab713",
-  "scope": "Recover DTS from complete public flattened references and require byte-exact native recompilation; not original OEM source reproduction",
+  "scope": "Recover DTS from complete public flattened references and verify full canonical content, reservations and boot CPU; report binary layout separately; not original OEM source reproduction",
   "reference_license": "LicenseRef-Proprietary",
   "notice": "Public reference repository has no top-level license; original author/source and redistribution review remain separate",
   "physical_admission": false,

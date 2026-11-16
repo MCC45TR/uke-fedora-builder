@@ -21,5 +21,5 @@ done < <(jq -r '.inputs[]|[.name,.path,(.bytes|tostring),.sha256]|@tsv' "$pins")
 tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner -cJf "$result/public-dt-reference.tar.xz" -C "$work/reference" .
 install -m644 "$owner/tests/dtbo-reference-roundtrip.sh" "$pins" "$result/"
 install -m644 "$owner/packaging/uke-dtbo-roundtrip-check.spec" "$result/uke-dtbo-tools-source-check.spec"
-[[ $(rpmspec --target aarch64 --define 'dist .fc46' -q --srpm --qf '%{NAME}-%{VERSION}-%{RELEASE}' "$result/uke-dtbo-tools-source-check.spec") == uke-dtbo-tools-source-check-1.0-8.fc46 ]]
+[[ $(rpmspec --target aarch64 --define 'dist .fc46' -q --srpm --qf '%{NAME}-%{VERSION}-%{RELEASE}' "$result/uke-dtbo-tools-source-check.spec") == uke-dtbo-tools-source-check-1.0-9.fc46 ]]
 printf 'Public complete FDT references pinned; native roundtrip remains a diagnostic without original-source, runtime or physical admission.\n'

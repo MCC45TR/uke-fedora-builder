@@ -53,15 +53,17 @@ groups without importing private live FDT or calibration data. The board,
 camera and display closure must be extended with these subsystem layers;
 successful source7 compilation alone cannot admit a runtime DTBO package.
 
-An independent roundtrip diagnostic is prepared as source-check8. It uses only
-the complete public flattened overlay and four public bases, recovers their
-DTS text with original Fedora DTC, and requires byte-identical native
-recompilation and application to all four public bases. The pinned v0 table
-header/padding are retained only when the recompiled payload is identical.
-Recovered text is not the missing original OEM source closure. This diagnostic
-does not admit a runtime DTBO, replace installed vendor_boot bases, enable OEM
-verification or authorize a partition write. Its references are public; no
-private tablet dump or calibration is uploaded.
+Independent roundtrip8/COPR11332128 refused byte-exact reproduction: the
+overlay recompiles from591793 to591697bytes while its canonical DTC text has
+no reported difference. This failed diagnostic admits no payload. Source9
+separates serialization from content: it requires identical complete canonical
+trees, reservations, boot CPU and all four applied public trees, with wrong
+model/CPU/reservation refusals. It reports lengths and byte equality separately
+and produces no DTBO transport; a runtime formatter must use the new actual
+FDT length. No numeric/phandle heuristic is used in that comparison.
+Recovered DTS is distinct from the missing original OEM source closure.
+Neither diagnostic admits installed vendor_boot replacement, OEM verification
+or a physical write. Only public references are uploaded.
 
 Original Fedora fdtoverlay applies both the installed and public overlay to
 each exact installed base. A bounded private PC data analysis resolves only
