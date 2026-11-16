@@ -9,12 +9,13 @@ source "$repo/src/image/rescue-admin-policy.sh"
 work=$(mktemp -d)
 trap 'find "$work" -depth -delete' EXIT
 root=$work/root
+fixture_hash="\$6\$fixture\$structural_only"
 reset(){
     if [[ -d $root ]];then find "$root" -depth -delete;fi
     mkdir -m700 "$root" "$root/etc"
     printf 'root:x:0:0:root:/root:/bin/bash\nfixture:x:1000:1000:Fixture:/home/fixture:/bin/bash\n' > "$root/etc/passwd"
     printf 'root:x:0:\nwheel:x:10:fixture\nfixture:x:1000:\n' > "$root/etc/group"
-    printf '%s\n' 'root:!:20000:0:99999:7:::' 'fixture:$6$fixture$structural_only:20000:0:99999:7:::' > "$root/etc/shadow"
+    printf 'root:!:20000:0:99999:7:::\nfixture:%s:20000:0:99999:7:::\n' "$fixture_hash" > "$root/etc/shadow"
     chmod 644 "$root/etc/passwd" "$root/etc/group"
     chmod 600 "$root/etc/shadow"
 }
@@ -25,7 +26,7 @@ reject(){
     [[ ! -s $work/result ]]
 }
 reset
-[[ $(uke_rescue_admin_hash "$root" fixture) == '$6$fixture$structural_only' ]]
+[[ $(uke_rescue_admin_hash "$root" fixture) == "$fixture_hash" ]]
 reject unknown
 reject root
 reject $'fixture\\nroot'
@@ -35,7 +36,7 @@ reject
 reset
 sed -i 's/1000:1000/1000:10/' "$root/etc/passwd"
 sed -i 's/wheel:x:10:fixture/wheel:x:10:/' "$root/etc/group"
-[[ $(uke_rescue_admin_hash "$root" fixture) == '$6$fixture$structural_only' ]]
+[[ $(uke_rescue_admin_hash "$root" fixture) == "$fixture_hash" ]]
 reset
 sed -i 's/fixture:x:1000/fixture:x:0/' "$root/etc/passwd"
 reject
