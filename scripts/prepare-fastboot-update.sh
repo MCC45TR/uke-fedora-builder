@@ -125,5 +125,5 @@ hash=$(sha256sum "$work/android-info.txt" | cut -d' ' -f1)
 awk -v hash="$hash" '$2=="android-info.txt"{$1=hash;print $1"  "$2;next}{print}' "$work/actual.sha256" | sort > "$work/SHA256SUMS"
 (cd "$work";zip -q device.zip android-info.txt SHA256SUMS)
 mv "$work/device.zip" "$output"
-sha256sum "$output" > "$output.sha256"
+(cd "${output%/*}";sha256sum "${output##*/}" > "${output##*/}.sha256")
 printf 'Prepared %s\nNo slot selection, flash, erase, reboot, relock or key operation was performed.\nRun: %q update %q\n' "$output" "$client" "$output"
