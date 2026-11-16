@@ -10,6 +10,7 @@ fail(){ printf 'UKE_RESCUE_LOGIN_REJECTED: %s\n' "$*" >&2;exit 1; }
 [[ $(id -u) == 0 ]] || fail 'root service required'
 [[ $# == 0 && $(readlink /proc/self/ns/mnt) != "$(readlink /proc/1/ns/mnt)" &&
    $(findmnt -rn -o PROPAGATION /) == private ]] || fail 'private mount namespace required'
+[[ $(findmnt -rn -o FSTYPE --target /run) == tmpfs && -f /etc/shadow && ! -L /etc/shadow ]] || fail 'volatile runtime and a regular rescue shadow file are required'
 # The systemd service creates a session before unshare. A blocking open with
 # CLOCAL cleared waits for the USB host carrier rather than polling for it.
 [[ -c /dev/ttyGS0 ]] || fail 'USB console device unavailable'
@@ -45,6 +46,10 @@ trap cleanup EXIT
 mount -t ext4 -o ro,noload /proc/self/fd/3 "$work/installed"
 mounted=true
 [[ $(findmnt -rn -o MAJ:MIN --mountpoint "$work/installed") == "$uke_userdata_devno" ]] || fail 'mounted userdata identity differs'
+case ,$(findmnt -rn -o OPTIONS --mountpoint "$work/installed"), in
+    *,ro,*) :;;
+    *) fail 'installed userdata is not read-only';;
+esac
 account=$(awk -F: '$3==1000{n++;who=$1} END{if(n!=1)exit 1;print who}' "$work/installed/etc/passwd") || fail 'one primary installed account with UID1000 is required'
 hash=$(uke_rescue_admin_hash "$work/installed" "$account") || fail 'an enabled installed administrator in wheel is required'
 # This synthetic shadow exists only on volatile /run and only in this namespace.
