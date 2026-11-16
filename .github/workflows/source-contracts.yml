@@ -397,6 +397,8 @@ jobs:
           shellcheck src/public/first-boot-policy.sh tests/first-boot-policy.sh tests/clock-epoch.sh
           bash tests/first-boot-policy.sh
           bash tests/clock-epoch.sh
+          shellcheck tests/setup-cdc-image.sh
+          bash tests/setup-cdc-image.sh
           bash tests/repository-kernel-plan.sh
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
           bash tests/repository-kernel-identity.sh
