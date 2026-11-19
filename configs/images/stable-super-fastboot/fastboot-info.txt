@@ -1,0 +1,5 @@
+version 1
+flash super super.img
+flash userdata userdata.img
+flash dtbo dtbo.img
+flash boot boot.img

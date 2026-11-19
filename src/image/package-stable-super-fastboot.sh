@@ -7,7 +7,8 @@ umask 077
 desktop=$(realpath "$1") components=$(realpath "$2") output=$(realpath -m "$3")
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 previous=uke-fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-fastboot.zip
-archive=uke-fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-super-fastboot.zip
+archive=fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-fastboot.zip
+profile=$repo/configs/images/stable-super-fastboot
 (cd "$desktop"; sha256sum -c --strict SHA256SUMS)
 for dir in super-boots super-seed; do (cd "$components/$dir"; sha256sum -c --strict SHA256SUMS); done
 mkdir "$output"
@@ -49,6 +50,8 @@ hash() { sha256sum "$1" | cut -d ' ' -f1; }
 [[ $(hash "$work/boot.img") == "$(jq -er .userdata_super_sha256 "$boots/super-profiles.json")" ]]
 [[ $(hash "$work/rescue-boot.img") == "$(jq -er .rescue_sha256 "$boots/super-profiles.json")" ]]
 [[ $(hash "$work/super.img") == "$(jq -er .super_sparse_sha256 "$seed/super-composition.json")" ]]
+[[ $(stat -Lc %s "$work/boot.img") == 100663296 && $(stat -Lc %s "$work/rescue-boot.img") == 100663296 ]]
+(( $(stat -c %s "$work/dtbo.img") <= 25165824 ))
 # Verify that the reused desktop root has the native swap manager and that its
 # kernel matches the signed wrappers rather than trusting its filename.
 simg2img "$work/userdata.img" "$work/userdata.raw"
@@ -60,6 +63,10 @@ debugfs -R 'cat /etc/systemd/system/uke-swap-ready.service' "$work/userdata.raw"
     grep -Fx 'ExecStart=/usr/bin/uke-control swap apply'
 debugfs -R 'stat /usr/libexec/uke-control/super-swap/prepare.sh' "$work/userdata.raw" |
     grep -Eq 'Type: regular[[:space:]]+Mode:[[:space:]]+0755'
+debugfs -R 'cat /etc/fstab' "$work/userdata.raw" |
+    grep -Fx 'PARTLABEL=userdata / ext4 defaults,noatime,x-systemd.growfs 0 0'
+debugfs -R 'cat /etc/systemd/system/uke-root-capacity.service' "$work/userdata.raw" |
+    grep -Fx 'Requires=systemd-growfs-root.service'
 debugfs -R 'cat /etc/senemos/kernel-update.conf' "$work/userdata.raw" | grep -Fx 'automatic=1'
 debugfs -R 'cat /etc/senemos/userdata-update.conf' "$work/userdata.raw" | grep -Fx 'automatic=1'
 unlink "$work/userdata.raw"
@@ -81,13 +88,12 @@ jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-compos
          boot_sha256:($images|from_entries|.["boot.img"].sha256),boot_profile:"userdata-super",
          previous_desktop_run:44546857648,super_layout:$super[0].layout,
          targets:["super","userdata","dtbo_active","boot_active"],required_current_slot:null,
-         product_capacity:"Measured from the attached Uke by the installer",
+         installation:"fastboot update",installation_script:false,
+         capacity_policy:"Grow to the measured physical userdata and super partitions during first boot",
          replaces_existing_userdata:true,rescue_boot_hardware_tested:false,
          xiaomi_pad_7_256gb_hardware_tested:false}
 ' "$desktop_manifest" > "$work/manifest.json"
-printf '%s\n' 'require product=uke-use-measured-host-installer' > "$work/android-info.txt"
-printf '%s\n' 'version 1' 'flash super super.img' 'flash userdata userdata.img' 'flash dtbo dtbo.img' 'flash boot boot.img' > "$work/fastboot-info.txt"
-cp "$repo/scripts/install-stable-super-fastboot.sh" "$work/"
+cp "$profile/"{android-info,fastboot-info}.txt "$work/"
 cat > "$work/README.txt" <<TEXT
 Fedora Rawhide Stable / KDE Plasma / Bash / EXT4 singleboot
 Kernel 7.4.5-senemos (Stable COPR RPM 7.3.5-13.fc46)
@@ -96,25 +102,19 @@ This installation replaces Android super and userdata. Back up all data and
 keep the matching Xiaomi stock firmware package before installing. An unlocked
 Uke with working, compatible vendor_boot and bootloader firmware is required.
 
-The host installer checks the connected device's active slot and measured
-partition sizes, including userdata and super. This supports the 256 GB and
-512 GB capacity variants when the measured Uke geometry passes. The workflow
-has not boot-tested this image on a physical Xiaomi Pad 7 256 GB.
+Use current Android SDK Platform-Tools and bootloader fastboot on the stock
+partition layout of a Xiaomi Pad 7 256 GB or POCO Pad X1 512 GB. Install with:
 
-From a Linux host with fastboot, jq and unzip installed:
-  sha256sum -c SHA256SUMS
-  bash install-stable-super-fastboot.sh --check $archive
-  bash install-stable-super-fastboot.sh --install $archive
+  fastboot update ./$archive
 
-Use the host installer. Direct fastboot update is blocked to keep the
-capacity check effective with stock fastboot clients. The installer writes
-super, userdata, DTBO and boot for the active slot and then reboots. It
-preserves GPT, vbmeta, vendor_boot, the other boot slot and device firmware.
-For installation, set TMPDIR to a disk with enough room for the sparse images
-if the default temporary filesystem is too small.
+The archive writes super, userdata, and the active slot's DTBO and boot.
+It preserves partition sizes, the other slot's boot and DTBO, vendor_boot,
+vbmeta, and the device firmware.
 
-On first boot the 4 GiB super seed expands in place against measured
-capacity, allocating approximately 80% to linux_swap and 20% to FEDORA_RESCUE.
+On first boot Fedora grows EXT4 to the detected userdata size. The 4 GiB
+super seed grows in place to the detected super size, allocating about 80%
+to linux_swap and 20% to FEDORA_RESCUE. Xiaomi Pad 7 256 GB physical boot
+still needs testing.
 The live rescue root is in super. Extract rescue-boot.img separately for a
 temporary boot on a bootloader that supports fastboot boot, after ordinary
 Fedora setup has created the administrator.
@@ -127,9 +127,15 @@ userdata read-only. Temporary rescue boot and login still need hardware testing.
 TEXT
 (
     cd "$work"
-    sha256sum android-info.txt fastboot-info.txt manifest.json README.txt install-stable-super-fastboot.sh "${files[@]}" > SHA256SUMS
-    zip -q -1 "$output/$archive" android-info.txt fastboot-info.txt manifest.json README.txt install-stable-super-fastboot.sh SHA256SUMS "${files[@]}"
+    sha256sum android-info.txt fastboot-info.txt manifest.json README.txt "${files[@]}" > SHA256SUMS
+    zip -q -1 "$output/$archive" android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS "${files[@]}"
 )
 unzip -tq "$output/$archive"
-cp "$work/"{manifest.json,README.txt,install-stable-super-fastboot.sh} "$output/"
-(cd "$output"; sha256sum "$archive" README.txt manifest.json install-stable-super-fastboot.sh > SHA256SUMS)
+for file in android-info.txt fastboot-info.txt; do
+    unzip -p "$output/$archive" "$file" | cmp - "$profile/$file"
+done
+printf '%s\n' android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS "${files[@]}" |
+    LC_ALL=C sort > "$work/expected-entries"
+unzip -Z -1 "$output/$archive" | LC_ALL=C sort | cmp - "$work/expected-entries"
+cp "$work/"{manifest.json,README.txt} "$output/"
+(cd "$output"; sha256sum "$archive" README.txt manifest.json > SHA256SUMS)
