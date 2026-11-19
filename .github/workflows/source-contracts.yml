@@ -12,12 +12,72 @@ on:
         description: Assemble the matching Stable super seed and live rescue from signed inputs
         type: boolean
         default: false
+      stable_super_components_run:
+        description: Successful Stable rescue components run for assembling the singleboot ZIP
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
   group: image-source-contracts-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  stable-super-fastboot:
+    if: github.event_name == 'workflow_dispatch' && inputs.stable_super_components_run != ''
+    needs: source
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify the source runs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMPONENTS_RUN: ${{ inputs.stable_super_components_run }}
+        run: |
+          set -Eeuo pipefail
+          [[ $COMPONENTS_RUN =~ ^[1-9][0-9]{0,13}$ ]]
+          api="repos/$GITHUB_REPOSITORY/actions/runs"
+          gh api "$api/44546857648" | jq -e '
+            .conclusion=="success" and .head_sha=="bc158a877d92d050fd3d7d6a08247df8e112b253"'
+          gh api "$api/$COMPONENTS_RUN" | jq -e '
+            .conclusion=="success" and .event=="workflow_dispatch" and
+            .path==".github/workflows/source-contracts.yml" and .head_branch=="release/stable-fastboot-7.4.5"'
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq zip unzip e2fsprogs android-sdk-libsparse-utils
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44546857648
+          name: uke-stable-kde-bash-singleboot-fastboot
+          path: ${{ runner.temp }}/uke-stable-desktop
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: ${{ inputs.stable_super_components_run }}
+          name: uke-stable-super-components
+          path: ${{ runner.temp }}/uke-stable-super-components
+      - name: Assemble the Stable singleboot fastboot ZIP
+        env:
+          COMPONENTS_RUN: ${{ inputs.stable_super_components_run }}
+        run: |
+          set -Eeuo pipefail
+          (( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2{print $4}') >= 16*1024*1024 ))
+          bash src/image/package-stable-super-fastboot.sh "$RUNNER_TEMP/uke-stable-desktop" \
+            "$RUNNER_TEMP/uke-stable-super-components" "$RUNNER_TEMP/uke-stable-super-fastboot"
+          (cd "$RUNNER_TEMP/uke-stable-super-fastboot"; sha256sum -c --strict SHA256SUMS)
+          echo "Stable KDE Plasma and Bash singleboot ZIP with DTBO, super, linux_swap and Fedora live rescue. Source runs 44546857648 and $COMPONENTS_RUN." >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: uke-stable-kde-bash-singleboot-super-fastboot
+          path: ${{ runner.temp }}/uke-stable-super-fastboot
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
   stable-super-rescue:
     if: github.event_name == 'workflow_dispatch' && inputs.stable_super_rescue
     runs-on: ubuntu-24.04-arm
@@ -149,6 +209,8 @@ jobs:
           bash tests/repository-kernel-plan.sh
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
           shellcheck src/image/fastboot-requirements.sh src/image/package-stable-fastboot-test.sh
+          shellcheck scripts/install-stable-super-fastboot.sh src/image/package-stable-super-fastboot.sh
+          bash tests/stable-super-fastboot-installer.sh
           bash tests/repository-kernel-identity.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
