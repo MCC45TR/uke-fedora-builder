@@ -1,7 +1,6 @@
 #!/usr/bin/env bash
 # Only a new regular file is attached to an isolated libguestfs appliance.
 set -Eeuo pipefail
-channel=$(jq -er .channel /job/request.json)
 # shellcheck source=cohort.sh
 # shellcheck disable=SC1091
 source /builder/src/public/cohort.sh
@@ -31,7 +30,7 @@ read_options=$(public_filesystem_ro_options "$filesystem")
 if [[ -c /dev/kvm && -r /dev/kvm && -w /dev/kvm ]]; then unset LIBGUESTFS_BACKEND_SETTINGS; fi
 cpus=$(getconf _NPROCESSORS_ONLN 2>/dev/null || echo 1)
 if [[ $filesystem == ext4 ]]; then
-    if [[ $channel == unstable ]]; then
+    if [[ -n ${UKE_IMAGE_TOOLS:-} ]]; then
         cp "$UKE_IMAGE_TOOLS/ext4-labels" /job/ext4-labels
     else
         c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/image/ext4-labels.cpp \
@@ -71,7 +70,7 @@ grep -Fx "$filesystem" /job/filesystem-readback.txt
 grep -Fx UKE_LINUX /job/filesystem-readback.txt
 grep -aF passwd_file_t /job/filesystem-readback.txt
 # Ignore generated SELinux labels here; contents, owners, ACLs and capabilities must match.
-if [[ $channel == unstable ]]; then
+if [[ -n ${UKE_IMAGE_TOOLS:-} ]]; then
     metadata_auditor=$UKE_IMAGE_TOOLS/compare-root-metadata
 else
     metadata_auditor=/job/compare-root-metadata
@@ -80,7 +79,7 @@ fi
 public_root_compare /job/root /job/rootfs.tar /job/root-readback.tar /job "$metadata_auditor" \
     /job/artifacts "$(jq -er .desktop /job/request.json)"
 [[ -s /job/artifacts/serialized-language-audit.json ]]
-if [[ $channel == unstable ]]; then cp "$UKE_IMAGE_TOOLS/android-sparse" /job/android-sparse
+if [[ -n ${UKE_IMAGE_TOOLS:-} ]]; then cp "$UKE_IMAGE_TOOLS/android-sparse" /job/android-sparse
 else c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot-pair/android-sparse.cpp -o /job/android-sparse; fi
 /job/android-sparse encode /job/root.raw "/job/artifacts/$partition.img"
 if jq -e '(.kernel_rpm_request // "") != ""' /job/request.json >/dev/null; then

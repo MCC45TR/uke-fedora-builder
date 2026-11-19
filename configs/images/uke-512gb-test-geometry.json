@@ -1,0 +1,21 @@
+{
+  "schema_version": 1,
+  "product": "uke",
+  "board": "xiaomi,uke",
+  "soc": "qcom,sm7675",
+  "observed_date": "2026-11-15",
+  "measurement": "Read-only SSH sysfs partition sectors multiplied by the kernel's 512-byte sector unit",
+  "scope": "Measured 512-GB installation-test target only; no 256-GB qualification",
+  "partitions": {
+    "boot_a": 100663296,
+    "boot_b": 100663296,
+    "dtbo_a": 25165824,
+    "dtbo_b": 25165824,
+    "super": 11274289152,
+    "userdata": 497535680512,
+    "vbmeta_a": 131072,
+    "vbmeta_b": 131072,
+    "vendor_boot_a": 100663296,
+    "vendor_boot_b": 100663296
+  }
+}

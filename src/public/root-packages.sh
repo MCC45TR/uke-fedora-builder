@@ -2,7 +2,7 @@
 # One package policy for actual root installation and COPR input resolution.
 public_root_packages() {
     local -n selection=$1
-    local release=$2 channel=$3 desktop=$4 login_shell=$5 package
+    local release=$2 channel=$3 desktop=$4 login_shell=$5 kernel_release=${6:-} package
     case $release in 44|45|rawhide) ;; *) return 1;; esac
     case $channel in stable|testing|unstable) ;; *) return 1;; esac
     case $desktop in core|kde|plasma-mobile|gnome|cutefish|nextkde) ;; *) return 1;; esac
@@ -21,7 +21,7 @@ public_root_packages() {
         uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
         uke-charge-control uke-offline-charge)
     [[ $release != rawhide ]] || selection+=(fedora-repos-rawhide)
-    if [[ $channel == unstable ]]; then
+    if [[ $channel == unstable || $kernel_release == 7.4.5-senemos ]]; then
         local individual=()
         for package in "${selection[@]}"; do
             case $package in

@@ -3,12 +3,60 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      stable_fastboot_kernel_evr:
+        description: Exact published normal Stable kernel RPM version-release for the KDE fastboot ZIP
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
   group: image-source-contracts-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  stable-fastboot:
+    if: github.event_name == 'workflow_dispatch' && inputs.stable_fastboot_kernel_evr != ''
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Assemble and verify the Stable fastboot ZIP
+        env:
+          IMAGE_EVR: ${{ inputs.stable_fastboot_kernel_evr }}
+          UKE_CONTAINER_ENGINE: docker
+          UKE_FASTBOOT_OUTPUT: '1'
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 && $IMAGE_EVR =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ ]]
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq zstd
+          bash scripts/build-image.sh --release rawhide --mode singleboot --filesystem ext4 \
+            --desktop kde --shell bash --channel stable --kernel-profile normal --kernel-rpm "$IMAGE_EVR" \
+            --linux-size 8192 --jobs 2 --out "$RUNNER_TEMP/uke-stable-fastboot-build" --yes
+          mapfile -t manifests < <(find "$RUNNER_TEMP/uke-stable-fastboot-build" -mindepth 3 -maxdepth 3 -path '*/fastboot/manifest.json')
+          [[ ${#manifests[@]} == 1 ]]
+          output=${manifests[0]%/manifest.json}
+          (cd "$output"; sha256sum -c --strict SHA256SUMS)
+          mv "$output" "$RUNNER_TEMP/uke-stable-fastboot"
+          printf 'Stable KDE Plasma and Bash singleboot installation test for the measured 512 GB Uke. Includes DTBO, boot and userdata. The archive replaces userdata.\n' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: uke-stable-kde-bash-singleboot-fastboot
+          path: ${{ runner.temp }}/uke-stable-fastboot
+          if-no-files-found: error
+          retention-days: 14
+          compression-level: 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: stable-fastboot-diagnostics
+          path: ${{ runner.temp }}/uke-stable-fastboot-build/image-*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
   source:
     runs-on: ubuntu-24.04
     steps:
@@ -48,6 +96,7 @@ jobs:
           bash tests/clock-epoch.sh
           bash tests/repository-kernel-plan.sh
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
+          shellcheck src/image/fastboot-requirements.sh src/image/package-stable-fastboot-test.sh
           bash tests/repository-kernel-identity.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh

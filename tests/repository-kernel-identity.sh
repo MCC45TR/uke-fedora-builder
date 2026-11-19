@@ -97,4 +97,44 @@ done
 jq '.channel="testing"' "$work/request" > "$work/wrong-channel"
 jq -s '.[0]+.[1]' "$work/wrong-channel" "$work/info" > "$work/manifest"
 if cohort_identity "$work/wrong-channel" "$work/info" "$work/manifest"; then exit 1; fi
+
+root=$work/publication-root
+abi=7.4.5-senemos
+bundle=$root/usr/lib/senemos/kernel-updates/$abi
+source_dir=$root/usr/share/senemos/uke/$abi
+mkdir -p "$root/usr/lib/modules/$abi" "$bundle" "$source_dir"
+printf 'kernel_release=%s\n' "$abi" > "$bundle/manifest"
+printf '%s\n' "$sha" > "$source_dir/source-commit"
+jq -n --arg sha "$sha" '{
+    kernel_release:"7.4.5-senemos",source_commit:$sha,upstream_version:"7.3.5",rpm_revision:"12",
+    publication:{family:"senemos-uke-linux-kernel-mainline",parent_copr_build:11360041,
+                 source_kernel_release:"7.3.5-12-unstable"}}' > "$work/publication-composition"
+cp "$work/publication-composition" "$source_dir/source-composition.json"
+[[ $(cohort_repository_release "$root" 7.3.5-12) == "$abi" ]]
+reject 7.3.5-13
+reject 7.4.5-12
+bad_compositions=(
+    'del(.publication)'
+    '.publication.source_kernel_release="7.3.5-13-unstable"'
+    '.publication.family="senemos-uke-linux-kernel-mainline-unstable"'
+    '.publication.parent_copr_build=0'
+)
+for expression in "${bad_compositions[@]}"; do
+    jq "$expression" "$work/publication-composition" > "$source_dir/source-composition.json"
+    reject 7.3.5-12
+done
+jq '.channel="stable" | .kernel_version="7.3.5" | .kernel_profile="normal"' "$work/request" > "$work/normal-request"
+jq '.kernel_version="7.3.5" | .kernel_profile="normal" | .kernel_family="senemos-uke-linux-kernel-mainline" |
+    .kernel_release="7.4.5-senemos" | .rpm_version_release="7.3.5-12"' "$work/info" > "$work/normal-info"
+jq -s '.[0]+.[1]' "$work/normal-request" "$work/normal-info" > "$work/manifest"
+cohort_identity "$work/normal-request" "$work/normal-info" "$work/manifest"
+
+family=senemos-uke-linux-kernel-mainline
+evr=7.3.5-12.fc46
+printf '%s\n' "$family-$evr.aarch64" "$family-core-$evr.aarch64" > "$work/inventory"
+[[ $(cohort_kernel_components "$work/inventory" "$family" "$evr") == $'\n-core' ]]
+printf '%s\n' "$family-modules-$evr.aarch64" >> "$work/inventory"
+if cohort_kernel_components "$work/inventory" "$family" "$evr" >/dev/null 2>&1; then exit 1; fi
+printf '%s\n' "$family-dtbs-$evr.aarch64" "$family-boot-$evr.aarch64" >> "$work/inventory"
+[[ $(cohort_kernel_components "$work/inventory" "$family" "$evr") == $'\n-core\n-modules\n-dtbs\n-boot' ]]
 echo 'Normal and cumulative unstable RPM/ABI identities, source proofs, family and channel refusal passed'

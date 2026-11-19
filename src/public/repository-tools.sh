@@ -3,10 +3,12 @@
 set -Eeuo pipefail
 [[ $(uname -m) == aarch64 ]]
 tools_policy=/builder/configs/public-build.json
-tools_project=$(jq -er .build_tools.project "$tools_policy")
-tools_fingerprint=$(jq -er .build_tools.fingerprint "$tools_policy")
+tools_channel=unstable
+if [[ -f /job/request.json ]]; then tools_channel=$(jq -er .channel /job/request.json); fi
+tools_project=$(jq -er --arg channel "$tools_channel" '.channels[$channel].project' "$tools_policy")
+tools_fingerprint=$(jq -er --arg channel "$tools_channel" '.channels[$channel].fingerprint' "$tools_policy")
 tools_nevra=$(jq -er .build_tools.nevra "$tools_policy")
-[[ $tools_project == uke-linux-unstable && $tools_fingerprint == 2204A661EA630A5303500085538797E72A3E4ECA &&
+[[ $tools_project =~ ^uke-linux(-test|-unstable)?$ && $tools_fingerprint =~ ^[A-F0-9]{40}$ &&
    $tools_nevra =~ ^uke-image-tools-[0-9]+\.[0-9]+\.[0-9]+-[0-9]+\.fc46\.aarch64$ ]]
 tools_key=/cache/$tools_project.asc
 if [[ ${UKE_OFFLINE:-0} != 1 ]]; then

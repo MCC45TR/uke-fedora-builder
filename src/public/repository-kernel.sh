@@ -52,22 +52,32 @@ if [[ $release == latest ]]; then
 fi
 [[ $release =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?[.]fc46$ ]]
 packages=()
-for component in '' -core -modules -dtbs -boot -singleboot; do
+inventory=/job/repository-kernel.available
+"${dnf[@]}" repoquery --arch=aarch64 --qf '%{name}-%{version}-%{release}.%{arch}' "$base*" > "$inventory"
+components=$(cohort_kernel_components "$inventory" "$base" "$release")
+while IFS= read -r component; do
     packages+=("$base$component-$release.aarch64")
-done
+done <<< "$components"
+packages+=("$base-singleboot-$release.aarch64")
 "${dnf[@]}" download --destdir=/job/artifacts/kernel "${packages[@]}"
 archives=(/job/artifacts/kernel/*.aarch64.rpm)
-[[ ${#archives[@]} == 6 ]]
+[[ ${#archives[@]} == "${#packages[@]}" ]]
 for archive in "${archives[@]}"; do
     rpmkeys --dbpath /job/kernel-keydb --checksig "$archive" | grep -F 'signatures OK'
-    [[ $(rpm -qp --qf '%{VERSION}-%{RELEASE}.%{ARCH}' "$archive") == "$release.aarch64" ]]
+    [[ $(rpm -qp --qf '%{NAME}-%{VERSION}-%{RELEASE}.%{ARCH}' "$archive") == "$(basename -- "$archive" .rpm)" ]]
     rpm2cpio "$archive" > /job/payload.cpio
     (cd /job/kernel-payload; cpio -idmu --quiet --no-absolute-filenames --io-size=1048576 < /job/payload.cpio)
 done
+if [[ ${#archives[@]} == 3 ]]; then
+    rpm -qp --provides "/job/artifacts/kernel/$base-core-$release.aarch64.rpm" > /job/kernel-core.provides
+    for component in -modules -dtbs -boot; do
+        grep -Fx "$base$component = $release" /job/kernel-core.provides
+    done
+fi
 rpm_evr=$release
 rpm_release=${release%"$dist"}
 release=$(cohort_repository_release /job/kernel-payload "$rpm_release" "$profile")
-version=${release%%-*}
+version=${rpm_release%%-*}
 source_commit=$(cat "/job/kernel-payload/usr/share/senemos/uke/$release/source-commit")
 [[ $source_commit =~ ^[0-9a-f]{40}$ ]]
 if [[ -n ${UKE_COPR_ROOT_INPUTS:-} ]]; then
@@ -84,7 +94,7 @@ payload_sha256=$(sha256sum /job/artifacts/kernel/payload.sha256)
 payload_sha256=${payload_sha256%% *}
 [[ -f $bundle/linux.img && -f $bundle/userdata.img && -f $modules/vmlinuz ]]
 (cd "$modules"; sha256sum -c "$bundle/modules.sha256")
-if [[ $channel == unstable ]]; then
+if [[ -n ${UKE_IMAGE_TOOLS:-} ]]; then
     cp "$UKE_IMAGE_TOOLS/boot-image" /job/boot-image
 else
     c++ -std=c++20 -O2 -Wall -Wextra -Werror /builder/src/boot/boot-image.cpp -o /job/boot-image

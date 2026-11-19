@@ -29,7 +29,8 @@ if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then
     trap 'chown -R "$UKE_OUTPUT_OWNER" /job/artifacts' EXIT
 fi
 channel=$(jq -er .channel "$request")
-if [[ $channel == unstable && ( $stage == repository-kernel || $stage == root || $stage == filesystem ) ]]; then
+if [[ ( $stage == repository-kernel || $stage == root || $stage == filesystem ) &&
+      ( $channel == unstable || ( $(uname -m) == aarch64 && -n $(jq -er '.kernel_rpm_request // ""' "$request") ) ) ]]; then
     [[ $fedora_release == rawhide ]] || exit 1
     # shellcheck source=repository-tools.sh
     # shellcheck disable=SC1091
@@ -291,6 +292,12 @@ if [[ $stage == hardware ]]; then
     mv /job/manifest.tmp /job/artifacts/manifest.json
     exit
 fi
+if [[ $stage == fastboot-zip ]]; then
+    (cd /job/artifacts; sha256sum -c --strict --quiet SHA256SUMS)
+    bash /builder/src/image/package-stable-fastboot-test.sh /job/artifacts /job/fastboot
+    if [[ ${UKE_OUTPUT_OWNER:-none} != none ]]; then chown -R "$UKE_OUTPUT_OWNER" /job/fastboot; fi
+    exit
+fi
 [[ $stage == root || $stage == filesystem ]]
 if [[ $stage == filesystem ]]; then
     bash /builder/src/public/filesystem.sh
@@ -361,20 +368,25 @@ public_desktop_repository "$desktop" /etc/yum.repos.d/uke-desktop.repo /etc/pki/
 # shellcheck source=root-packages.sh
 # shellcheck disable=SC1091
 source /builder/src/public/root-packages.sh
-public_root_packages packages "$fedora_release" "$channel" "$desktop" "$(jq -er .default_shell "$request")" || die 'Unsupported root package selection'
 release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
+public_root_packages packages "$fedora_release" "$channel" "$desktop" "$(jq -er .default_shell "$request")" "$release" || die 'Unsupported root package selection'
+if [[ $release == 7.4.5-senemos ]]; then
+    packages+=('uke-control(normal-release-abi-v1)')
+    [[ $partition != userdata ]] || packages+=(uke-senemos-dtbo)
+fi
 base=$kernel_family
 rpm_release=$(jq -er '.rpm_version_release // .kernel_release' /job/artifacts/kernel/kernel-info.json)
 local_rpms=()
-for component in '' -core -modules -dtbs -boot; do
+components=$(cohort_kernel_components /job/artifacts/kernel/packages.tsv "$base" "$rpm_release$dist")
+while IFS= read -r component; do
     package=/job/artifacts/kernel/$base$component-$rpm_release$dist.aarch64.rpm
     [[ -f $package ]]
     local_rpms+=("$package")
-done
+done <<< "$components"
 if [[ $partition == userdata ]]; then
     local_rpms+=("/job/artifacts/kernel/$base-singleboot-$rpm_release$dist.aarch64.rpm")
 fi
-if [[ $channel == unstable ]]; then
+if jq -e '.kernel_rpm_signature == "verified COPR signature"' /job/artifacts/kernel/kernel-info.json >/dev/null; then
     # Do not depend on the producer's temporary key database crossing jobs.
     # The key fingerprint was checked above against the selected channel policy.
     # shellcheck source=root-kernel-signatures.sh
@@ -431,6 +443,12 @@ bundle=$root/usr/lib/senemos/kernel-updates/$release
 (cd "$root/usr/lib/modules/$release"; sha256sum -c "$bundle/modules.sha256")
 cp "$bundle/$partition.img" /job/artifacts/boot.img
 cmp /job/artifacts/boot.img "/job/artifacts/boot-$partition.img"
+if [[ $partition == userdata && $release == 7.4.5-senemos ]]; then
+    dtbo=/usr/lib/senemos/dtbo/dtbo.img
+    [[ $(rpm --root "$root" -qf --qf '%{NAME}' "$dtbo") == uke-senemos-dtbo ]]
+    install -m644 "$root$dtbo" /job/artifacts/dtbo.img
+    install -m644 "$root/usr/lib/senemos/dtbo/source-cohort.json" /job/artifacts/dtbo-source-cohort.json
+fi
 # Prove Python exceptions against independently signature-verified Fedora bytes.
 rpmkeys --dbpath /job/keydb --import "$fedora_key"
 : > /job/fedora-inputs.tsv
@@ -539,7 +557,7 @@ if [[ -f /job/artifacts/first-boot-policy.json ]]; then
     jq '. + {root_capacity_gate_configured:true,swap_policy:"half",clear_binary_verified:true}' /job/artifacts/manifest.json > /job/manifest.tmp
     mv /job/manifest.tmp /job/artifacts/manifest.json
 fi
-if [[ $channel == unstable ]]; then
+if [[ -n ${UKE_IMAGE_TOOLS:-} ]]; then
     cohort_codec=$UKE_IMAGE_TOOLS/boot-image
 else
     cohort_codec=/job/cohort-boot-image
@@ -570,7 +588,7 @@ done
 # shellcheck source=root-metadata.sh
 # shellcheck disable=SC1091
 source /builder/src/public/root-metadata.sh
-if [[ $channel == unstable ]]; then
+if [[ -n ${UKE_IMAGE_TOOLS:-} ]]; then
     archive_verifier=$UKE_IMAGE_TOOLS/ext4-labels
 else
     archive_verifier=/job/ext4-labels
