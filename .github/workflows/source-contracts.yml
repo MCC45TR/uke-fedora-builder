@@ -23,8 +23,10 @@ concurrency:
   cancel-in-progress: false
 jobs:
   stable-super-fastboot:
-    if: github.event_name == 'workflow_dispatch' && inputs.stable_super_components_run != ''
-    needs: source
+    if: >-
+      always() && github.event_name == 'workflow_dispatch' && needs.source.result == 'success' &&
+      (inputs.stable_super_components_run != '' || needs.stable-super-rescue.result == 'success')
+    needs: [source, stable-super-rescue]
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     permissions:
@@ -37,16 +39,18 @@ jobs:
       - name: Verify the source runs
         env:
           GH_TOKEN: ${{ github.token }}
-          COMPONENTS_RUN: ${{ inputs.stable_super_components_run }}
+          COMPONENTS_RUN: ${{ inputs.stable_super_components_run || github.run_id }}
         run: |
           set -Eeuo pipefail
           [[ $COMPONENTS_RUN =~ ^[1-9][0-9]{0,13}$ ]]
           api="repos/$GITHUB_REPOSITORY/actions/runs"
           gh api "$api/44546857648" | jq -e '
             .conclusion=="success" and .head_sha=="bc158a877d92d050fd3d7d6a08247df8e112b253"'
-          gh api "$api/$COMPONENTS_RUN" | jq -e '
-            .conclusion=="success" and .event=="workflow_dispatch" and
-            .path==".github/workflows/source-contracts.yml" and .head_branch=="release/stable-fastboot-7.4.5"'
+          if [[ $COMPONENTS_RUN != "$GITHUB_RUN_ID" ]]; then
+            gh api "$api/$COMPONENTS_RUN" | jq -e '
+              .conclusion=="success" and .event=="workflow_dispatch" and
+              .path==".github/workflows/source-contracts.yml" and .head_branch=="release/stable-fastboot-7.4.5"'
+          fi
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends jq zip unzip e2fsprogs android-sdk-libsparse-utils
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
@@ -58,12 +62,12 @@ jobs:
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.stable_super_components_run }}
+          run-id: ${{ inputs.stable_super_components_run || github.run_id }}
           name: uke-stable-super-components
           path: ${{ runner.temp }}/uke-stable-super-components
       - name: Assemble the Stable singleboot fastboot ZIP
         env:
-          COMPONENTS_RUN: ${{ inputs.stable_super_components_run }}
+          COMPONENTS_RUN: ${{ inputs.stable_super_components_run || github.run_id }}
         run: |
           set -Eeuo pipefail
           (( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2{print $4}') >= 16*1024*1024 ))
@@ -115,7 +119,9 @@ jobs:
               (cd /job/artifacts/super-seed; sha256sum -c --strict SHA256SUMS)
               (cd /job/artifacts/super-boots; sha256sum boot.img rescue-boot.img super-profiles.json > SHA256SUMS)
             '
-          sudo chown -R "$(id -u):$(id -g)" "$job/artifacts/super-boots" "$job/artifacts/super-seed"
+          owner="$(id -u):$(id -g)"
+          sudo chown "$owner" "$job/artifacts"
+          sudo chown -R "$owner" "$job/artifacts/super-boots" "$job/artifacts/super-seed"
           printf 'Signed Stable boot wrapper reproduction, FEDORA_RESCUE readback and the linux_swap/super seed verified.\n' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
