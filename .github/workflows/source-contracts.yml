@@ -8,14 +8,66 @@ on:
         description: Exact published normal Stable kernel RPM version-release for the KDE fastboot ZIP
         type: string
         default: ''
+      stable_super_rescue:
+        description: Assemble the matching Stable super seed and live rescue from signed inputs
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
   group: image-source-contracts-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  stable-super-rescue:
+    if: github.event_name == 'workflow_dispatch' && inputs.stable_super_rescue
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Compose the signed Stable boot profiles and live rescue seed
+        env:
+          IMAGE_EVR: ${{ inputs.stable_fastboot_kernel_evr }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 && $IMAGE_EVR == 7.3.5-13.fc46 ]]
+          image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
+          [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
+          job="$RUNNER_TEMP/uke-rescue-job"
+          cache="$RUNNER_TEMP/uke-rescue-cache"
+          mkdir -m700 "$job" "$cache"
+          (( $(df -Pk "$job" | awk 'NR==2{print $4}') >= 24*1024*1024 ))
+          jq -n --arg evr "$IMAGE_EVR" --arg source 717f7d6c8fd26d3c066f936101b8c2011391cbf2 '
+            {channel:"stable",fedora_release:"rawhide",kernel_profile:"normal",kernel_rpm_request:$evr,expected_kernel_source:$source}
+          ' > "$job/request.json"
+          docker run --rm --cpus=2 --memory=3g --pids-limit=512 \
+            --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$job,target=/job" \
+            --mount "type=bind,source=$cache,target=/cache" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf5 -y --setopt=install_weak_deps=False install jq gnupg2 curl cpio e2fsprogs util-linux coreutils findutils diffutils grep sed gawk binutils systemd systemd-libs libselinux libstdc++ kmod android-tools dnf5-plugins
+              : > /.uke-rescue-worker
+              bash /builder/src/image/compose-fedora-rescue.sh
+              bash /builder/src/image/compose-fastboot-super-seed.sh /job/artifacts/rescue 4294967296 /job/artifacts/super-seed
+              (cd /job/artifacts/super-seed; sha256sum -c --strict SHA256SUMS)
+              (cd /job/artifacts/super-boots; sha256sum boot.img rescue-boot.img super-profiles.json > SHA256SUMS)
+            '
+          sudo chown -R "$(id -u):$(id -g)" "$job/artifacts/super-boots" "$job/artifacts/super-seed"
+          printf 'Signed Stable boot wrapper reproduction, FEDORA_RESCUE readback and the linux_swap/super seed verified.\n' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: uke-stable-super-components
+          path: |
+            ${{ runner.temp }}/uke-rescue-job/artifacts/super-boots
+            ${{ runner.temp }}/uke-rescue-job/artifacts/super-seed
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
   stable-fastboot:
-    if: github.event_name == 'workflow_dispatch' && inputs.stable_fastboot_kernel_evr != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.stable_fastboot_kernel_evr != '' && !inputs.stable_super_rescue
     needs: source
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 110

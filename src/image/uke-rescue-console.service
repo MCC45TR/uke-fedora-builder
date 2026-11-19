@@ -1,0 +1,32 @@
+[Unit]
+Description=Authenticate the installed primary administrator for Uke USB rescue
+ConditionKernelCommandLine=senemos.role=rescue
+ConditionFirmware=device-tree-compatible(xiaomi,uke)
+Wants=uke-rescue-usb.service
+After=uke-rescue-usb.service dev-ttyGS0.device
+BindsTo=dev-ttyGS0.device
+
+[Service]
+Type=simple
+RuntimeDirectory=uke-rescue-auth
+RuntimeDirectoryMode=0700
+PrivateMounts=yes
+BindReadOnlyPaths=-/run/uke-rescue-auth/etc:/etc
+ExecStartPre=/usr/bin/unshare --mount --propagation private /usr/libexec/uke-rescue/console-login
+ExecStopPost=/usr/libexec/uke-rescue/console-login --cleanup
+# Execute the original labeled binary directly from PID1, retaining Fedora's
+# sulogin domain transition instead of inheriting a generic service domain.
+ExecStart=/usr/sbin/sulogin --login-shell /dev/ttyGS0
+StandardInput=tty
+StandardOutput=tty
+StandardError=tty
+TTYPath=/dev/ttyGS0
+TTYReset=yes
+Restart=always
+RestartSec=1
+KillMode=control-group
+TimeoutStopSec=10
+Environment=HISTFILE=/dev/null
+
+[Install]
+WantedBy=rescue.target
