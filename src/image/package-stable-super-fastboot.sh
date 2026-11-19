@@ -102,7 +102,7 @@ This installation replaces Android super and userdata. Back up all data and
 keep the matching Xiaomi stock firmware package before installing. An unlocked
 Uke with working, compatible vendor_boot and bootloader firmware is required.
 
-Use current Android SDK Platform-Tools and bootloader fastboot on the stock
+Use Android SDK Platform-Tools 37.0.1 and bootloader fastboot on the stock
 partition layout of a Xiaomi Pad 7 256 GB or POCO Pad X1 512 GB. Install with:
 
   fastboot update ./$archive

@@ -76,11 +76,20 @@ jobs:
           (cd "$RUNNER_TEMP/uke-stable-super-fastboot"; sha256sum -c --strict SHA256SUMS)
           printf 'Install on stock Uke with `fastboot update ./fedora-*-fastboot.zip`. Signed source runs 44546857648 and %s.\n' "$COMPONENTS_RUN" >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        id: download
         with:
           path: ${{ runner.temp }}/uke-stable-super-fastboot/fedora-*-fastboot.zip
           archive: false
           if-no-files-found: error
           retention-days: 14
+      - name: Verify the downloadable bytes match the fastboot ZIP
+        env:
+          ARTIFACT_DIGEST: ${{ steps.download.outputs.artifact-digest }}
+        run: |
+          cd "$RUNNER_TEMP/uke-stable-super-fastboot"
+          expected=$(awk '$2 ~ /^fedora-.*-fastboot[.]zip$/ {print $1}' SHA256SUMS)
+          [[ $expected =~ ^[0-9a-f]{64}$ && $ARTIFACT_DIGEST == "$expected" ]]
+          printf 'Fastboot ZIP SHA-256 `%s`.\n' "$expected" >> "$GITHUB_STEP_SUMMARY"
   stable-super-rescue:
     if: github.event_name == 'workflow_dispatch' && inputs.stable_super_rescue
     runs-on: ubuntu-24.04-arm
@@ -179,7 +188,7 @@ jobs:
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
       - name: Install source inspection tools
-        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep make zstd zip unzip e2fsprogs fastboot socat
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends shellcheck jq ripgrep make zstd zip unzip e2fsprogs socat
       - name: Validate source without compilation or RPM generation
         shell: bash
         run: |
@@ -215,8 +224,14 @@ jobs:
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
           shellcheck src/image/fastboot-requirements.sh src/image/package-stable-fastboot-test.sh
           shellcheck src/image/package-stable-super-fastboot.sh tests/stable-super-fastboot-update.sh tests/fastboot-tcp-peer.sh
-          fastboot --version
-          bash tests/stable-super-fastboot-update.sh
+          tools="$RUNNER_TEMP/stock-fastboot"
+          mkdir "$tools"
+          curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 16777216 \
+            https://dl.google.com/android/repository/platform-tools_r37.0.1-linux.zip -o "$tools/platform-tools.zip"
+          (cd "$tools"; echo 'd230f13842f60f782a8645f9c813f8f845bf36089ea7289f28c48f17979313f1  platform-tools.zip' | sha256sum -c --strict)
+          unzip -j "$tools/platform-tools.zip" platform-tools/fastboot -d "$tools"
+          "$tools/fastboot" --version
+          PATH="$tools:$PATH" bash tests/stable-super-fastboot-update.sh
           bash tests/repository-kernel-identity.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
