@@ -29,7 +29,7 @@ cleanup() {
     if [[ $mounted == true ]]; then umount "$root/proc" || status=1; fi
     if ((status)); then
         for log in "$work/"*.log; do [[ ! -f $log ]] || tail -n 12 "$log" >&2; done
-        for log in "$out/"{units,python,filesystem,selinux}-audit.txt; do
+        for log in "$out/"{units,python,filesystem,selinux}-audit.txt "$out/rescue-usb-module-closure.txt"; do
             [[ ! -f $log ]] || { printf '%s\n' "${log##*/}" >&2; tail -n 12 "$log" >&2; }
         done
     fi
@@ -127,7 +127,7 @@ install -d -m755 "$root/usr/share/senemos/uke/$release"
 printf "%s\n" "$expected_source" > "$root/usr/share/senemos/uke/$release/source-commit"
 chmod 644 "$root/usr/share/senemos/uke/$release/source-commit"
 modprobe --show-depends -d "$root" -S "$release" g_serial > "$out/rescue-usb-module-closure.txt"
-grep -Eq '/g_serial[.]ko([.]zst)?$' "$out/rescue-usb-module-closure.txt"
+grep -Eq '/g_serial[.]ko([.]zst)?[[:space:]]*$' "$out/rescue-usb-module-closure.txt"
 bash "$repo/src/image/configure-fedora-rescue.sh" "$root"
 [[ -x $root/usr/libexec/uke-rescue/console-login &&
    -f $root/usr/libexec/uke-rescue/rescue-admin-policy.sh &&
