@@ -79,7 +79,7 @@ jobs:
             --mount "type=bind,source=$RUNNER_TEMP/uke-stable-super-components,target=/components,readonly" \
             --mount "type=bind,source=$export_dir,target=/export" \
             "$image" bash -Eeuo pipefail -c '
-              dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs jq zip unzip socat
+              dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs jq zip unzip socat diffutils findutils grep
               bash /builder/src/image/package-stable-super-fastboot.sh /desktop /components /export/final
               cd /export/final
               sha256sum -c --strict SHA256SUMS
