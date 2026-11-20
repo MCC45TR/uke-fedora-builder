@@ -12,6 +12,18 @@ on:
         description: Assemble the matching Stable super seed and live rescue from signed inputs
         type: boolean
         default: false
+      pad7_kernel_evr:
+        description: Signed normal COPR kernel RPM version-release containing the Pad 7 ramoops fix
+        type: string
+        default: ''
+      pad7_kernel_release:
+        description: Exact uname -r of the Pad 7 test kernel
+        type: string
+        default: ''
+      pad7_kernel_source:
+        description: Upstream source commit recorded in the signed Pad 7 kernel cohort
+        type: string
+        default: ''
       stable_super_components_run:
         description: Successful Stable rescue components run for assembling the singleboot ZIP
         type: string
@@ -25,8 +37,9 @@ jobs:
   stable-super-fastboot:
     if: >-
       always() && github.event_name == 'workflow_dispatch' && needs.source.result == 'success' &&
-      (inputs.stable_super_components_run != '' || needs.stable-super-rescue.result == 'success')
-    needs: [source, stable-super-rescue]
+      ((inputs.pad7_kernel_evr == '' && (inputs.stable_super_components_run != '' || needs.stable-super-rescue.result == 'success')) ||
+       (inputs.pad7_kernel_evr != '' && needs.pad7-desktop.result == 'success' && needs.stable-super-rescue.result == 'success'))
+    needs: [source, stable-super-rescue, pad7-desktop]
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     permissions:
@@ -37,6 +50,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify the source runs
+        if: inputs.pad7_kernel_evr == ''
         env:
           GH_TOKEN: ${{ github.token }}
           COMPONENTS_RUN: ${{ inputs.stable_super_components_run || github.run_id }}
@@ -52,19 +66,28 @@ jobs:
               .path==".github/workflows/source-contracts.yml" and .head_branch=="release/stable-fastboot-7.4.5"'
           fi
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: inputs.pad7_kernel_evr == ''
         with:
           github-token: ${{ github.token }}
           run-id: 44546857648
           name: uke-stable-kde-bash-singleboot-fastboot
           path: ${{ runner.temp }}/uke-stable-desktop
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: inputs.pad7_kernel_evr != ''
+        with:
+          name: uke-pad7-desktop
+          path: ${{ runner.temp }}/uke-stable-desktop
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           github-token: ${{ github.token }}
-          run-id: ${{ inputs.stable_super_components_run || github.run_id }}
+          run-id: ${{ inputs.pad7_kernel_evr != '' && github.run_id || inputs.stable_super_components_run || github.run_id }}
           name: uke-stable-super-components
           path: ${{ runner.temp }}/uke-stable-super-components
-      - name: Assemble the Stable singleboot fastboot ZIP
+      - name: Assemble the singleboot fastboot ZIP
         env:
+          PAD7_RELEASE: ${{ inputs.pad7_kernel_release }}
+          PAD7_EVR: ${{ inputs.pad7_kernel_evr }}
+          PAD7_SOURCE: ${{ inputs.pad7_kernel_source }}
           COMPONENTS_RUN: ${{ inputs.stable_super_components_run || github.run_id }}
         run: |
           set -Eeuo pipefail
@@ -73,14 +96,18 @@ jobs:
           [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
           export_dir="$RUNNER_TEMP/uke-stable-fastboot-export"
           mkdir "$export_dir"
-          docker run --rm --cpus=2 --memory=3g \
+          package_args=()
+          if [[ -n $PAD7_EVR ]]; then
+            package_args=("$PAD7_RELEASE" "$PAD7_EVR" "$PAD7_SOURCE")
+          fi
+          docker run --rm --cpus=2 --memory=3g --env GITHUB_SHA \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/uke-stable-desktop,target=/desktop,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/uke-stable-super-components,target=/components,readonly" \
             --mount "type=bind,source=$export_dir,target=/export" \
             "$image" bash -Eeuo pipefail -c '
               dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs jq zip unzip socat diffutils findutils grep
-              bash /builder/src/image/package-stable-super-fastboot.sh /desktop /components /export/final
+              bash /builder/src/image/package-stable-super-fastboot.sh /desktop /components /export/final "$@"
               cd /export/final
               sha256sum -c --strict SHA256SUMS
               archive=(fedora-*-fastboot.zip)
@@ -88,10 +115,15 @@ jobs:
               unzip -p "${archive[0]}" super_empty.img > /export/super_empty.img
               fastboot --version
               bash /builder/tests/stable-super-fastboot-update.sh /export/super_empty.img
-            '
+            ' bash "${package_args[@]}"
           sudo chown -R "$(id -u):$(id -g)" "$export_dir/final"
           mv "$export_dir/final" "$RUNNER_TEMP/uke-stable-super-fastboot"
-          printf 'Install on stock Uke with `fastboot update ./fedora-*-fastboot.zip`. Signed source runs 44546857648 and %s.\n' "$COMPONENTS_RUN" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Install on stock Uke with `fastboot update ./fedora-*-fastboot.zip`.\n' >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n $PAD7_EVR ]]; then
+            printf 'Pad 7 ramoops fallback verified in signed normal kernel `%s` (COPR RPM `%s`).\n' "$PAD7_RELEASE" "$PAD7_EVR" >> "$GITHUB_STEP_SUMMARY"
+          else
+            printf 'Signed source runs 44546857648 and %s.\n' "$COMPONENTS_RUN" >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         id: download
         with:
@@ -108,28 +140,43 @@ jobs:
           [[ $expected =~ ^[0-9a-f]{64}$ && $ARTIFACT_DIGEST == "$expected" ]]
           printf 'Fastboot ZIP SHA-256 `%s`.\n' "$expected" >> "$GITHUB_STEP_SUMMARY"
   stable-super-rescue:
-    if: github.event_name == 'workflow_dispatch' && inputs.stable_super_rescue
+    if: github.event_name == 'workflow_dispatch' && (inputs.stable_super_rescue || inputs.pad7_kernel_evr != '')
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 35
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Compose the signed Stable boot profiles and live rescue seed
+      - name: Compose the signed boot profiles and live rescue seed
         env:
           IMAGE_EVR: ${{ inputs.stable_fastboot_kernel_evr }}
+          PAD7_EVR: ${{ inputs.pad7_kernel_evr }}
+          PAD7_RELEASE: ${{ inputs.pad7_kernel_release }}
+          PAD7_SOURCE: ${{ inputs.pad7_kernel_source }}
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ $(uname -m) == aarch64 && $IMAGE_EVR == 7.3.5-13.fc46 ]]
+          [[ $(uname -m) == aarch64 ]]
+          channel=stable
+          release=7.4.5-senemos
+          source=717f7d6c8fd26d3c066f936101b8c2011391cbf2
+          if [[ -n $PAD7_EVR ]]; then
+            [[ $PAD7_EVR =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ && $PAD7_RELEASE =~ ^7[.]4[.][1-9][0-9]+-senemos$ && $PAD7_SOURCE =~ ^[0-9a-f]{40}$ ]]
+            channel=unstable
+            IMAGE_EVR=$PAD7_EVR
+            release=$PAD7_RELEASE
+            source=$PAD7_SOURCE
+          else
+            [[ $IMAGE_EVR == 7.3.5-13.fc46 ]]
+          fi
           image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
           [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
           job="$RUNNER_TEMP/uke-rescue-job"
           cache="$RUNNER_TEMP/uke-rescue-cache"
           mkdir -m700 "$job" "$cache"
           (( $(df -Pk "$job" | awk 'NR==2{print $4}') >= 24*1024*1024 ))
-          jq -n --arg evr "$IMAGE_EVR" --arg source 717f7d6c8fd26d3c066f936101b8c2011391cbf2 '
-            {channel:"stable",fedora_release:"rawhide",kernel_profile:"normal",kernel_rpm_request:$evr,expected_kernel_source:$source}
+          jq -n --arg evr "$IMAGE_EVR" --arg source "$source" --arg release "$release" --arg channel "$channel" '
+            {channel:$channel,fedora_release:"rawhide",kernel_profile:"normal",kernel_rpm_request:$evr,expected_kernel_release:$release,expected_kernel_source:$source}
           ' > "$job/request.json"
           docker run --rm --cpus=2 --memory=3g --pids-limit=512 \
             --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
@@ -147,7 +194,7 @@ jobs:
           owner="$(id -u):$(id -g)"
           sudo chown "$owner" "$job/artifacts"
           sudo chown -R "$owner" "$job/artifacts/super-boots" "$job/artifacts/super-seed"
-          printf 'Signed Stable boot wrapper reproduction, FEDORA_RESCUE readback and the linux_swap/super seed verified.\n' >> "$GITHUB_STEP_SUMMARY"
+          printf 'Signed boot wrapper reproduction, FEDORA_RESCUE readback and the linux_swap/super seed verified.\n' >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: uke-stable-super-components
@@ -157,6 +204,56 @@ jobs:
           if-no-files-found: error
           retention-days: 7
           compression-level: 6
+  pad7-desktop:
+    if: github.event_name == 'workflow_dispatch' && inputs.pad7_kernel_evr != ''
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Assemble the KDE desktop from signed RPMs
+        env:
+          IMAGE_EVR: ${{ inputs.pad7_kernel_evr }}
+          IMAGE_RELEASE: ${{ inputs.pad7_kernel_release }}
+          IMAGE_SOURCE: ${{ inputs.pad7_kernel_source }}
+          UKE_CONTAINER_ENGINE: docker
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 && $IMAGE_EVR =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ &&
+             $IMAGE_RELEASE =~ ^7[.]4[.][1-9][0-9]+-senemos$ && $IMAGE_SOURCE =~ ^[0-9a-f]{40}$ ]]
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq zstd
+          output="$RUNNER_TEMP/uke-pad7-desktop-build"
+          bash scripts/build-image.sh --release rawhide --mode singleboot --filesystem ext4 \
+            --desktop kde --shell bash --channel unstable --kernel-profile normal --kernel-rpm "$IMAGE_EVR" \
+            --linux-size 8192 --jobs 2 --out "$output" --yes
+          mapfile -t manifests < <(find "$output" -mindepth 3 -maxdepth 3 -path '*/artifacts/manifest.json')
+          [[ ${#manifests[@]} == 1 ]]
+          artifacts=${manifests[0]%/manifest.json}
+          jq -e --arg release "$IMAGE_RELEASE" --arg source "$IMAGE_SOURCE" --arg evr "$IMAGE_EVR" '
+            .kernel_release==$release and .kernel_source_commit==$source and (.rpm_version_release+.rpm_dist)==$evr
+          ' "$artifacts/manifest.json" >/dev/null
+          payload="$RUNNER_TEMP/uke-pad7-desktop"
+          mkdir "$payload"
+          mv "$artifacts/"{manifest.json,userdata.img,dtbo.img,dtbo-source-cohort.json} "$payload/"
+          (cd "$payload"; sha256sum manifest.json userdata.img dtbo.img dtbo-source-cohort.json > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: uke-pad7-desktop
+          path: ${{ runner.temp }}/uke-pad7-desktop
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: pad7-desktop-diagnostics
+          path: ${{ runner.temp }}/uke-pad7-desktop-build/image-*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
   stable-fastboot:
     if: github.event_name == 'workflow_dispatch' && inputs.stable_fastboot_kernel_evr != '' && !inputs.stable_super_rescue
     needs: source

@@ -129,6 +129,29 @@ jq '.kernel_version="7.3.5" | .kernel_profile="normal" | .kernel_family="senemos
 jq -s '.[0]+.[1]' "$work/normal-request" "$work/normal-info" > "$work/manifest"
 cohort_identity "$work/normal-request" "$work/normal-info" "$work/manifest"
 
+new_abi=7.4.11-senemos
+for parent in usr/lib/modules usr/lib/senemos/kernel-updates usr/share/senemos/uke; do
+    mv "$root/$parent/$abi" "$root/$parent/$new_abi"
+done
+bundle=$root/usr/lib/senemos/kernel-updates/$new_abi
+source_dir=$root/usr/share/senemos/uke/$new_abi
+printf 'kernel_release=%s\n' "$new_abi" > "$bundle/manifest"
+jq --arg abi "$new_abi" '.kernel_release=$abi | .rpm_revision="19" |
+    .publication.normal_parent_copr_build=11366170 | .publication.source_rpm_revision="12"' \
+    "$work/publication-composition" > "$work/new-publication-composition"
+cp "$work/new-publication-composition" "$source_dir/source-composition.json"
+[[ $(cohort_repository_release "$root" 7.3.5-19) == "$new_abi" ]]
+for expression in 'del(.publication.normal_parent_copr_build)' '.publication.source_rpm_revision="19"' \
+    '.publication.parent_copr_build=0' '.rpm_revision="19.1"'; do
+    jq "$expression" "$work/new-publication-composition" > "$source_dir/source-composition.json"
+    reject 7.3.5-19
+done
+jq --arg abi "$new_abi" '.kernel_release=$abi | .rpm_version_release="7.3.5-19"' \
+    "$work/normal-info" > "$work/new-normal-info"
+jq '.channel="unstable"' "$work/normal-request" > "$work/new-normal-request"
+jq -s '.[0]+.[1]' "$work/new-normal-request" "$work/new-normal-info" > "$work/manifest"
+cohort_identity "$work/new-normal-request" "$work/new-normal-info" "$work/manifest"
+
 family=senemos-uke-linux-kernel-mainline
 evr=7.3.5-12.fc46
 printf '%s\n' "$family-$evr.aarch64" "$family-core-$evr.aarch64" > "$work/inventory"

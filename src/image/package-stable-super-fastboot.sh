@@ -3,34 +3,59 @@
 set -Eeuo pipefail
 export LC_ALL=C
 umask 077
-[[ $# == 3 && -d $1 && -d $2 && ! -e $3 ]]
+[[ ( $# == 3 || $# == 6 ) && -d $1 && -d $2 && ! -e $3 ]]
+release=${4:-7.4.5-senemos}
+evr=${5:-7.3.5-13.fc46}
+source=${6:-717f7d6c8fd26d3c066f936101b8c2011391cbf2}
+channel=stable
+if [[ $# == 6 ]]; then
+    [[ $release =~ ^7[.]4[.][1-9][0-9]+-senemos$ && $evr =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ && $source =~ ^[0-9a-f]{40}$ ]]
+    channel=unstable
+fi
 desktop=$(realpath "$1") components=$(realpath "$2") output=$(realpath -m "$3")
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 previous=uke-fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-fastboot.zip
 archive=fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-r2-fastboot.zip
+if [[ $channel == unstable ]]; then
+    archive=fedora-rawhide-pad7-kde-bash-singleboot-$release-fastboot.zip
+fi
 profile=$repo/configs/images/stable-super-fastboot
 (cd "$desktop"; sha256sum -c --strict SHA256SUMS)
 for dir in super-boots super-seed; do (cd "$components/$dir"; sha256sum -c --strict SHA256SUMS); done
 mkdir "$output"
 work=$(mktemp -d "${output%/*}/stable-super-archive.XXXXXXXX")
 trap 'find "$work" -depth -delete' EXIT
-unzip -j "$desktop/$previous" manifest.json dtbo.img userdata.img -d "$work"
-cmp "$desktop/manifest.json" "$work/manifest.json"
-mv "$work/manifest.json" "$work/desktop.json"
+if [[ $channel == stable ]]; then
+    unzip -j "$desktop/$previous" manifest.json dtbo.img userdata.img -d "$work"
+    cmp "$desktop/manifest.json" "$work/manifest.json"
+    mv "$work/manifest.json" "$work/desktop.json"
+else
+    for file in userdata.img dtbo.img; do ln -s "$desktop/$file" "$work/$file"; done
+    dtbo_sha=74958f51ed384f86e542fefe42c2252c4f309339df5c0850287e983db89fcfda
+    jq -e --arg hash "$dtbo_sha" '
+        .schema_version==1 and .dtbo_sha256==$hash and .common_dtbo and
+        .reconstructed_flattened_source and (.automatic_partition_writes|not)
+    ' "$desktop/dtbo-source-cohort.json" >/dev/null
+    jq --arg hash "$dtbo_sha" --slurpfile dtbo "$desktop/dtbo-source-cohort.json" \
+        '. + {dtbo_sha256:$hash,dtbo_source:$dtbo[0]}' "$desktop/manifest.json" > "$work/desktop.json"
+fi
 desktop_manifest=$work/desktop.json
 boots=$components/super-boots
 seed=$components/super-seed
-jq -e --slurpfile rescue "$seed/rescue-source/kernel-info.json" '
-    .channel=="stable" and .fedora_release=="rawhide" and .architecture=="aarch64" and
+jq -e --slurpfile rescue "$seed/rescue-source/kernel-info.json" --arg channel "$channel" \
+    --arg release "$release" --arg evr "$evr" --arg source "$source" --arg builder "${GITHUB_SHA:-}" '
+    .channel==$channel and .fedora_release=="rawhide" and .architecture=="aarch64" and
     .device=="uke" and .desktop=="kde" and .default_shell=="bash" and .mode=="singleboot" and
     .partition=="userdata" and .filesystem=="ext4" and .root_raw_bytes==8589934592 and
-    .builder_commit=="bc158a877d92d050fd3d7d6a08247df8e112b253" and
+    (if $channel=="stable" then .builder_commit=="bc158a877d92d050fd3d7d6a08247df8e112b253"
+     else ($builder|test("^[0-9a-f]{40}$")) and .builder_commit==$builder end) and
     .cohort_validation.final_filesystem_hashes_verified and .independent_aosp_decoder_verified and
     .selinux_policy_contexts_verified and (.credentials_included|not) and (.device_private_data_included|not) and
-    .kernel_release=="7.4.5-senemos" and .rpm_version_release=="7.3.5-13" and
+    .kernel_release==$release and (.rpm_version_release+.rpm_dist)==$evr and .kernel_source_commit==$source and
+    .kernel_profile=="normal" and .kernel_rpm_signature=="verified COPR signature" and
     ($rescue[0] as $k | .kernel_release==$k.kernel_release and .kernel_source_commit==$k.kernel_source_commit and
         .payload_sha256==$k.payload_sha256 and .rpm_version_release==$k.rpm_version_release and .rpm_dist==$k.rpm_dist and
-        .kernel_key_fingerprint==$k.kernel_key_fingerprint and .kernel_rpm_signature==$k.kernel_rpm_signature)
+        .kernel_repository==$k.kernel_repository and .kernel_key_fingerprint==$k.kernel_key_fingerprint and .kernel_rpm_signature==$k.kernel_rpm_signature)
 ' "$desktop_manifest" >/dev/null
 jq -e '
     .liblp_three_slot_readback and .independent_aosp_decode and .both_logical_payloads_byte_matched and
@@ -58,14 +83,17 @@ hash() { sha256sum "$1" | cut -d ' ' -f1; }
 [[ $(hash "$work/rescue-boot.img") == "$(jq -er .rescue_sha256 "$boots/super-profiles.json")" ]]
 [[ $(hash "$work/super.img") == "$(jq -er .super_sparse_sha256 "$seed/super-composition.json")" ]]
 [[ $(stat -Lc %s "$work/boot.img") == 100663296 && $(stat -Lc %s "$work/rescue-boot.img") == 100663296 ]]
-(( $(stat -c %s "$work/dtbo.img") <= 25165824 ))
+(( $(stat -Lc %s "$work/dtbo.img") <= 25165824 ))
 # Verify that the reused desktop root has the native swap manager and that its
 # kernel matches the signed wrappers rather than trusting its filename.
 simg2img "$work/userdata.img" "$work/userdata.raw"
 [[ $(stat -c %s "$work/userdata.raw") == 8589934592 ]]
 [[ $(hash "$work/userdata.raw") == "$(jq -er .root_raw_sha256 "$desktop_manifest")" ]]
-debugfs -R "dump /usr/lib/modules/7.4.5-senemos/vmlinuz $work/vmlinuz" "$work/userdata.raw"
+debugfs -R "dump /usr/lib/modules/$release/vmlinuz $work/vmlinuz" "$work/userdata.raw"
 [[ $(hash "$work/vmlinuz") == "$(jq -er .raw_image_sha256 "$boots/super-profiles.json")" ]]
+if [[ $channel == unstable ]]; then
+    grep -aFq 'Uke ABL DT: using firmware ramoops layout' "$work/vmlinuz"
+fi
 debugfs -R 'cat /etc/systemd/system/uke-swap-ready.service' "$work/userdata.raw" |
     grep -Fx 'ExecStart=/usr/bin/uke-control swap apply'
 debugfs -R 'stat /usr/libexec/uke-control/super-swap/prepare.sh' "$work/userdata.raw" |
@@ -91,21 +119,22 @@ for file in "${files[@]}"; do
     '
 done > "$work/images.jsonl"
 jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-composition.json" \
-    --arg empty_sha256 "$(hash "$work/super_empty.img")" '
-    . + {schema_version:1,artifact_kind:"uke-stable-super-fastboot",images:($images|from_entries),
+    --arg empty_sha256 "$(hash "$work/super_empty.img")" --arg channel "$channel" '
+    . + {schema_version:1,artifact_kind:(if $channel=="stable" then "uke-stable-super-fastboot" else "uke-pad7-super-fastboot" end),images:($images|from_entries),
          boot_sha256:($images|from_entries|.["boot.img"].sha256),boot_profile:"userdata-super",
-         previous_desktop_run:44546857648,super_layout:$super[0].layout,
+         super_layout:$super[0].layout,
          targets:["super","userdata","dtbo_active","boot_active"],required_current_slot:null,
          super_empty_sha256:$empty_sha256,super_empty_role:"Metadata only, parsed by fastboot and never a flash task",
          installation:"fastboot update",installation_script:false,
          capacity_policy:"Grow to the measured physical userdata and super partitions during first boot",
          replaces_existing_userdata:true,rescue_boot_hardware_tested:false,
-         xiaomi_pad_7_256gb_hardware_tested:false}
+         xiaomi_pad_7_256gb_hardware_tested:false} +
+    (if $channel=="stable" then {previous_desktop_run:44546857648} else {pad7_ramoops_fallback_verified:true} end)
 ' "$desktop_manifest" > "$work/manifest.json"
 cp "$profile/"{android-info,fastboot-info}.txt "$work/"
 cat > "$work/README.txt" <<TEXT
-Fedora Rawhide Stable / KDE Plasma / Bash / EXT4 singleboot
-Kernel 7.4.5-senemos (Stable COPR RPM 7.3.5-13.fc46)
+Fedora Rawhide / KDE Plasma / Bash / EXT4 singleboot
+Kernel $release (COPR ${channel} RPM $evr)
 
 This installation replaces Android super and userdata. Back up all data and
 keep the matching Xiaomi stock firmware package before installing. An unlocked

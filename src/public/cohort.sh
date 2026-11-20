@@ -15,7 +15,7 @@ cohort_identity() {
       $r.kernel_profile == $k.kernel_profile and
       (($k.kernel_profile == "normal" and
         $k.kernel_family == "senemos-uke-linux-kernel-mainline" and
-        (($k.kernel_release == "7.4.5-senemos" and $k.kernel_version == "7.3.5" and
+        ((($k.kernel_release | test("^7[.]4[.](5|[1-9][0-9]+)-senemos$")) and $k.kernel_version == "7.3.5" and
           ($k.rpm_version_release | test("^7[.]3[.]5-[1-9][0-9]*$"))) or
          $k.kernel_release == $k.rpm_version_release or
          (($k.rpm_version_release | startswith($k.kernel_release + ".")) and
@@ -32,7 +32,7 @@ cohort_identity() {
         $k.kernel_family == "senemos-uke-linux-kernel-mainline-kvm" and
         $k.kernel_release == ($k.rpm_version_release + "-kvm"))) and
       (($k.kernel_release | startswith($r.kernel_version + "-")) or
-       ($k.kernel_profile == "normal" and $k.kernel_release == "7.4.5-senemos")) and
+       ($k.kernel_profile == "normal" and ($k.kernel_release | test("^7[.]4[.](5|[1-9][0-9]+)-senemos$")))) and
       ($k.payload_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
       $k.kernel_source_commit == $r.kernel_commit and $k.kernel_version == $r.kernel_version and
       .builder_commit == $r.builder_commit and .kernel_commit == $r.kernel_commit and
@@ -54,12 +54,13 @@ cohort_identity() {
 # that exact relationship; never infer an ABI by dropping arbitrary suffixes.
 cohort_repository_release() (
     set -Eeuo pipefail
-    local root=$1 rpm_release=$2 profile=${3:-normal} abi base_abi source composition bundle
+    local root=$1 rpm_release=$2 profile=${3:-normal} abi base_abi source composition bundle published=false
     [[ $rpm_release =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?$ ]] || return 1
     abi=$(find "$root/usr/lib/modules" -mindepth 1 -maxdepth 1 -printf '%f\n') || return 1
     case $profile in
         normal)
-            if [[ $abi == 7.4.5-senemos ]]; then
+            if [[ $abi =~ ^7[.]4[.](5|[1-9][0-9]+)-senemos$ ]]; then
+                published=true
                 [[ $rpm_release =~ ^7[.]3[.]5-[1-9][0-9]*$ ]] || return 1
                 base_abi=$rpm_release
             else
@@ -77,19 +78,25 @@ cohort_repository_release() (
     if [[ $rpm_release != "$base_abi" ]]; then
         [[ $rpm_release == "$base_abi".* && ${rpm_release#"$base_abi".} =~ ^[1-9][0-9]*$ ]] || return 1
     fi
-    if [[ $profile == unstable || $rpm_release != "$base_abi" || $abi == 7.4.5-senemos ]]; then
+    if [[ $profile == unstable || $rpm_release != "$base_abi" || $published == true ]]; then
         source=$root/usr/share/senemos/uke/$abi/source-commit
         composition=$root/usr/share/senemos/uke/$abi/source-composition.json
         [[ -f $source && ! -L $source && -f $composition && ! -L $composition ]] || return 1
         [[ $(< "$source") =~ ^[0-9a-f]{40}$ ]] || return 1
-        jq -e --arg abi "$abi" --arg evr "$rpm_release" --arg source "$(< "$source")" '
+        jq -e --argjson published "$published" --arg abi "$abi" --arg evr "$rpm_release" --arg source "$(< "$source")" '
           .kernel_release==$abi and .source_commit==$source and
           .upstream_version==($evr|split("-")[0]) and
           .rpm_revision==($evr|split("-")[1]) and
-          (if $abi=="7.4.5-senemos" then
+          (if $published then
               .publication.family=="senemos-uke-linux-kernel-mainline" and
-              .publication.source_kernel_release==($evr+"-unstable") and
-              (.publication.parent_copr_build|type=="number" and .>0 and floor==.)
+              (.publication.parent_copr_build|type=="number" and .>0 and floor==.) and
+              (if $abi=="7.4.5-senemos" then
+                 .publication.source_kernel_release==($evr+"-unstable")
+               else
+                 (.publication.normal_parent_copr_build|type=="number" and .>0 and floor==.) and
+                 (.publication.source_rpm_revision|type=="string" and test("^[1-9][0-9]*$")) and
+                 .publication.source_kernel_release==("7.3.5-"+.publication.source_rpm_revision+"-unstable")
+               end)
            else true end)' "$composition" >/dev/null || return 1
     fi
     printf '%s\n' "$abi"

@@ -371,8 +371,10 @@ source /builder/src/public/root-packages.sh
 release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
 public_root_packages packages "$fedora_release" "$channel" "$desktop" "$(jq -er .default_shell "$request")" "$release" || die 'Unsupported root package selection'
 if [[ $release == 7.4.5-senemos ]]; then
-    packages+=('uke-control(normal-release-abi-v1)')
     [[ $partition != userdata ]] || packages+=(uke-senemos-dtbo)
+fi
+if [[ $release =~ ^7[.]4[.](5|[1-9][0-9]+)-senemos$ ]]; then
+    packages+=('uke-control(normal-release-abi-v1)')
 fi
 base=$kernel_family
 rpm_release=$(jq -er '.rpm_version_release // .kernel_release' /job/artifacts/kernel/kernel-info.json)
@@ -443,9 +445,11 @@ bundle=$root/usr/lib/senemos/kernel-updates/$release
 (cd "$root/usr/lib/modules/$release"; sha256sum -c "$bundle/modules.sha256")
 cp "$bundle/$partition.img" /job/artifacts/boot.img
 cmp /job/artifacts/boot.img "/job/artifacts/boot-$partition.img"
-if [[ $partition == userdata && $release == 7.4.5-senemos ]]; then
+if [[ $partition == userdata && $release =~ ^7[.]4[.](5|[1-9][0-9]+)-senemos$ ]]; then
+    dtbo_owner=$base-singleboot
+    [[ $release != 7.4.5-senemos ]] || dtbo_owner=uke-senemos-dtbo
     dtbo=/usr/lib/senemos/dtbo/dtbo.img
-    [[ $(rpm --root "$root" -qf --qf '%{NAME}' "$dtbo") == uke-senemos-dtbo ]]
+    [[ $(rpm --root "$root" -qf --qf '%{NAME}' "$dtbo") == "$dtbo_owner" ]]
     install -m644 "$root$dtbo" /job/artifacts/dtbo.img
     install -m644 "$root/usr/lib/senemos/dtbo/source-cohort.json" /job/artifacts/dtbo-source-cohort.json
 fi

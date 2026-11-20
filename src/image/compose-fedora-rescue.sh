@@ -14,14 +14,17 @@ root=/job/rescue-root
 work=/job/rescue-work
 for path in "$out" "$root" "$work"; do [[ ! -e $path && ! -L $path ]] || fail 'owned output must be new'; done
 for tool in dnf5 rpm rpmkeys gpg curl jq readelf mke2fs e2fsck debugfs dumpe2fs cpio mount umount; do command -v "$tool" >/dev/null; done
-jq -e '.channel=="stable" and .kernel_profile=="normal" and .fedora_release=="rawhide" and
+jq -e '((.channel=="stable" and ((.expected_kernel_release // "7.4.5-senemos")=="7.4.5-senemos")) or
+  (.channel=="unstable" and (.expected_kernel_release|test("^7[.]4[.][1-9][0-9]+-senemos$")))) and .kernel_profile=="normal" and .fedora_release=="rawhide" and
   (.expected_kernel_source|test("^[a-f0-9]{40}$")) and
   (.kernel_rpm_request|test("^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$"))' /job/request.json >/dev/null
 (( $(df -Pk /job | awk 'NR==2{print $4}') >= 8*1024*1024 )) || fail '8GiB free required, including the operating reserve'
 mkdir -p /job/artifacts
 mkdir -m700 "$out" "$root" "$work"
 mkdir -m0555 "$root/proc"
-expected_source=$(jq -er .expected_kernel_source /job/request.json)
+read -r channel expected_release expected_source < <(jq -r '[.channel, (.expected_kernel_release // "7.4.5-senemos"), .expected_kernel_source] | @tsv' /job/request.json)
+kernel_repo=mcc45tr/uke-linux
+[[ $channel != unstable ]] || kernel_repo+=-unstable
 mounted=false
 cleanup() {
     local status=$?
@@ -36,14 +39,15 @@ cleanup() {
     exit "$status"
 }
 trap cleanup EXIT
-# Verify the Stable signing key and the full matched kernel RPM cohort.
+# Verify the selected signing key and the full matched kernel RPM cohort.
 # shellcheck source=../public/repository-tools.sh
 # shellcheck disable=SC1091
 source "$repo/src/public/repository-tools.sh"
 bash "$repo/src/public/repository-kernel.sh"
 info=/job/artifacts/kernel/kernel-info.json
-jq -e '.kernel_profile=="normal" and .kernel_repository=="mcc45tr/uke-linux" and
-  .kernel_rpm_signature=="verified COPR signature" and .kernel_release=="7.4.5-senemos"' "$info" >/dev/null
+jq -e --arg repo "$kernel_repo" --arg release "$expected_release" '
+  .kernel_profile=="normal" and .kernel_repository==$repo and
+  .kernel_rpm_signature=="verified COPR signature" and .kernel_release==$release' "$info" >/dev/null
 [[ $(jq -er .kernel_source_commit "$info") == "$expected_source" ]] || fail 'kernel source differs from the qualified request'
 release=$(jq -er .kernel_release "$info")
 evr=$(jq -er '.rpm_version_release+.rpm_dist' "$info")
@@ -55,6 +59,10 @@ mkdir "$work/kernel" /job/artifacts/super-boots
 rpm2cpio "$core" > "$work/core.cpio"
 (cd "$work/kernel"; cpio -idm --quiet --no-absolute-filenames     "./$modules/*" "./$bundle/boot-image" "./$bundle/super-profiles.json" < "$work/core.cpio")
 unlink "$work/core.cpio"
+if [[ $channel == unstable ]]; then
+    grep -aFq 'Uke ABL DT: using firmware ramoops layout' "$work/kernel/$modules/vmlinuz" ||
+        fail 'signed kernel lacks the Pad 7 firmware ramoops fallback'
+fi
 bash "$repo/src/image/compose-signed-super-boots.sh" "$work/kernel/$bundle" "$work/kernel/$modules/vmlinuz"     "$info" /job/artifacts/super-boots
 fedora_key=$repo/configs/keys/fedora-46.asc
 [[ $(gpg --show-keys --with-colons "$fedora_key" | awk -F: '$1=="fpr"{print $10;exit}') == D924B10D3E810DABDD8B56B596E7E91491211FCE ]]
