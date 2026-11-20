@@ -4,13 +4,15 @@ set -Eeuo pipefail
 export LC_ALL=C
 [[ $# == 1 && -d $1 ]]
 work=$1
+max_download=1048576
+[[ ! -f $work/boot-only ]] || max_download=100663296
 receive_length() {
     local b n=0 bytes
     bytes=$(dd bs=8 count=1 iflag=fullblock status=none | od -An -v -tu1)
     read -r -a octets <<< "$bytes"
     [[ ${#octets[@]} == 8 ]] || return 1
     for b in "${octets[@]}"; do n=$((n * 256 + b)); done
-    ((n > 0 && n <= 1048576)) || return 1
+    ((n > 0 && n <= max_download)) || return 1
     length=$n
 }
 send_packet() {
@@ -36,14 +38,14 @@ while receive_length; do
         set_active:a|set_active:b) send_packet OKAY;;
         download:*)
             size=${command#download:}
-            [[ $size =~ ^[0-9a-f]{8}$ ]] && ((16#$size <= 1048576))
+            [[ $size =~ ^[0-9a-f]{8}$ ]] && ((16#$size <= max_download))
             remaining=$((16#$size))
             send_packet "DATA$size"
             : > "$work/download.bin"
             while ((remaining)); do
                 receive_length
                 ((length <= remaining))
-                dd bs="$length" count=1 iflag=fullblock status=none >> "$work/download.bin"
+                dd bs=65536 count="$length" iflag=count_bytes,fullblock status=none >> "$work/download.bin"
                 remaining=$((remaining - length))
             done
             [[ $(stat -c %s "$work/download.bin") == "$((16#$size))" ]]
@@ -67,6 +69,10 @@ while receive_length; do
                 printf '%s %s\n' "$partition" "$bytes" >> "$work/accepted.txt"
                 send_packet OKAY
             fi;;
+        boot)
+            [[ -f $work/boot-only && $(stat -c %s "$work/download.bin") == "$max_download" ]]
+            send_packet OKAY
+            exit 0;;
         reboot)
             send_packet OKAY
             exit 0;;

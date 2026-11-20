@@ -24,6 +24,10 @@ on:
         description: Upstream source commit recorded in the signed Pad 7 kernel cohort
         type: string
         default: ''
+      pad7_temporary_boot:
+        description: Rewrap the verified 7.4.11 Pad 7 image for a temporary fastboot boot test
+        type: boolean
+        default: false
       stable_super_components_run:
         description: Successful Stable rescue components run for assembling the singleboot ZIP
         type: string
@@ -34,6 +38,64 @@ concurrency:
   group: image-source-contracts-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  pad7-temporary-boot:
+    if: github.event_name == 'workflow_dispatch' && inputs.pad7_temporary_boot
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Verify the signed-kernel source workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -Eeuo pipefail
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/44701861114" | jq -e '
+            .conclusion=="success" and .head_sha=="e3b35feba3ee8be90d65f3a882025e5feabae10c"'
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/14613925842" | jq -e '
+            (.expired|not) and .workflow_run.id==44701861114 and
+            .digest=="sha256:6125f281e0dec916c70c8c3aa49d1ceac8c14b0e28e341fb864bd2fc5bf7354b"'
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          github-token: ${{ github.token }}
+          run-id: 44701861114
+          name: uke-stable-super-components
+          path: ${{ runner.temp }}/pad7-boot-source
+      - name: Rewrap and verify the temporary boot image
+        run: |
+          set -Eeuo pipefail
+          image=$(jq -er '.fedora_targets.rawhide.images.x86_64' configs/build-rules.json)
+          [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
+          output="$RUNNER_TEMP/pad7-temporary-boot"
+          mkdir "$output"
+          docker run --rm --cpus=2 --memory=2g \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/pad7-boot-source,target=/inputs,readonly" \
+            --mount "type=bind,source=$output,target=/output" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf5 -y --setopt=install_weak_deps=False install android-tools diffutils findutils grep jq socat
+              bash /builder/src/image/compose-pad7-temporary-boot.sh /inputs/super-boots/boot.img /output/boot.img
+              bash /builder/tests/temporary-fastboot-boot.sh /output/boot.img
+            '
+          sha256sum "$output/boot.img" | awk '{print $1}' > "$RUNNER_TEMP/pad7-boot-sha256"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        id: boot
+        with:
+          path: ${{ runner.temp }}/pad7-temporary-boot/boot.img
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify the downloadable image
+        env:
+          DIGEST: ${{ steps.boot.outputs.artifact-digest }}
+        run: |
+          expected=$(< "$RUNNER_TEMP/pad7-boot-sha256")
+          [[ $expected =~ ^[0-9a-f]{64}$ && $DIGEST == "$expected" ]]
+          printf 'Use `fastboot boot boot.img` with the existing 7.4.11 Fedora installation. SHA-256 `%s`.\n' "$expected" >> "$GITHUB_STEP_SUMMARY"
   stable-super-fastboot:
     if: >-
       always() && github.event_name == 'workflow_dispatch' && needs.source.result == 'success' &&
@@ -338,6 +400,7 @@ jobs:
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
           shellcheck src/image/fastboot-requirements.sh src/image/package-stable-fastboot-test.sh
           shellcheck src/image/package-stable-super-fastboot.sh src/image/compose-super-empty.sh tests/stable-super-fastboot-update.sh tests/fastboot-tcp-peer.sh
+          shellcheck src/image/compose-pad7-temporary-boot.sh tests/temporary-fastboot-boot.sh
           tools="$RUNNER_TEMP/stock-fastboot"
           mkdir "$tools"
           curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 16777216 \
