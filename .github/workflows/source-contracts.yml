@@ -28,6 +28,10 @@ on:
         description: Rewrap the verified 7.4.11 Pad 7 image for a temporary fastboot boot test
         type: boolean
         default: false
+      pad7_unstable_boot_build:
+        description: Successful Unstable COPR build ID for a temporary Pad 7 boot image
+        type: string
+        default: ''
       stable_super_components_run:
         description: Successful Stable rescue components run for assembling the singleboot ZIP
         type: string
@@ -39,8 +43,8 @@ concurrency:
   cancel-in-progress: false
 jobs:
   pad7-temporary-boot:
-    if: github.event_name == 'workflow_dispatch' && inputs.pad7_temporary_boot
-    runs-on: ubuntu-24.04
+    if: github.event_name == 'workflow_dispatch' && (inputs.pad7_temporary_boot || inputs.pad7_unstable_boot_build != '')
+    runs-on: ${{ inputs.pad7_unstable_boot_build != '' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
     timeout-minutes: 15
     permissions:
       contents: read
@@ -50,6 +54,7 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify the signed-kernel source workflow
+        if: inputs.pad7_unstable_boot_build == ''
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -60,25 +65,34 @@ jobs:
             (.expired|not) and .workflow_run.id==44701861114 and
             .digest=="sha256:6125f281e0dec916c70c8c3aa49d1ceac8c14b0e28e341fb864bd2fc5bf7354b"'
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        if: inputs.pad7_unstable_boot_build == ''
         with:
           github-token: ${{ github.token }}
           run-id: 44701861114
           name: uke-stable-super-components
           path: ${{ runner.temp }}/pad7-boot-source
       - name: Rewrap and verify the temporary boot image
+        env:
+          COPR_BUILD_ID: ${{ inputs.pad7_unstable_boot_build }}
         run: |
           set -Eeuo pipefail
-          image=$(jq -er '.fedora_targets.rawhide.images.x86_64' configs/build-rules.json)
+          image=$(jq -er --arg arch "$(uname -m)" '.fedora_targets.rawhide.images[$arch]' configs/build-rules.json)
           [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
           output="$RUNNER_TEMP/pad7-temporary-boot"
-          mkdir "$output"
-          docker run --rm --cpus=2 --memory=2g \
+          mkdir -p "$output" "$RUNNER_TEMP/pad7-boot-source"
+          docker run --rm --cpus=2 --memory=2g --env COPR_BUILD_ID \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/pad7-boot-source,target=/inputs,readonly" \
             --mount "type=bind,source=$output,target=/output" \
             "$image" bash -Eeuo pipefail -c '
               dnf5 -y --setopt=install_weak_deps=False install android-tools diffutils findutils grep jq socat
-              bash /builder/src/image/compose-pad7-temporary-boot.sh /inputs/super-boots/boot.img /output/boot.img
+              if [[ -n $COPR_BUILD_ID ]]; then
+                dnf5 -y --setopt=install_weak_deps=False install cpio curl gnupg2 rpm
+                bash /builder/src/image/compose-pad7-unstable-boot.sh "$COPR_BUILD_ID" /output
+              else
+                bash /builder/src/image/compose-pad7-temporary-boot.sh /inputs/super-boots/boot.img /output/boot.img
+                printf "%s\n" 7.4.11-senemos > /output/kernel-release
+              fi
               bash /builder/tests/temporary-fastboot-boot.sh /output/boot.img
             '
           sha256sum "$output/boot.img" | awk '{print $1}' > "$RUNNER_TEMP/pad7-boot-sha256"
@@ -95,7 +109,9 @@ jobs:
         run: |
           expected=$(< "$RUNNER_TEMP/pad7-boot-sha256")
           [[ $expected =~ ^[0-9a-f]{64}$ && $DIGEST == "$expected" ]]
-          printf 'Use `fastboot boot boot.img` with the existing 7.4.11 Fedora installation. SHA-256 `%s`.\n' "$expected" >> "$GITHUB_STEP_SUMMARY"
+          release=$(< "$RUNNER_TEMP/pad7-temporary-boot/kernel-release")
+          [[ $release =~ ^(7[.]4[.]11-senemos|7[.]3[.]5-[1-9][0-9]*)$ ]]
+          printf 'Temporary `fastboot boot boot.img` test for kernel `%s`. Full Fedora functionality needs matching modules. SHA-256 `%s`.\n' "$release" "$expected" >> "$GITHUB_STEP_SUMMARY"
   stable-super-fastboot:
     if: >-
       always() && github.event_name == 'workflow_dispatch' && needs.source.result == 'success' &&
@@ -400,7 +416,7 @@ jobs:
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
           shellcheck src/image/fastboot-requirements.sh src/image/package-stable-fastboot-test.sh
           shellcheck src/image/package-stable-super-fastboot.sh src/image/compose-super-empty.sh tests/stable-super-fastboot-update.sh tests/fastboot-tcp-peer.sh
-          shellcheck src/image/compose-pad7-temporary-boot.sh tests/temporary-fastboot-boot.sh
+          shellcheck src/image/compose-pad7-temporary-boot.sh src/image/compose-pad7-unstable-boot.sh tests/temporary-fastboot-boot.sh
           tools="$RUNNER_TEMP/stock-fastboot"
           mkdir "$tools"
           curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 16777216 \
