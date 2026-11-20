@@ -9,7 +9,8 @@ here=$(cd -- "$(dirname -- "$0")" && pwd)
 # shellcheck disable=SC1091
 source "$here/fastboot-singleboot-layout.sh"
 jq -e '.kernel_profile=="normal" and .kernel_rpm_signature=="verified COPR signature" and
- ((.kernel_repository=="mcc45tr/uke-linux" and .kernel_release=="7.4.5-senemos") or
+ ((.kernel_repository=="mcc45tr/uke-linux" and (.kernel_release |
+   .=="7.4.5-senemos" or test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$"))) or
   (.kernel_repository=="mcc45tr/uke-linux-unstable" and (.kernel_release|test("^7[.]4[.][1-9][0-9]+-senemos$")))) and
  (.kernel_source_commit|test("^[a-f0-9]{40}$"))' "$info" >/dev/null
 layout=$(fastboot_seed_layout "$bytes" "$minimum")

@@ -14,7 +14,8 @@ root=/job/rescue-root
 work=/job/rescue-work
 for path in "$out" "$root" "$work"; do [[ ! -e $path && ! -L $path ]] || fail 'owned output must be new'; done
 for tool in dnf5 rpm rpmkeys gpg curl jq readelf mke2fs e2fsck debugfs dumpe2fs cpio mount umount; do command -v "$tool" >/dev/null; done
-jq -e '((.channel=="stable" and ((.expected_kernel_release // "7.4.5-senemos")=="7.4.5-senemos")) or
+jq -e '((.channel=="stable" and ((.expected_kernel_release // "7.4.5-senemos") |
+  .=="7.4.5-senemos" or test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$"))) or
   (.channel=="unstable" and (.expected_kernel_release|test("^7[.]4[.][1-9][0-9]+-senemos$")))) and .kernel_profile=="normal" and .fedora_release=="rawhide" and
   (.expected_kernel_source|test("^[a-f0-9]{40}$")) and
   (.kernel_rpm_request|test("^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$"))' /job/request.json >/dev/null
@@ -59,7 +60,7 @@ mkdir "$work/kernel" /job/artifacts/super-boots
 rpm2cpio "$core" > "$work/core.cpio"
 (cd "$work/kernel"; cpio -idm --quiet --no-absolute-filenames     "./$modules/*" "./$bundle/boot-image" "./$bundle/super-profiles.json" < "$work/core.cpio")
 unlink "$work/core.cpio"
-if [[ $channel == unstable ]]; then
+if [[ $expected_release != 7.4.5-senemos ]]; then
     grep -aFq 'Uke ABL DT: using firmware ramoops layout' "$work/kernel/$modules/vmlinuz" ||
         fail 'signed kernel lacks the Pad 7 firmware ramoops fallback'
 fi

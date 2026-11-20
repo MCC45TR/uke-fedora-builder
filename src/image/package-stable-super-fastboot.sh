@@ -3,14 +3,21 @@
 set -Eeuo pipefail
 export LC_ALL=C
 umask 077
-[[ ( $# == 3 || $# == 6 ) && -d $1 && -d $2 && ! -e $3 ]]
+[[ ( $# == 3 || $# == 6 || $# == 7 ) && -d $1 && -d $2 && ! -e $3 ]]
 release=${4:-7.4.5-senemos}
 evr=${5:-7.3.5-13.fc46}
 source=${6:-717f7d6c8fd26d3c066f936101b8c2011391cbf2}
 channel=stable
-if [[ $# == 6 ]]; then
-    [[ $release =~ ^7[.]4[.][1-9][0-9]+-senemos$ && $evr =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ && $source =~ ^[0-9a-f]{40}$ ]]
-    channel=unstable
+fresh=false
+if (( $# >= 6 )); then
+    fresh=true
+    channel=${7:-unstable}
+    [[ $evr =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ && $source =~ ^[0-9a-f]{40}$ ]]
+    case $channel in
+        unstable) [[ $release =~ ^7[.]4[.][1-9][0-9]+-senemos$ ]];;
+        stable) [[ $release == "${evr%.fc46}" && $release =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ]];;
+        *) exit 1;;
+    esac
 fi
 desktop=$(realpath "$1") components=$(realpath "$2") output=$(realpath -m "$3")
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
@@ -18,6 +25,8 @@ previous=uke-fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-fastboot.zi
 archive=fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-r2-fastboot.zip
 if [[ $channel == unstable ]]; then
     archive=fedora-rawhide-pad7-kde-bash-singleboot-$release-fastboot.zip
+elif [[ $fresh == true ]]; then
+    archive=fedora-rawhide-stable-kde-bash-singleboot-$release-fastboot.zip
 fi
 profile=$repo/configs/images/stable-super-fastboot
 (cd "$desktop"; sha256sum -c --strict SHA256SUMS)
@@ -25,7 +34,7 @@ for dir in super-boots super-seed; do (cd "$components/$dir"; sha256sum -c --str
 mkdir "$output"
 work=$(mktemp -d "${output%/*}/stable-super-archive.XXXXXXXX")
 trap 'find "$work" -depth -delete' EXIT
-if [[ $channel == stable ]]; then
+if [[ $fresh == false ]]; then
     unzip -j "$desktop/$previous" manifest.json dtbo.img userdata.img -d "$work"
     cmp "$desktop/manifest.json" "$work/manifest.json"
     mv "$work/manifest.json" "$work/desktop.json"
@@ -42,13 +51,13 @@ fi
 desktop_manifest=$work/desktop.json
 boots=$components/super-boots
 seed=$components/super-seed
-jq -e --slurpfile rescue "$seed/rescue-source/kernel-info.json" --arg channel "$channel" \
+jq -e --slurpfile rescue "$seed/rescue-source/kernel-info.json" --arg channel "$channel" --argjson fresh "$fresh" \
     --arg release "$release" --arg evr "$evr" --arg source "$source" --arg builder "${GITHUB_SHA:-}" '
     .channel==$channel and .fedora_release=="rawhide" and .architecture=="aarch64" and
     .device=="uke" and .desktop=="kde" and .default_shell=="bash" and .mode=="singleboot" and
     .partition=="userdata" and .filesystem=="ext4" and .root_raw_bytes==8589934592 and
-    (if $channel=="stable" then .builder_commit=="bc158a877d92d050fd3d7d6a08247df8e112b253"
-     else ($builder|test("^[0-9a-f]{40}$")) and .builder_commit==$builder end) and
+    (if $fresh then ($builder|test("^[0-9a-f]{40}$")) and .builder_commit==$builder
+     else .builder_commit=="bc158a877d92d050fd3d7d6a08247df8e112b253" end) and
     .cohort_validation.final_filesystem_hashes_verified and .independent_aosp_decoder_verified and
     .selinux_policy_contexts_verified and (.credentials_included|not) and (.device_private_data_included|not) and
     .kernel_release==$release and (.rpm_version_release+.rpm_dist)==$evr and .kernel_source_commit==$source and
@@ -91,7 +100,7 @@ simg2img "$work/userdata.img" "$work/userdata.raw"
 [[ $(hash "$work/userdata.raw") == "$(jq -er .root_raw_sha256 "$desktop_manifest")" ]]
 debugfs -R "dump /usr/lib/modules/$release/vmlinuz $work/vmlinuz" "$work/userdata.raw"
 [[ $(hash "$work/vmlinuz") == "$(jq -er .raw_image_sha256 "$boots/super-profiles.json")" ]]
-if [[ $channel == unstable ]]; then
+if [[ $fresh == true ]]; then
     grep -aFq 'Uke ABL DT: using firmware ramoops layout' "$work/vmlinuz"
 fi
 debugfs -R 'cat /etc/systemd/system/uke-swap-ready.service' "$work/userdata.raw" |
@@ -119,7 +128,7 @@ for file in "${files[@]}"; do
     '
 done > "$work/images.jsonl"
 jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-composition.json" \
-    --arg empty_sha256 "$(hash "$work/super_empty.img")" --arg channel "$channel" '
+    --arg empty_sha256 "$(hash "$work/super_empty.img")" --arg channel "$channel" --argjson fresh "$fresh" '
     . + {schema_version:1,artifact_kind:(if $channel=="stable" then "uke-stable-super-fastboot" else "uke-pad7-super-fastboot" end),images:($images|from_entries),
          boot_sha256:($images|from_entries|.["boot.img"].sha256),boot_profile:"userdata-super",
          super_layout:$super[0].layout,
@@ -128,8 +137,8 @@ jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-compos
          installation:"fastboot update",installation_script:false,
          capacity_policy:"Grow to the measured physical userdata and super partitions during first boot",
          replaces_existing_userdata:true,rescue_boot_hardware_tested:false,
-         xiaomi_pad_7_256gb_hardware_tested:false} +
-    (if $channel=="stable" then {previous_desktop_run:44546857648} else {pad7_ramoops_fallback_verified:true} end)
+         xiaomi_pad_7_128gb_hardware_tested:false,xiaomi_pad_7_256gb_hardware_tested:false} +
+    (if $fresh then {pad7_ramoops_fallback_verified:true} else {previous_desktop_run:44546857648} end)
 ' "$desktop_manifest" > "$work/manifest.json"
 cp "$profile/"{android-info,fastboot-info}.txt "$work/"
 cat > "$work/README.txt" <<TEXT
@@ -141,7 +150,8 @@ keep the matching Xiaomi stock firmware package before installing. An unlocked
 Uke with working, compatible vendor_boot and bootloader firmware is required.
 
 Use Android SDK Platform-Tools 37.0.1 and bootloader fastboot on the stock
-partition layout of a Xiaomi Pad 7 256 GB or POCO Pad X1 512 GB. Install with:
+Xiaomi Pad 7 or POCO Pad X1 partition layout. This archive needs at least
+4 GiB in super and 8 GiB in userdata. Install with:
 
   fastboot update ./$archive
 
@@ -156,7 +166,7 @@ vbmeta, and the device firmware.
 
 On first boot Fedora grows EXT4 to the detected userdata size. The 4 GiB
 super seed grows in place to the detected super size, allocating about 80%
-to linux_swap and 20% to FEDORA_RESCUE. Xiaomi Pad 7 256 GB physical boot
+to linux_swap and 20% to FEDORA_RESCUE. Xiaomi Pad 7 physical boot
 still needs testing.
 The live rescue root is in super. Extract rescue-boot.img separately for a
 temporary boot on a bootloader that supports fastboot boot, after ordinary

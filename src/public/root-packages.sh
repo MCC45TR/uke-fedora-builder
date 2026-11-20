@@ -21,7 +21,8 @@ public_root_packages() {
         uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
         uke-charge-control uke-offline-charge)
     [[ $release != rawhide ]] || selection+=(fedora-repos-rawhide)
-    if [[ $channel == unstable || $kernel_release == 7.4.5-senemos ]]; then
+    if [[ $channel == unstable || $kernel_release == 7.4.5-senemos ||
+          $kernel_release =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ]]; then
         local individual=()
         for package in "${selection[@]}"; do
             case $package in

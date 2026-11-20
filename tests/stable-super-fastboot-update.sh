@@ -98,6 +98,9 @@ run_case() {
 run_case poco-512 a accept < "$work/vars.json"
 run_case pad-256 b accept < <(jq '."current-slot"="b" | ."partition-size:super"=" 0x220000000" |
     ."partition-size:userdata"=" 0x37D7700000"' "$work/vars.json")
+# Pad 7 128 GB reported userdata size, with a simulated minimum-size super.
+run_case pad-128-minimum b accept < <(jq '."current-slot"="b" | ."partition-size:super"=" 0x100000000" |
+    ."partition-size:userdata"=" 0x1A767FB000"' "$work/vars.json")
 # The observed bootloader on slot B reports DTBO through its unqualified alias.
 run_case slot-b-dtbo-alias b accept < <(jq '."current-slot"="b" | ."has-slot:dtbo"="no" |
     ."partition-size:dtbo"=."partition-size:dtbo_b"' "$work/vars.json")
@@ -106,4 +109,4 @@ run_case fastbootd a reject < <(jq '."is-userspace"="yes"' "$work/vars.json")
 run_case snapshot a reject < <(jq '."snapshot-update-status"="merging"' "$work/vars.json")
 run_case single-slot a reject < <(jq '."slot-count"="1"' "$work/vars.json")
 run_case too-small a undersized < <(jq '."partition-size:super"=" 0x20000000"' "$work/vars.json")
-printf 'Stock fastboot update passed active-slot, 256/512 GB geometry, and refusal fixtures.\n'
+printf 'Stock fastboot update passed active-slot, 128/256/512 GB geometry, and refusal fixtures.\n'

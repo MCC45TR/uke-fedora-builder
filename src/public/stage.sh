@@ -445,7 +445,9 @@ bundle=$root/usr/lib/senemos/kernel-updates/$release
 (cd "$root/usr/lib/modules/$release"; sha256sum -c "$bundle/modules.sha256")
 cp "$bundle/$partition.img" /job/artifacts/boot.img
 cmp /job/artifacts/boot.img "/job/artifacts/boot-$partition.img"
-if [[ $partition == userdata && $release =~ ^7[.]4[.](5|[1-9][0-9]+)-senemos$ ]]; then
+if [[ $partition == userdata && $KERNEL_PROFILE == normal &&
+      ( $release =~ ^7[.]4[.](5|[1-9][0-9]+)-senemos$ ||
+        $release =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ) ]]; then
     dtbo_owner=$base-singleboot
     [[ $release != 7.4.5-senemos ]] || dtbo_owner=uke-senemos-dtbo
     dtbo=/usr/lib/senemos/dtbo/dtbo.img

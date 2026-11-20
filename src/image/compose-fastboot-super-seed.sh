@@ -22,7 +22,8 @@ jq -e '.artifact_kind=="unqualified-fedora-rescue-root" and .architecture=="aarc
   (.sha256|test("^[a-f0-9]{64}$")) and .kernel.kernel_profile=="normal" and
   .kernel.kernel_family=="senemos-uke-linux-kernel-mainline" and
   .kernel.kernel_rpm_signature=="verified COPR signature" and
-  (.kernel | (.kernel_repository=="mcc45tr/uke-linux" and .kernel_release=="7.4.5-senemos") or
+  (.kernel | (.kernel_repository=="mcc45tr/uke-linux" and (.kernel_release |
+    .=="7.4.5-senemos" or test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$"))) or
    (.kernel_repository=="mcc45tr/uke-linux-unstable" and (.kernel_release|test("^7[.]4[.][1-9][0-9]+-senemos$"))))' "$composition" >/dev/null
 [[ $(jq -Sc .kernel "$composition") == "$(jq -Sc . "$input/kernel-info.json")" ]]
 bytes=$(jq -er .raw_bytes "$composition")
