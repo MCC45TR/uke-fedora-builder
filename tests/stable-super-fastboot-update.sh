@@ -2,6 +2,12 @@
 # Exercise stock fastboot update over loopback with non-bootable test images.
 set -Eeuo pipefail
 export LC_ALL=C
+(( $# <= 1 ))
+metadata=''
+if [[ $# == 1 ]]; then
+    [[ -f $1 && $(stat -c %s "$1") -le 69632 ]]
+    metadata=$(realpath "$1")
+fi
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)
 work=$(mktemp -d)
 server=''
@@ -30,6 +36,7 @@ mkdir "$work/images"
     }
     sparse_fixture '\x00\x00\x10\x00' '\xff\xff\x0f\x00' > super.img
     sparse_fixture '\x00\x00\x20\x00' '\xff\xff\x1f\x00' > userdata.img
+    if [[ -n $metadata ]]; then cp "$metadata" super_empty.img; fi
     zip -q "$work/fedora-fixture.zip" ./*
 )
 jq -n '{
@@ -44,10 +51,12 @@ jq -n '{
 
 run_case() {
     local name=$1 slot=$2 condition=$3 port status=0
-    local case_dir=$work/$name
+    local case_dir=$work/$name dtbo
     mkdir "$case_dir"
     cat > "$case_dir/vars.json"
-    jq -n --arg slot "$slot" '["super","userdata","dtbo_"+$slot,"boot_"+$slot]' > "$case_dir/allowed.json"
+    dtbo=dtbo_$slot
+    if [[ $(jq -er '."has-slot:dtbo"' "$case_dir/vars.json") == no ]]; then dtbo=dtbo; fi
+    jq -n --arg slot "$slot" --arg dtbo "$dtbo" '["super","userdata",$dtbo,"boot_"+$slot]' > "$case_dir/allowed.json"
     : > "$case_dir/commands.txt"
     for _ in {1..10}; do
         port=$((30000 + RANDOM % 20000))
@@ -67,11 +76,15 @@ run_case() {
     case $condition in
         accept)
             [[ $status == 0 ]]
-            printf 'super 4294967296\nuserdata 8589934592\ndtbo_%s 4096\nboot_%s 4096\n' "$slot" "$slot" |
+            printf 'super 4294967296\nuserdata 8589934592\n%s 4096\nboot_%s 4096\n' "$dtbo" "$slot" |
                 cmp - "$case_dir/accepted.txt"
             grep -Ev '^(getvar:|download:)' "$case_dir/commands.txt" > "$case_dir/mutations.txt"
-            printf 'set_active:%s\nflash:super\nflash:userdata\nflash:dtbo_%s\nflash:boot_%s\nreboot\n' "$slot" "$slot" "$slot" |
-                cmp - "$case_dir/mutations.txt";;
+            printf 'set_active:%s\nflash:super\nflash:userdata\nflash:%s\nflash:boot_%s\nreboot\n' "$slot" "$dtbo" "$slot" |
+                cmp - "$case_dir/mutations.txt"
+            if [[ -n $metadata ]]; then
+                grep -Fq 'extracting super_empty.img' "$case_dir/client.log"
+                if grep -Fq "archive does not contain 'super_empty.img'" "$case_dir/client.log"; then return 1; fi
+            fi;;
         reject)
             [[ $status != 0 && $status != 124 && $status != 137 ]]
             grep -Fq 'requirements not met' "$case_dir/client.log"
@@ -85,6 +98,9 @@ run_case() {
 run_case poco-512 a accept < "$work/vars.json"
 run_case pad-256 b accept < <(jq '."current-slot"="b" | ."partition-size:super"=" 0x220000000" |
     ."partition-size:userdata"=" 0x37D7700000"' "$work/vars.json")
+# The observed bootloader on slot B reports DTBO through its unqualified alias.
+run_case slot-b-dtbo-alias b accept < <(jq '."current-slot"="b" | ."has-slot:dtbo"="no" |
+    ."partition-size:dtbo"=."partition-size:dtbo_b"' "$work/vars.json")
 run_case foreign a reject < <(jq '.product="foreign"' "$work/vars.json")
 run_case fastbootd a reject < <(jq '."is-userspace"="yes"' "$work/vars.json")
 run_case snapshot a reject < <(jq '."snapshot-update-status"="merging"' "$work/vars.json")

@@ -7,7 +7,7 @@ umask 077
 desktop=$(realpath "$1") components=$(realpath "$2") output=$(realpath -m "$3")
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 previous=uke-fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-fastboot.zip
-archive=fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-fastboot.zip
+archive=fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-r2-fastboot.zip
 profile=$repo/configs/images/stable-super-fastboot
 (cd "$desktop"; sha256sum -c --strict SHA256SUMS)
 for dir in super-boots super-seed; do (cd "$components/$dir"; sha256sum -c --strict SHA256SUMS); done
@@ -44,6 +44,13 @@ jq -e --slurpfile super "$seed/super-composition.json" '
 ' "$seed/rescue-console-readback.json" >/dev/null
 for file in boot.img rescue-boot.img; do ln -s "$boots/$file" "$work/$file"; done
 ln -s "$seed/super.img" "$work/super.img"
+bash "$repo/src/image/compose-super-empty.sh" "$seed/super-layout.json" "$work/super_empty.img"
+# Check the metadata-only entry against each independent readback of super.img.
+lp_projection='{partitions:(.partitions|sort_by(.name)),groups:(.groups|sort_by(.name)),block_devices,super_device}'
+lpdump --json "$work/super_empty.img" | jq -Sc "$lp_projection" > "$work/empty-layout.json"
+for slot in 0 1 2; do
+    jq -Sc "$lp_projection" "$seed/lp-slot-$slot.json" | cmp - "$work/empty-layout.json"
+done
 hash() { sha256sum "$1" | cut -d ' ' -f1; }
 [[ $(hash "$work/dtbo.img") == "$(jq -er .dtbo_sha256 "$desktop_manifest")" ]]
 [[ $(hash "$work/userdata.img") == "$(jq -er .root_sparse_sha256 "$desktop_manifest")" ]]
@@ -83,11 +90,13 @@ for file in "${files[@]}"; do
         {key:$file,value:{sha256:$hash,stored_bytes:$stored,expanded_bytes:$expanded}}
     '
 done > "$work/images.jsonl"
-jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-composition.json" '
+jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-composition.json" \
+    --arg empty_sha256 "$(hash "$work/super_empty.img")" '
     . + {schema_version:1,artifact_kind:"uke-stable-super-fastboot",images:($images|from_entries),
          boot_sha256:($images|from_entries|.["boot.img"].sha256),boot_profile:"userdata-super",
          previous_desktop_run:44546857648,super_layout:$super[0].layout,
          targets:["super","userdata","dtbo_active","boot_active"],required_current_slot:null,
+         super_empty_sha256:$empty_sha256,super_empty_role:"Metadata only, parsed by fastboot and never a flash task",
          installation:"fastboot update",installation_script:false,
          capacity_policy:"Grow to the measured physical userdata and super partitions during first boot",
          replaces_existing_userdata:true,rescue_boot_hardware_tested:false,
@@ -106,6 +115,11 @@ Use Android SDK Platform-Tools 37.0.1 and bootloader fastboot on the stock
 partition layout of a Xiaomi Pad 7 256 GB or POCO Pad X1 512 GB. Install with:
 
   fastboot update ./$archive
+
+An optional .sig notice or a sparse AVB footer warning may appear in stock
+Fastboot. Check the Sending, Writing and Rebooting results for installation
+status. super_empty.img contains only the matching liblp layout for Fastboot
+to read. super.img contains the payload sent to the physical super partition.
 
 The archive writes super, userdata, and the active slot's DTBO and boot.
 It preserves partition sizes, the other slot's boot and DTBO, vendor_boot,
@@ -127,14 +141,14 @@ userdata read-only. Temporary rescue boot and login still need hardware testing.
 TEXT
 (
     cd "$work"
-    sha256sum android-info.txt fastboot-info.txt manifest.json README.txt "${files[@]}" > SHA256SUMS
-    zip -q -1 "$output/$archive" android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS "${files[@]}"
+    sha256sum android-info.txt fastboot-info.txt manifest.json README.txt super_empty.img "${files[@]}" > SHA256SUMS
+    zip -q -1 "$output/$archive" android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS super_empty.img "${files[@]}"
 )
 unzip -tq "$output/$archive"
 for file in android-info.txt fastboot-info.txt; do
     unzip -p "$output/$archive" "$file" | cmp - "$profile/$file"
 done
-printf '%s\n' android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS "${files[@]}" |
+printf '%s\n' android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS super_empty.img "${files[@]}" |
     LC_ALL=C sort > "$work/expected-entries"
 unzip -Z -1 "$output/$archive" | LC_ALL=C sort | cmp - "$work/expected-entries"
 cp "$work/"{manifest.json,README.txt} "$output/"
