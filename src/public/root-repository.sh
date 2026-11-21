@@ -9,6 +9,7 @@ public_root_repository() {
     if [[ $desktop == cutefish ]]; then
         [[ $project == uke-linux-unstable && $release == rawhide ]] || return 1
         # shellcheck source=cutefish-profile.sh
+        # shellcheck disable=SC1091
         source "$(dirname -- "${BASH_SOURCE[0]}")/cutefish-profile.sh"
         cutefish_packages=$(public_cutefish_profile '.repository_packages | join(",")') || return
         allowed+=,$cutefish_packages
