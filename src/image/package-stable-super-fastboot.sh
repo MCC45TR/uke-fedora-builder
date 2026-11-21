@@ -26,26 +26,20 @@ fi
 desktop=$(realpath "$1") components=$(realpath "$2") output=$(realpath -m "$3")
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 previous=uke-fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-fastboot.zip
-archive=fedora-rawhide-stable-kde-bash-singleboot-7.4.5-senemos-r2-fastboot.zip
-if [[ $channel == unstable ]]; then
-    archive=fedora-rawhide-pad7-kde-bash-singleboot-$release-fastboot.zip
-elif [[ $fresh == true ]]; then
-    archive=fedora-rawhide-stable-kde-bash-singleboot-$release-fastboot.zip
-fi
+desktop_slug=$desktop_profile
 case $desktop_profile in
-    kde) ;;
+    kde) desktop_slug=kde-plasma ;;
     gnome)
         [[ $fresh == true ]]
         desktop_name=GNOME
-        archive=fedora-rawhide-$channel-gnome-bash-singleboot-$release-fastboot.zip
         ;;
     cutefish)
         [[ $channel == unstable ]]
         desktop_name=Cutefish
-        archive=fedora-rawhide-unstable-cutefish-bash-singleboot-$release-fastboot.zip
         ;;
     *) exit 1;;
 esac
+archive="fedora-rawhide-uke-$desktop_slug-$(TZ=Europe/Istanbul date +%d%m%y-%H%M).zip"
 profile=$repo/configs/images/stable-super-fastboot
 (cd "$desktop"; sha256sum -c --strict SHA256SUMS)
 for dir in super-boots super-seed; do (cd "$components/$dir"; sha256sum -c --strict SHA256SUMS); done

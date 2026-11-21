@@ -61,3 +61,14 @@ date/revision errors, actual boot-byte collisions, compatible and incompatible
 cohorts, cross-desktop sharing, published root collisions, unsafe layouts,
 image-only uploads, checksum tables and preservation of legacy releases. These
 tests do not build an OS image or establish tablet acceptance.
+
+## Fastboot ZIPs in Actions
+
+Full Fedora Rawhide desktop Fastboot ZIPs on GitHub Actions use
+`fedora-rawhide-uke-<desktop>-<DDMMYY>-<HHMM>.zip`. Use `kde-plasma`, `gnome`, or
+`cutefish` for the desktop. The packager records the date and 24-hour time in
+Europe/Istanbul when packaging starts. The downloadable artifact and the
+`fastboot update` instructions use the same filename.
+
+For GNOME on 21 November 2026 at 20:01, the filename is
+`fedora-rawhide-uke-gnome-211126-2001.zip`.
