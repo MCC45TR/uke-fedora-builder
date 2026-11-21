@@ -106,6 +106,11 @@ for project in uke-linux uke-linux-test uke-linux-unstable; do
     public_root_repository "$work/runtime.repo" "$project" rawhide
     grep -Fxq "baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-\$basearch/" "$work/runtime.repo"
     grep -Fxq 'gpgcheck=1' "$work/runtime.repo"
+    if [[ $project == uke-linux-unstable ]]; then
+        grep -Eq '^includepkgs=.*[, ]thirparty-repos,thirparty-repos-google-chrome,thirparty-repos-solidcraft(,|$)' "$work/runtime.repo"
+    elif grep -Eq '^includepkgs=.*[, ]thirparty-repos(,|$)' "$work/runtime.repo"; then
+        exit 1
+    fi
 done
 public_root_repository "$work/worker.repo" uke-linux-unstable rawhide copr-frozen
 grep -Fxq 'baseurl=file:///inputs/target/rpms/uke' "$work/worker.repo"

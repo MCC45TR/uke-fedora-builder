@@ -5,7 +5,10 @@ public_root_repository() {
     local allowed='uke-*,senemos-uke-linux-kernel-*' cutefish_packages
     case $project in uke-linux|uke-linux-test|uke-linux-unstable) ;; *) return 1;; esac
     case $release in 44|45|rawhide) ;; *) return 1;; esac
-    [[ $project != uke-linux-unstable || $release == rawhide ]] || return 1
+    if [[ $project == uke-linux-unstable ]]; then
+        [[ $release == rawhide ]] || return 1
+        allowed+=,thirparty-repos,thirparty-repos-google-chrome,thirparty-repos-solidcraft
+    fi
     if [[ $desktop == cutefish ]]; then
         [[ $project == uke-linux-unstable && $release == rawhide ]] || return 1
         # shellcheck source=cutefish-profile.sh
