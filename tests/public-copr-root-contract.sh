@@ -107,8 +107,8 @@ for project in uke-linux uke-linux-test uke-linux-unstable; do
     grep -Fxq "baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-rawhide-\$basearch/" "$work/runtime.repo"
     grep -Fxq 'gpgcheck=1' "$work/runtime.repo"
     if [[ $project == uke-linux-unstable ]]; then
-        grep -Eq '^includepkgs=.*[, ]thirparty-repos,thirparty-repos-google-chrome,thirparty-repos-solidcraft(,|$)' "$work/runtime.repo"
-    elif grep -Eq '^includepkgs=.*[, ]thirparty-repos(,|$)' "$work/runtime.repo"; then
+        grep -Eq '^includepkgs=.*[, ]thirparty-repos,thirparty-repos-\*(,|$)' "$work/runtime.repo"
+    elif grep -Eq '^includepkgs=.*[, ]thirparty-repos(-[^, ]+)?(,|$)' "$work/runtime.repo"; then
         exit 1
     fi
 done
