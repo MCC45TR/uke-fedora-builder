@@ -32,7 +32,7 @@ on:
       pad7_image_desktop:
         description: Desktop for the full Fastboot ZIP
         type: choice
-        options: [kde, cutefish]
+        options: [kde, gnome, cutefish]
         default: kde
       pad7_temporary_boot:
         description: Rewrap the verified 7.4.11 Pad 7 image for a temporary fastboot boot test
@@ -345,7 +345,8 @@ jobs:
                          ( $IMAGE_RELEASE == "${IMAGE_EVR%.fc46}" && $IMAGE_RELEASE =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ) ]];;
             *) exit 1;;
           esac
-          [[ $IMAGE_DESKTOP == kde || ( $IMAGE_DESKTOP == cutefish && $IMAGE_CHANNEL == unstable ) ]]
+          [[ $IMAGE_DESKTOP == kde || $IMAGE_DESKTOP == gnome ||
+             ( $IMAGE_DESKTOP == cutefish && $IMAGE_CHANNEL == unstable ) ]]
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends jq zstd
           output="$RUNNER_TEMP/uke-pad7-desktop-build"

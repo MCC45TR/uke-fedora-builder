@@ -34,6 +34,11 @@ elif [[ $fresh == true ]]; then
 fi
 case $desktop_profile in
     kde) ;;
+    gnome)
+        [[ $fresh == true ]]
+        desktop_name=GNOME
+        archive=fedora-rawhide-$channel-gnome-bash-singleboot-$release-fastboot.zip
+        ;;
     cutefish)
         [[ $channel == unstable ]]
         desktop_name=Cutefish
@@ -76,6 +81,7 @@ jq -e --slurpfile rescue "$seed/rescue-source/kernel-info.json" --arg channel "$
     (if $desktop=="cutefish" then .account_setup=="uke-cutefish-firstboot" and
       .firstboot_backend_input_tests and .systemd_units_verified and .root_password_locked and
       .autologin_enabled==false else true end) and
+    (if $desktop=="gnome" then .account_setup=="gnome-initial-setup" else true end) and
     .kernel_release==$release and (.rpm_version_release+.rpm_dist)==$evr and .kernel_source_commit==$source and
     .kernel_profile=="normal" and .kernel_rpm_signature=="verified COPR signature" and
     ($rescue[0] as $k | .kernel_release==$k.kernel_release and .kernel_source_commit==$k.kernel_source_commit and
