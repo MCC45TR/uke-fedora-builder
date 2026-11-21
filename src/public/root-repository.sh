@@ -7,7 +7,7 @@ public_root_repository() {
     case $release in 44|45|rawhide) ;; *) return 1;; esac
     if [[ $project == uke-linux-unstable ]]; then
         [[ $release == rawhide ]] || return 1
-        allowed+=,thirparty-repos,thirparty-repos-*
+        allowed+=',thirparty-repos,thirparty-repos-*'
     fi
     if [[ $desktop == cutefish ]]; then
         [[ $project == uke-linux-unstable && $release == rawhide ]] || return 1
