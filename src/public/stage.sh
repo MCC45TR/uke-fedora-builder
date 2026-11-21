@@ -578,7 +578,7 @@ public_root_proc_unmount "$root"
 # Audit the final installed files only after every chroot operation has finished
 # and procfs is detached. The auditor rejects any remaining mounted subtree.
 icon_proof=()
-if [[ $desktop == cutefish ]]; then
+if [[ $desktop == cutefish || $desktop == gnome ]]; then
     # Anthy can generate bytecode while the staged desktop is being configured.
     # Drop that cache only when its source matches the separately verified RPM.
     for anthy_component in engine setup; do
@@ -597,6 +597,8 @@ if [[ $desktop == cutefish ]]; then
             fi
         done
     done
+fi
+if [[ $desktop == cutefish ]]; then
     # shellcheck source=cutefish-icons-proof.sh
     # shellcheck disable=SC1091
     source /builder/src/public/cutefish-icons-proof.sh
