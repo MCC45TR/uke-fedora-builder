@@ -29,6 +29,11 @@ on:
         type: choice
         options: [unstable, stable]
         default: unstable
+      pad7_image_desktop:
+        description: Desktop for the full Fastboot ZIP
+        type: choice
+        options: [kde, cutefish]
+        default: kde
       pad7_temporary_boot:
         description: Rewrap the verified 7.4.11 Pad 7 image for a temporary fastboot boot test
         type: boolean
@@ -194,6 +199,7 @@ jobs:
           PAD7_EVR: ${{ inputs.pad7_kernel_evr }}
           PAD7_SOURCE: ${{ inputs.pad7_kernel_source }}
           PAD7_CHANNEL: ${{ inputs.pad7_image_channel }}
+          PAD7_DESKTOP: ${{ inputs.pad7_image_desktop }}
           COMPONENTS_RUN: ${{ inputs.stable_super_components_run || github.run_id }}
         run: |
           set -Eeuo pipefail
@@ -204,7 +210,7 @@ jobs:
           mkdir "$export_dir"
           package_args=()
           if [[ -n $PAD7_EVR ]]; then
-            package_args=("$PAD7_RELEASE" "$PAD7_EVR" "$PAD7_SOURCE" "$PAD7_CHANNEL")
+            package_args=("$PAD7_RELEASE" "$PAD7_EVR" "$PAD7_SOURCE" "$PAD7_CHANNEL" "$PAD7_DESKTOP")
           fi
           docker run --rm --cpus=2 --memory=3g --env GITHUB_SHA \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
@@ -320,12 +326,13 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
-      - name: Assemble the KDE desktop from signed RPMs
+      - name: Assemble the desktop from signed RPMs
         env:
           IMAGE_EVR: ${{ inputs.pad7_kernel_evr }}
           IMAGE_RELEASE: ${{ inputs.pad7_kernel_release }}
           IMAGE_SOURCE: ${{ inputs.pad7_kernel_source }}
           IMAGE_CHANNEL: ${{ inputs.pad7_image_channel }}
+          IMAGE_DESKTOP: ${{ inputs.pad7_image_desktop }}
           UKE_CONTAINER_ENGINE: docker
         shell: bash
         run: |
@@ -334,20 +341,23 @@ jobs:
              $IMAGE_SOURCE =~ ^[0-9a-f]{40}$ ]]
           case $IMAGE_CHANNEL in
             stable) [[ $IMAGE_RELEASE == "${IMAGE_EVR%.fc46}" && $IMAGE_RELEASE =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ]];;
-            unstable) [[ $IMAGE_RELEASE =~ ^7[.]4[.][1-9][0-9]+-senemos$ ]];;
+            unstable) [[ $IMAGE_RELEASE =~ ^7[.]4[.][1-9][0-9]+-senemos$ ||
+                         ( $IMAGE_RELEASE == "${IMAGE_EVR%.fc46}" && $IMAGE_RELEASE =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ) ]];;
             *) exit 1;;
           esac
+          [[ $IMAGE_DESKTOP == kde || ( $IMAGE_DESKTOP == cutefish && $IMAGE_CHANNEL == unstable ) ]]
           sudo apt-get update
           sudo apt-get install -y --no-install-recommends jq zstd
           output="$RUNNER_TEMP/uke-pad7-desktop-build"
           bash scripts/build-image.sh --release rawhide --mode singleboot --filesystem ext4 \
-            --desktop kde --shell bash --channel "$IMAGE_CHANNEL" --kernel-profile normal --kernel-rpm "$IMAGE_EVR" \
+            --desktop "$IMAGE_DESKTOP" --shell bash --channel "$IMAGE_CHANNEL" --kernel-profile normal --kernel-rpm "$IMAGE_EVR" \
             --linux-size 8192 --jobs 2 --out "$output" --yes
           mapfile -t manifests < <(find "$output" -mindepth 3 -maxdepth 3 -path '*/artifacts/manifest.json')
           [[ ${#manifests[@]} == 1 ]]
           artifacts=${manifests[0]%/manifest.json}
-          jq -e --arg release "$IMAGE_RELEASE" --arg source "$IMAGE_SOURCE" --arg evr "$IMAGE_EVR" '
-            .kernel_release==$release and .kernel_source_commit==$source and (.rpm_version_release+.rpm_dist)==$evr
+          jq -e --arg release "$IMAGE_RELEASE" --arg source "$IMAGE_SOURCE" --arg evr "$IMAGE_EVR" --arg desktop "$IMAGE_DESKTOP" '
+            .desktop==$desktop and .kernel_release==$release and
+            .kernel_source_commit==$source and (.rpm_version_release+.rpm_dist)==$evr
           ' "$artifacts/manifest.json" >/dev/null
           payload="$RUNNER_TEMP/uke-pad7-desktop"
           mkdir "$payload"

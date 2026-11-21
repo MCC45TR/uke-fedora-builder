@@ -16,7 +16,11 @@ for path in "$out" "$root" "$work"; do [[ ! -e $path && ! -L $path ]] || fail 'o
 for tool in dnf5 rpm rpmkeys gpg curl jq readelf mke2fs e2fsck debugfs dumpe2fs cpio mount umount; do command -v "$tool" >/dev/null; done
 jq -e '((.channel=="stable" and ((.expected_kernel_release // "7.4.5-senemos") |
   .=="7.4.5-senemos" or test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$"))) or
-  (.channel=="unstable" and (.expected_kernel_release|test("^7[.]4[.][1-9][0-9]+-senemos$")))) and .kernel_profile=="normal" and .fedora_release=="rawhide" and
+  (.channel=="unstable" and
+    ((.expected_kernel_release|test("^7[.]4[.][1-9][0-9]+-senemos$")) or
+     ((.expected_kernel_release|test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$")) and
+      .expected_kernel_release==(.kernel_rpm_request|rtrimstr(".fc46")))))) and
+  .kernel_profile=="normal" and .fedora_release=="rawhide" and
   (.expected_kernel_source|test("^[a-f0-9]{40}$")) and
   (.kernel_rpm_request|test("^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$"))' /job/request.json >/dev/null
 (( $(df -Pk /job | awk 'NR==2{print $4}') >= 8*1024*1024 )) || fail '8GiB free required, including the operating reserve'

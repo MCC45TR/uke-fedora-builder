@@ -1,20 +1,24 @@
 #!/usr/bin/env bash
-# Assemble the final ZIP on GitHub from the verified KDE root and rescue jobs.
+# Assemble the final ZIP on GitHub from the verified desktop and rescue jobs.
 set -Eeuo pipefail
 export LC_ALL=C
 umask 077
-[[ ( $# == 3 || $# == 6 || $# == 7 ) && -d $1 && -d $2 && ! -e $3 ]]
+(( $# == 3 || ( $# >= 6 && $# <= 8 ) ))
+[[ -d $1 && -d $2 && ! -e $3 ]]
 release=${4:-7.4.5-senemos}
 evr=${5:-7.3.5-13.fc46}
 source=${6:-717f7d6c8fd26d3c066f936101b8c2011391cbf2}
 channel=stable
+desktop_profile=${8:-kde}
+desktop_name='KDE Plasma'
 fresh=false
 if (( $# >= 6 )); then
     fresh=true
     channel=${7:-unstable}
     [[ $evr =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ && $source =~ ^[0-9a-f]{40}$ ]]
     case $channel in
-        unstable) [[ $release =~ ^7[.]4[.][1-9][0-9]+-senemos$ ]];;
+        unstable) [[ $release =~ ^7[.]4[.][1-9][0-9]+-senemos$ ||
+                     ( $release == "${evr%.fc46}" && $release =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ) ]];;
         stable) [[ $release == "${evr%.fc46}" && $release =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ]];;
         *) exit 1;;
     esac
@@ -28,6 +32,15 @@ if [[ $channel == unstable ]]; then
 elif [[ $fresh == true ]]; then
     archive=fedora-rawhide-stable-kde-bash-singleboot-$release-fastboot.zip
 fi
+case $desktop_profile in
+    kde) ;;
+    cutefish)
+        [[ $channel == unstable ]]
+        desktop_name=Cutefish
+        archive=fedora-rawhide-unstable-cutefish-bash-singleboot-$release-fastboot.zip
+        ;;
+    *) exit 1;;
+esac
 profile=$repo/configs/images/stable-super-fastboot
 (cd "$desktop"; sha256sum -c --strict SHA256SUMS)
 for dir in super-boots super-seed; do (cd "$components/$dir"; sha256sum -c --strict SHA256SUMS); done
@@ -52,14 +65,17 @@ desktop_manifest=$work/desktop.json
 boots=$components/super-boots
 seed=$components/super-seed
 jq -e --slurpfile rescue "$seed/rescue-source/kernel-info.json" --arg channel "$channel" --argjson fresh "$fresh" \
-    --arg release "$release" --arg evr "$evr" --arg source "$source" --arg builder "${GITHUB_SHA:-}" '
+    --arg release "$release" --arg evr "$evr" --arg source "$source" --arg builder "${GITHUB_SHA:-}" --arg desktop "$desktop_profile" '
     .channel==$channel and .fedora_release=="rawhide" and .architecture=="aarch64" and
-    .device=="uke" and .desktop=="kde" and .default_shell=="bash" and .mode=="singleboot" and
+    .device=="uke" and .desktop==$desktop and .default_shell=="bash" and .mode=="singleboot" and
     .partition=="userdata" and .filesystem=="ext4" and .root_raw_bytes==8589934592 and
     (if $fresh then ($builder|test("^[0-9a-f]{40}$")) and .builder_commit==$builder
      else .builder_commit=="bc158a877d92d050fd3d7d6a08247df8e112b253" end) and
     .cohort_validation.final_filesystem_hashes_verified and .independent_aosp_decoder_verified and
     .selinux_policy_contexts_verified and (.credentials_included|not) and (.device_private_data_included|not) and
+    (if $desktop=="cutefish" then .account_setup=="uke-cutefish-firstboot" and
+      .firstboot_backend_input_tests and .systemd_units_verified and .root_password_locked and
+      .autologin_enabled==false else true end) and
     .kernel_release==$release and (.rpm_version_release+.rpm_dist)==$evr and .kernel_source_commit==$source and
     .kernel_profile=="normal" and .kernel_rpm_signature=="verified COPR signature" and
     ($rescue[0] as $k | .kernel_release==$k.kernel_release and .kernel_source_commit==$k.kernel_source_commit and
@@ -142,7 +158,7 @@ jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-compos
 ' "$desktop_manifest" > "$work/manifest.json"
 cp "$profile/"{android-info,fastboot-info}.txt "$work/"
 cat > "$work/README.txt" <<TEXT
-Fedora Rawhide / KDE Plasma / Bash / EXT4 singleboot
+Fedora Rawhide / $desktop_name / Bash / EXT4 singleboot
 Kernel $release (COPR ${channel} RPM $evr)
 
 This installation replaces Android super and userdata. Back up all data and
