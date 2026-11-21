@@ -4,12 +4,7 @@ public_desktop_repository() {
     local desktop=$1 destination=$2 keydir=$3 project fingerprint allowed key
     case $desktop in
         nextkde) project=kdenext; fingerprint=0C7AFEE52E73FCC565CFFD8EDB4A656550EA0312; allowed='nextkde,quickshell';;
-        cutefish) project=cutefish; fingerprint=8FBA3624A1628EB0AE35FD3A6525D78F085B03D6; allowed='';
-            # shellcheck source=cutefish-profile.sh
-            # shellcheck disable=SC1091
-            source "$(dirname -- "${BASH_SOURCE[0]}")/cutefish-profile.sh"
-            allowed=$(public_cutefish_profile '.repository_packages | join(",")') || return;;
-        core|kde|gnome|plasma-mobile) return 0;;
+        core|kde|gnome|plasma-mobile|cutefish) return 0;;
         *) return 1;;
     esac
     mkdir -p "$keydir"

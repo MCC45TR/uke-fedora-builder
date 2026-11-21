@@ -3,7 +3,7 @@
   "desktop": "cutefish",
   "release": "rawhide",
   "channel": "unstable",
-  "upstream_packaging": "ea2f0a3f387b9f2094dbc50c92bd7595037b69c5",
+  "upstream_packaging": "dbf5421ba38c1ef9cbf9c725febb782f8fd49a7e",
   "packages": [
     "cutefish-toolkit",
     "cutefish-framework",
@@ -88,7 +88,12 @@
     "uke-cutefish-firstboot",
     "uke-cutefish-session-config",
     "uke-cutefish-wallpapers",
-    "wvkbd"
+    "wvkbd",
+    "cutefish-suite",
+    "cutefish-plymouth-theme",
+    "cutefish-desktop-devel",
+    "cutefish-toolkit-devel",
+    "cutefish-framework-devel"
   ],
   "translation_domains": [
     "cutefish-toolkit",

@@ -352,8 +352,8 @@ install -m644 "$fedora_key" /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-fedora
 source /builder/src/public/root-repository.sh
 repository_mode=public
 [[ -z $copr_inputs ]] || repository_mode=copr-frozen
-public_root_repository /etc/yum.repos.d/uke-selected.repo "$project" "$fedora_release" "$repository_mode"
 desktop=$(jq -er .desktop "$request")
+public_root_repository /etc/yum.repos.d/uke-selected.repo "$project" "$fedora_release" "$repository_mode" "$desktop"
 # shellcheck source=desktop-repository.sh
 # shellcheck disable=SC1091
 source /builder/src/public/desktop-repository.sh
@@ -395,7 +395,7 @@ if [[ -n $copr_inputs ]]; then dnf+=(--enable-repo=copr-frozen-fedora)
 else
     while IFS= read -r repo; do dnf+=(--enable-repo="$repo"); done < <(jq -er --arg release "$fedora_release" ' .fedora_targets[$release].repos[]' /builder/configs/build-rules.json)
 fi
-if [[ $desktop == cutefish || $desktop == nextkde ]]; then dnf+=(--enable-repo=uke-desktop); fi
+if [[ $desktop == nextkde ]]; then dnf+=(--enable-repo=uke-desktop); fi
 if [[ -d /job/artifacts/runtime ]]; then
     local_repository
     dnf+=(--enable-repo=uke-source-build)
@@ -477,12 +477,10 @@ mkdir -p "$root/mnt/vendor/persist"
 chmod 700 "$root/mnt/vendor/persist"
 printf 'SELINUX=enforcing\nSELINUXTYPE=targeted\n' > "$root/etc/selinux/config"
 install -m644 /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected "$root/etc/pki/rpm-gpg/"
-public_root_repository "$root/etc/yum.repos.d/uke-selected.repo" "$project" "$fedora_release"
-if [[ $desktop == cutefish || $desktop == nextkde ]]; then
+public_root_repository "$root/etc/yum.repos.d/uke-selected.repo" "$project" "$fedora_release" public "$desktop"
+if [[ $desktop == nextkde ]]; then
     cp /etc/yum.repos.d/uke-desktop.repo "$root/etc/yum.repos.d/uke-desktop.repo"
-    desktop_project=cutefish
-    [[ $desktop != nextkde ]] || desktop_project=kdenext
-    cp "/etc/pki/rpm-gpg/RPM-GPG-KEY-uke-$desktop_project" "$root/etc/pki/rpm-gpg/"
+    cp /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-kdenext "$root/etc/pki/rpm-gpg/"
 fi
 cat > "$root/etc/dnf/dnf.conf" <<'DNF'
 [main]

@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 # The assembly repository may be frozen; the delivered root uses its public channel.
 public_root_repository() {
-    local output=$1 project=$2 release=$3 mode=${4:-public} baseurl
+    local output=$1 project=$2 release=$3 mode=${4:-public} desktop=${5:-core} baseurl
+    local allowed='uke-*,senemos-uke-linux-kernel-*' cutefish_packages
     case $project in uke-linux|uke-linux-test|uke-linux-unstable) ;; *) return 1;; esac
     case $release in 44|45|rawhide) ;; *) return 1;; esac
     [[ $project != uke-linux-unstable || $release == rawhide ]] || return 1
+    if [[ $desktop == cutefish ]]; then
+        [[ $project == uke-linux-unstable && $release == rawhide ]] || return 1
+        # shellcheck source=cutefish-profile.sh
+        source "$(dirname -- "${BASH_SOURCE[0]}")/cutefish-profile.sh"
+        cutefish_packages=$(public_cutefish_profile '.repository_packages | join(",")') || return
+        allowed+=,$cutefish_packages
+    fi
     case $mode in
         public) baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/$project/fedora-$release-\$basearch/;;
         copr-frozen)
@@ -22,6 +30,6 @@ repo_gpgcheck=0
 gpgkey=file:///etc/pki/rpm-gpg/RPM-GPG-KEY-uke-selected
 skip_if_unavailable=False
 priority=40
-includepkgs=uke-*,senemos-uke-linux-kernel-*
+includepkgs=$allowed
 REPO
 }

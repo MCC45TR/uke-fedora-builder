@@ -10,8 +10,8 @@ The public builder accepts Fedora 44, Fedora 45 and Rawhide as
 separate targets, and Bash, Fish or Zsh as the new normal user's login shell.
 The default remains Rawhide, KDE and Bash. Fedora 44/45 image composition stops
 before host preparation until signed Uke family builds and dependency resolution
-are validated. GNOME and KDE Plasma are the active desktop choices. Cutefish,
-NextKDE and the separate mobile profile are suspended. Historical releases remain available.
+are validated. GNOME and KDE Plasma are available. Cutefish is available on
+Rawhide Unstable. NextKDE remains suspended. Historical releases remain available.
 
 The three targets use reviewed per-architecture Fedora image digests in
 `configs/build-rules.json`. Public RPM stages derive the dist tag from that
@@ -20,6 +20,18 @@ kernel caches by release and channel. Package mode reads source provenance from
 the signed kernel cohort. Source mode retains the reviewed pinned kernel profile;
 no generic Fedora kernel is substituted.
 The legacy Core command retains its original Rawhide-only contract.
+
+On Rawhide AArch64, the Cutefish profile uses the signed Uke Unstable repository
+for `cutefish-desktop`, its applications and the Uke session packages. Existing
+Rawhide Unstable images that have `uke-desktop` pointing to the old Cutefish
+COPR can switch their package source while keeping their installed desktop.
+
+```sh
+sudo dnf5 config-manager setopt --create-missing-dir \
+  'uke-selected.includepkgs=uke-*,senemos-uke-linux-kernel-*,cutefish-*,xdg-desktop-portal-cutefish,wvkbd' \
+  uke-desktop.enabled=0
+sudo dnf5 --refresh upgrade 'cutefish-*' 'uke-cutefish-*' xdg-desktop-portal-cutefish wvkbd
+```
 
 `--shell` installs the original Fedora shell, validates the executable from the
 target RPM and `/etc/shells`, and updates `useradd -D` in the new root.
@@ -47,9 +59,9 @@ multiboot requires an existing physical `linux` partition.
 
 All 432 active release/desktop/shell/layout/filesystem/channel plans are checked without
 network or host preparation. The Cutefish meta package selects the real,
-separately packaged upstream desktop; it enables no display manager and cannot
-establish image or tablet support. Fedora 44/45 chroots were enabled in
-`mcc45tr/uke-linux`, `mcc45tr/uke-linux-test` and `mcc45tr/cutefish`.
+separately packaged upstream desktop. The image profile controls activation of
+its display manager. Historical Fedora 44/45 chroots were enabled in
+`mcc45tr/uke-linux`, `mcc45tr/uke-linux-test` and the former Cutefish project.
 Compatibility builds 11222490 and 11222501–11222510 failed after source preparation,
 without published binary logs. No Fedora 44/45 stable RPM promotion was performed.
 
