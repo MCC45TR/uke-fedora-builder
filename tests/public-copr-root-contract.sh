@@ -117,7 +117,7 @@ grep -Fxq 'baseurl=file:///inputs/target/rpms/uke' "$work/worker.repo"
 public_root_repository "$work/runtime.repo" uke-linux-unstable rawhide
 if grep -Fq '/inputs/' "$work/runtime.repo"; then echo 'Worker repository escaped into runtime' >&2; exit 1; fi
 public_root_repository "$work/cutefish.repo" uke-linux-unstable rawhide public cutefish
-grep -Fxq 'baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux-unstable/fedora-rawhide-$basearch/' "$work/cutefish.repo"
+grep -Fxq "baseurl=https://download.copr.fedorainfracloud.org/results/mcc45tr/uke-linux-unstable/fedora-rawhide-\$basearch/" "$work/cutefish.repo"
 grep -Eq '^includepkgs=.*[, ]cutefish-desktop(,|$)' "$work/cutefish.repo"
 if public_root_repository "$work/invalid.repo" uke-linux rawhide public cutefish; then exit 1; fi
 if public_root_repository "$work/invalid.repo" uke-linux-unstable 45; then exit 1; fi
