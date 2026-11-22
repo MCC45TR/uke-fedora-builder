@@ -14,7 +14,7 @@ tar -cf "$work/recipe.tar" -C "$recipe" src/public/root-proc.sh src/public/root-
     src/public/ext4-filesystem.sh src/public/root-metadata.sh src/public/guest-runtime.sh \
     src/public/copr-filesystem-entry.sh tests/copr-label-tree.sh tests/copr-guest-runtime.sh \
     tests/copr-guest-transaction.sh tests/copr-guest-compare.sh configs/keys/fedora-46.asc \
-    configs/copr-image-fixture-packages.json \
+    configs/copr/image-fixture-packages.json \
     build-tools/ext4-labels build-tools/compare-root-metadata
 tar -cf "$work/inputs.tar" -C "$inputs" .
 truncate -s 8G "$work/guest.raw"

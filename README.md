@@ -25,9 +25,9 @@ cd uke-linux
 ./ukelinux.sh
 ```
 
-The interactive menu lets you choose a distribution, build target, installation layout, filesystem, desktop, package channel and output directory. The repository keeps its existing `uke-fedora-builder` name and uses only `main` for active development.
+The interactive menu lets you choose a distribution, build target, installation layout, filesystem, desktop, package channel and output directory. The active branch is `main`. Frozen release and development branch tips are available as [archive tags](docs/architecture/builder.md#source-branches).
 
-As of **1 November 2026**, `--distro fedora` selects the existing Fedora backend and remains the default. `--distro ubuntu` and `--distro arch` are reserved choices that stop explicitly before host preparation, including with `--dry-run`; they do not produce Fedora images under another distribution's name. See [distribution backend status](docs/DISTRIBUTIONS.md) for remaining work.
+As of **1 November 2026**, `--distro fedora` selects the existing Fedora backend and remains the default. `--distro ubuntu` and `--distro arch` are reserved choices that stop explicitly before host preparation, including with `--dry-run`. See [distribution backend status](docs/guides/distributions.md) for remaining work.
 
 | Option | Available selections |
 | --- | --- |
@@ -68,7 +68,7 @@ Cutefish uses the independently built upstream RPM set, Cutefish DM and a
 credentials-free first-account session. It is limited to Rawhide unstable.
 Both new profiles retain the shared kernel, filesystem and package checks;
 physical setup, login, touch/GPU and application acceptance remain pending.
-The [image profile notes](docs/DESKTOP-TEST-IMAGES.md) record their boundaries.
+The [desktop image guide](docs/guides/desktop-image-profiles.md) describes the supported profiles.
 Cutefish test images remain Actions artifacts until physical acceptance permits
 publication. Existing KDE/GNOME release assets are unchanged.
 
@@ -102,12 +102,12 @@ Generic public images do not bundle private per-device touch references. If the 
 
 | Topic | Reference |
 | --- | --- |
-| Public image and kernel builds | [PUBLIC-BUILD.md](docs/PUBLIC-BUILD.md) |
-| Image profiles and earlier Core builds | [IMAGES.md](docs/IMAGES.md) |
-| Plasma first-run setup | [PLASMA-FIRST-RUN.md](docs/PLASMA-FIRST-RUN.md) |
-| Userdata/F2FS maintenance | [USERDATA-PREPARATION.md](docs/USERDATA-PREPARATION.md) |
-| Build architecture | [ARCHITECTURE.md](docs/ARCHITECTURE.md) |
-| Validation records | [reports/](reports/) |
+| Public image and kernel builds | [Build guide](docs/PUBLIC-BUILD.md) |
+| Desktop profiles | [Desktop image guide](docs/guides/desktop-image-profiles.md) |
+| Plasma first-run setup | [Plasma setup guide](docs/guides/plasma-first-run.md) |
+| Userdata/F2FS maintenance | [Userdata preparation](docs/guides/userdata-preparation.md) |
+| Build architecture and repository layout | [Builder architecture](docs/architecture/builder.md) |
+| Image release publication | [Publication guide](docs/releases/image-publication.md) |
 | Security reporting | [SECURITY.md](SECURITY.md) |
 
 Build results, package installation tests and physical tablet tests are recorded separately. For known hardware limitations, see the [Uke Linux hardware table](https://github.com/MCC45TR/uke-linux#hardware-support).

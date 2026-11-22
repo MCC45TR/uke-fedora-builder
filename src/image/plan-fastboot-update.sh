@@ -21,5 +21,5 @@ printf 'require product=uke\n' > "$output/android-info.txt"
  printf 'version 1\n'
  jq -r '.payloads[]|"flash "+.partition+" "+.file' "$repo/configs/images/fastboot-update-uke.json"
 } > "$output/fastboot-info.txt"
-cp "$repo/docs/FASTBOOT-UPDATE-PREPARATION.md" "$output/README.md"
+cp "$repo/docs/guides/fastboot-update-preparation.md" "$output/README.md"
 printf 'Fastboot install plan prepared; no images,ZIP,flash,slot change or encryption activation.\n'

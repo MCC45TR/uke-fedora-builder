@@ -136,7 +136,10 @@ pair_main() {
     [[ $(stat -c %s "$device_dt") -ge 40 && $(stat -c %s "$device_dt") -le 2097152 ]] || die 'Live FDT is outside ARM64 bounds'
     kernel_cache=${kernel_cache:-$BUILDER/build/boot/boot-b-b09bf6e9cbffa4d5}
     core=${core:-$BUILDER/build/images/core-rawhide-6bd23aae9255f1de}
-    stock=${stock:-$BUILDER/referances/firmware/android17-evolutionx-12.1/boot.img}
+    if [[ -z $stock ]]; then
+        stock=$BUILDER/references/firmware/android17-evolutionx-12.1/boot.img
+        [[ -f $stock ]] || stock=$BUILDER/referances/firmware/android17-evolutionx-12.1/boot.img
+    fi
     kernel_cache=$(realpath -e "$kernel_cache"); core=$(realpath -e "$core"); kernel=$(realpath -e "$kernel")
     local artifact=$kernel/artifacts/fedora-rawhide/7.2.9 recipe effective uuid hash name file tool
     verify_cache "$artifact/build-manifest.json" "$(jq -r .kernel_manifest_sha256 "$profile")"

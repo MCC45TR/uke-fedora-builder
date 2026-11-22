@@ -68,7 +68,7 @@ verify_cache() {
 }
 recipe_hash() {
     local dir=$1
-    cat "$dir/configs/Containerfile.image" "$dir/configs/images/core-rawhide.json" \
+    cat "$dir/containers/Containerfile.image" "$dir/configs/images/core-rawhide.json" \
         "$dir"/src/image/*.sh "$dir"/src/image/*.cpp "$dir"/src/audit/*.sh \
         "$dir"/src/image/dracut/91uke-bringup/* \
         "$dir"/manifests/images/core-*.json "$dir"/configs/images/transactions/*.json \
@@ -166,7 +166,7 @@ image_main() {
     RECIPE_ROOT=$WORK/recipe
     if [[ ! -d $RECIPE_ROOT ]]; then
         mkdir "$RECIPE_ROOT"
-        cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/manifests" "$RECIPE_ROOT/"
+        cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/containers" "$BUILDER/manifests" "$RECIPE_ROOT/"
     fi
     [[ $(recipe_hash "$RECIPE_ROOT") == "$source_recipe" ]] || die 'Source changed while freezing the recipe'
     printf '%s\n' "$effective_profile" > "$WORK/profile.json"
@@ -202,7 +202,7 @@ image_main() {
     TEST_IMAGE=$base
     prepare_aarch64
     local container_recipe
-    container_recipe=$(sha256sum "$BUILDER/configs/Containerfile.image" | cut -d ' ' -f1)
+    container_recipe=$(sha256sum "$RECIPE_ROOT/containers/Containerfile.image" | cut -d ' ' -f1)
     tool_image=localhost/senemos-uke-image-host:$architecture-${container_recipe:0:16}
     if ! "$ENGINE" image inspect "$tool_image" >/dev/null 2>&1; then
         ((OFFLINE == 0)) || die 'Offline image host toolchain is missing'
@@ -210,7 +210,7 @@ image_main() {
         wait_idle
         "$ENGINE" build --cpu-period=100000 --cpu-quota="$((JOBS * 100000))" --memory=3g \
             --build-arg "BASE_IMAGE=$base" --build-arg "RECIPE_SHA=$container_recipe" \
-            -t "$tool_image" -f "$BUILDER/configs/Containerfile.image" "$BUILDER/configs" > "$WORK/host-tools.log" 2>&1
+            -t "$tool_image" -f "$RECIPE_ROOT/containers/Containerfile.image" "$RECIPE_ROOT/containers" > "$WORK/host-tools.log" 2>&1
     fi
     tool_id=$("$ENGINE" image inspect "$tool_image" --format '{{.Id}}')
     local preparation_key prepared_cache

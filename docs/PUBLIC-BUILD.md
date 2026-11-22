@@ -57,13 +57,11 @@ multiboot requires an existing physical `linux` partition.
 ./ukelinux.sh --self-test
 ```
 
-All 432 active release/desktop/shell/layout/filesystem/channel plans are checked without
-network or host preparation. The Cutefish meta package selects the real,
-separately packaged upstream desktop. The image profile controls activation of
-its display manager. Historical Fedora 44/45 chroots were enabled in
-`mcc45tr/uke-linux`, `mcc45tr/uke-linux-test` and the former Cutefish project.
-Compatibility builds 11222490 and 11222501–11222510 failed after source preparation,
-without published binary logs. No Fedora 44/45 stable RPM promotion was performed.
+The source contracts check release, desktop, shell, layout, filesystem and
+channel plans without network access or host preparation. The Cutefish meta
+package selects the separately packaged upstream desktop. Its image profile
+controls display-manager activation. Fedora 44/45 image composition remains
+gated on signed package availability and dependency resolution.
 
 ## Start
 

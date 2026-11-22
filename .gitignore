@@ -1,5 +1,7 @@
-/referances/*
-!/referances/README.md
+/references/*
+!/references/README.md
+AGENTS.md
+/referances/
 /build/
 /out/
 /artifacts/

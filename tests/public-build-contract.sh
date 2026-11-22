@@ -202,7 +202,7 @@ cache_fixture=$(mktemp -d)
     printf '{"channel":"testing","kernel_requested":"latest"}\n' > "$WORK/request.json"
     say() { :; }
     mkdir "$cache_fixture/recipe"
-    cp -a "$root/src" "$root/configs" "$cache_fixture/recipe/"
+    cp -a "$root/src" "$root/configs" "$root/containers" "$cache_fixture/recipe/"
     recipe_a=$(kernel_recipe_hash "$cache_fixture/recipe")
     [[ $recipe_a == "$(kernel_recipe_hash "$root")" ]]
     printf '\n# Fixture producer inventory change\n' >> "$cache_fixture/recipe/src/public/cohort.sh"

@@ -260,7 +260,7 @@ public_main() {
     trap cleanup EXIT
     mkdir -p "$WORK/artifacts" "$WORK/recipe" "$WORK/inputs" "$output/cache"
     # Freeze the source recipe before any container operation.
-    cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/tests" "$WORK/recipe/"
+    cp -a "$BUILDER/src" "$BUILDER/configs" "$BUILDER/containers" "$BUILDER/tests" "$WORK/recipe/"
     # Resolve the kernel version and source revision once; every stage and the cache use these exact values.
     local policy_file=$WORK/recipe/configs/public-build.json kernel_url bundle='' kernel_ref
     kernel_ref=$(jq -er --arg profile "$KERNEL_PROFILE" '.kernel.profiles[$profile].ref // .kernel.ref' "$policy_file")
@@ -314,7 +314,7 @@ public_main() {
     if [[ $channel == unstable && -n $kernel_rpm ]]; then arm_recipe=Containerfile.public-unstable; native_recipe=$arm_recipe; fi
     native_base=$(jq -er --arg release "$fedora_release" --arg arch "$architecture" '.fedora_targets[$release].images[$arch]' "$WORK/recipe/configs/build-rules.json")
     arm_base=$(jq -er --arg release "$fedora_release" '.fedora_targets[$release].images.aarch64' "$WORK/recipe/configs/build-rules.json")
-    recipe_sha=$({ printf '%s\n' "$fedora_release" "$native_base" "$arm_base" "$arm_recipe"; cat "$WORK/recipe/configs/Containerfile.public" "$WORK/recipe/configs/Containerfile.public-native" "$WORK/recipe/configs/Containerfile.public-repository" "$WORK/recipe/configs/Containerfile.public-unstable" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json"; } | sha256sum | cut -d ' ' -f1)
+    recipe_sha=$({ printf '%s\n' "$fedora_release" "$native_base" "$arm_base" "$arm_recipe"; cat "$WORK/recipe/containers/Containerfile.public" "$WORK/recipe/containers/Containerfile.public-native" "$WORK/recipe/containers/Containerfile.public-repository" "$WORK/recipe/containers/Containerfile.public-unstable" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json"; } | sha256sum | cut -d ' ' -f1)
     native_image=localhost/uke-public-native:${recipe_sha:0:16}-$architecture
     arm_image=localhost/uke-public-arm64:${recipe_sha:0:16}
     if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $channel != unstable ]]; then
@@ -448,7 +448,7 @@ public_worker() {
         trust=(--secret "id=proxy_ca,src=$UKE_CA_BUNDLE")
     fi
     "$ENGINE" build ${trust[@]+"${trust[@]}"} --platform "$platform" --build-arg "BASE_IMAGE=$base" \
-        -t "$image" -f "$WORK/recipe/configs/$file" "$WORK/recipe/configs"
+        -t "$image" -f "$WORK/recipe/containers/$file" "$WORK/recipe/containers"
 }
 public_stage() {
     local image=$1 platform=$2 stage=$3 result owner=none

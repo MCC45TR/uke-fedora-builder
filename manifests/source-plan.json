@@ -8,7 +8,7 @@
   "sources": [
     {
       "id": "postmarketos-pmaports",
-      "path": "referances/donors/postmarketos-pmaports",
+      "path": "references/donors/postmarketos-pmaports",
       "url": "https://gitlab.com/postmarketOS/pmaports.git",
       "checkout": "refs/heads/master",
       "refs": {
@@ -22,7 +22,7 @@
     },
     {
       "id": "linux-firmware",
-      "path": "referances/upstream/linux-firmware",
+      "path": "references/upstream/linux-firmware",
       "url": "https://git.kernel.org/pub/scm/linux/kernel/git/firmware/linux-firmware.git",
       "checkout": "refs/heads/main",
       "refs": {

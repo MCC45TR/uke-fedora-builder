@@ -29,8 +29,8 @@ jobs:
           chmod +x "$guard/refuse-build"
           for tool in gcc g++ cc c++ clang clang++ as ld rpmbuild; do ln -s refuse-build "$guard/$tool"; done
           export PATH="$guard:$PATH"
-          for script in src/public/*.sh packaging/*.sh; do bash -n "$script"; done
-          shellcheck --exclude=SC2015 src/public/*.sh packaging/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
+          for script in src/public/*.sh packaging/rpm/image-tools/*.sh; do bash -n "$script"; done
+          shellcheck --exclude=SC2015 src/public/*.sh packaging/rpm/image-tools/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
           bash tests/public-build-contract.sh
           shellcheck tests/distribution-routing.sh
           bash tests/distribution-routing.sh

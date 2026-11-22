@@ -1,6 +1,6 @@
 # Fedora userdata F2FS preparation
 
-Retained private-root maintenance recipe. New public composition from an empty root is documented in [PUBLIC-BUILD.md](PUBLIC-BUILD.md); it does not require this recipe or any retained device image.
+Retained private-root maintenance recipe. New public composition from an empty root is documented in [PUBLIC-BUILD.md](../PUBLIC-BUILD.md); it does not require this recipe or any retained device image.
 
 21 October 2026 refresh: the retained private image selects the completed signed
 `7.2.12-1` ordinary/singleboot cohort, COPR 11183190/11183373. Both Fedora Rawhide
@@ -149,7 +149,7 @@ identity; its presence does not establish automatic recovery or rollback of the
 shared root filesystem.
 
 The same frozen payload can be exported as separate sparse userdata and boot
-images with the [host-only fastboot exporter](USERDATA-FASTBOOT.md). This changes
+images with the [host-only fastboot exporter](userdata-fastboot.md). This changes
 the distribution format; firmware provisioning and physical acceptance remain
 required. The exporter does not operate a device. The delivered manifest records
 the audited first-boot growth mechanism independently of kernel activation.

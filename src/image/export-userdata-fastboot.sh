@@ -51,7 +51,7 @@ ln "$destination/userdata.img" "$destination/system.img"
 mkdir "$destination/rollback"
 cp --reflink=auto "$job/rollback/boot_b-before-refresh.img" "$job/rollback/SHA256SUMS" "$destination/rollback/"
 cp "$job/delivery/checks/boot-header.json" "$destination/checks/boot-header.json"
-cp "$repo/docs/USERDATA-FASTBOOT.md" "$destination/README.md"
+cp "$repo/docs/guides/userdata-fastboot.md" "$destination/README.md"
 jq -n --slurpfile prepared "$manifest" \
     --arg created "$(date -u +%F)" --arg exporter "$(git -C "$repo" rev-parse HEAD)" \
     --arg codec "$(sha256sum "$repo/src/boot-pair/android-sparse.cpp" | cut -d ' ' -f1)" \

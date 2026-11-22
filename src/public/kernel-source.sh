@@ -88,7 +88,7 @@ kernel_source_check() {
 
 # Record executable producer inputs separately so script edits do not rebuild unchanged worker images.
 kernel_recipe_hash() {
-    (cd -- "$1" && sha256sum configs/Containerfile.public configs/Containerfile.public-native \
+    (cd -- "$1" && sha256sum containers/Containerfile.public containers/Containerfile.public-native \
         configs/public-build.json configs/build-rules.json \
         src/public/entry.sh src/public/stage.sh src/public/kernel-source.sh src/public/cohort.sh) | sha256sum | cut -d ' ' -f1
 }

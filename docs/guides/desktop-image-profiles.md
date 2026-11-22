@@ -1,4 +1,4 @@
-# Cutefish and KDE Mobile test images
+# Cutefish and Plasma Mobile images
 
 15 November 2026. Source integration; build results and physical acceptance are
 recorded separately. Both profiles use the existing public singleboot EXT4
@@ -55,10 +55,7 @@ utility and ScreenCast remain physical acceptance items.
 
 The hosted unstable entry selects the explicit cumulative `unstable` kernel
 profile as well as the unstable repository. RPM version/release, the suffixed
-ABI, source composition, family and both boot payloads must agree. The first
-compose stopped before root installation because the historical default asked
-for the normal family; the existing qualified selector and its refusal tests
-are now integrated. No replacement kernel is compiled by image assembly.
+ABI, source composition, family and both boot payloads must agree. Image assembly consumes signed kernel packages.
 
 The actual signed set contains 224 catalogs: sixteen in each of fourteen
 translated components. The portal and Qt integration plugins supply no separate
@@ -70,5 +67,4 @@ Revision 4 seeds the standard systemd offline clock floor through the mtime of
 `/var/lib/systemd/timesync/clock`. PID1 uses this state before services start;
 chronyd remains the NTP provider. This prevents a stale RTC from making current
 RPM signatures appear to come from the future before network time is available.
-No Fedora binary or additional clock service is introduced. The source fixture
-checks refusal of unexpected state and verifies the mtime in a real EXT4 inode.
+No Fedora binary or additional clock service is introduced.

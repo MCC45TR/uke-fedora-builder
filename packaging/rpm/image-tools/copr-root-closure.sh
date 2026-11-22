@@ -4,10 +4,10 @@ set -Eeuo pipefail
 [[ $# == 3 && -n ${COPR_RESULTDIR:-} && -d $1 && -d $3 && ! -e $2 && ! -L $2 ]]
 recipe=$(realpath "$1") output=$(realpath -m "$2") cache=$(realpath "$3")
 export LANG=C LC_ALL=C
-# shellcheck source=../src/public/root-packages.sh
+# shellcheck source=../../../src/public/root-packages.sh
 # shellcheck disable=SC1091
 source "$recipe/src/public/root-packages.sh"
-kernel=$(jq -er .kernel_rpm "$recipe/configs/copr-image-closure.json")
+kernel=$(jq -er .kernel_rpm "$recipe/configs/copr/image-closure.json")
 [[ $kernel =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ ]]
 family=$(jq -er .kernel.profiles.normal.family "$recipe/configs/public-build.json")
 [[ $family == senemos-uke-linux-kernel-mainline ]]
