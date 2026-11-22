@@ -106,6 +106,7 @@ Generic public images do not bundle private per-device touch references. If the 
 | Desktop profiles | [Desktop image guide](docs/guides/desktop-image-profiles.md) |
 | Plasma first-run setup | [Plasma setup guide](docs/guides/plasma-first-run.md) |
 | Userdata/F2FS maintenance | [Userdata preparation](docs/guides/userdata-preparation.md) |
+| Signed Rawhide Fastboot ZIPs | [Actions and local assembly](docs/guides/userdata-fastboot.md#rawhide-desktop-fastboot-zips-from-actions) |
 | Build architecture and repository layout | [Builder architecture](docs/architecture/builder.md) |
 | Image release publication | [Publication guide](docs/releases/image-publication.md) |
 | Security reporting | [SECURITY.md](SECURITY.md) |

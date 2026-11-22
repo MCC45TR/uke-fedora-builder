@@ -107,3 +107,35 @@ Host package, filesystem/metadata, sparse decode and boot/Image checks do not
 establish physical boot, ABL root-selector forwarding or hardware acceptance.
 Recovery installation and native Uke acceptance of newly composed filesystem
 variants remain separate stages. No in-place filesystem conversion is performed.
+
+## Rawhide desktop Fastboot ZIPs from Actions
+
+Run [Image source contracts](https://github.com/MCC45TR/uke-fedora-builder/actions/workflows/source-contracts.yml)
+with the exact signed COPR kernel RPM, its reported kernel release and source
+commit. Select Testing, Stable or Unstable and choose KDE Plasma or GNOME.
+Cutefish uses Unstable. The resulting ZIP is named
+`fedora-rawhide-uke-<desktop>-<DDMMYY>-<HHMM>.zip` in Europe/Istanbul time.
+
+The public ZIP contains `boot.img`, `dtbo.img`, `super.img`,
+`super_empty.img`, `userdata.img`, a separate `rescue-boot.img` and the
+manifest and checksums. The stock Fastboot plan writes super, userdata and
+the selected slot's boot and DTBO. The plan needs a matching stock Uke
+bootloader and vendor boot. Installation replaces Android userdata and super.
+Use the ZIP and matching checksum from the same Actions run.
+
+An archive that includes `vendor_boot.img` can be assembled on a Linux host
+from a compatible local OEM image. Use the SHA-256 from the Actions summary and
+the independently verified SHA-256 of the local firmware:
+
+```sh
+bash src/image/add-fastboot-vendor-boot.sh \
+    ACTIONS_ZIP ACTIONS_SHA256 VENDOR_BOOT_IMG VENDOR_SHA256 NEW_OUTPUT_DIRECTORY
+```
+
+The builder checks the Uke vendor boot v4 header, base DTB digest, partition
+capacity and both input digests. The output directory contains a ZIP with
+the original name and its new checksum. The resulting Fastboot plan targets
+the selected slot's vendor boot and checks both vendor boot partition
+capacities before starting. The local OEM image is for that local archive.
+Keep the matching stock firmware for recovery. Archive and Fastboot protocol
+checks do not qualify the physical boot or Live Rescue entry.

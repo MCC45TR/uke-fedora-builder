@@ -16,6 +16,7 @@ case $desktop_profile in
     cutefish) [[ $channel == unstable ]]; desktop_name=Cutefish ;;
     *) exit 1;;
 esac
+[[ -r /usr/share/zoneinfo/Europe/Istanbul ]]
 archive="fedora-rawhide-uke-$desktop_slug-$(TZ=Europe/Istanbul date +%d%m%y-%H%M).zip"
 profile=$repo/configs/images/rawhide-fastboot
 (cd "$desktop"; sha256sum -c --strict SHA256SUMS)

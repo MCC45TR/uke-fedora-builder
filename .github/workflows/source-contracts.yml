@@ -253,7 +253,7 @@ jobs:
             --mount "type=bind,source=$RUNNER_TEMP/fastboot-rescue,target=/components,readonly" \
             --mount "type=bind,source=$export_dir,target=/export" \
             "$image" bash -Eeuo pipefail -c '
-              dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs jq zip unzip socat diffutils findutils grep
+              dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs jq zip unzip socat diffutils findutils grep tzdata
               bash /builder/src/image/package-rawhide-fastboot.sh /desktop /components /export/final "$@"
               cd /export/final
               sha256sum -c --strict SHA256SUMS
