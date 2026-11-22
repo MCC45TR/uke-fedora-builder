@@ -570,32 +570,30 @@ public_root_proc_unmount "$root"
 # Audit the final installed files only after every chroot operation has finished
 # and procfs is detached. The auditor rejects any remaining mounted subtree.
 icon_proof=()
-if [[ $desktop == cutefish || $desktop == gnome ]]; then
-    # Anthy can generate bytecode while the staged desktop is being configured.
-    # Drop that cache only when its source matches the separately verified RPM.
-    for anthy_component in engine setup; do
-        anthy_dir=$root/usr/share/ibus-anthy/$anthy_component
-        anthy_cache=$anthy_dir/__pycache__
-        [[ -d $anthy_cache && $(realpath -- "$anthy_cache") == "$anthy_cache" ]] || continue
-        for bytecode in "$anthy_cache/"*.cpython-*.pyc; do
-            [[ -f $bytecode && ! -L $bytecode ]] || continue
-            original_bytecode=/job/original-fedora/${bytecode#"$root/"}
-            [[ ! -e $original_bytecode && ! -L $original_bytecode ]] || continue
-            anthy_module=${bytecode##*/}
-            anthy_module=${anthy_module%%.cpython-*}.py
-            [[ -f $anthy_dir/$anthy_module && ! -L $anthy_dir/$anthy_module ]] || continue
-            if cmp -s -- "$anthy_dir/$anthy_module" "/job/original-fedora/${anthy_dir#"$root/"}/$anthy_module"; then
-                unlink -- "$bytecode"
-            fi
-        done
+# Anthy can generate bytecode while the staged desktop is being configured.
+# Drop that cache only when its source matches the separately verified RPM.
+for anthy_component in engine setup; do
+    anthy_dir=$root/usr/share/ibus-anthy/$anthy_component
+    anthy_cache=$anthy_dir/__pycache__
+    [[ -d $anthy_cache && $(realpath -- "$anthy_cache") == "$anthy_cache" ]] || continue
+    for bytecode in "$anthy_cache/"*.cpython-*.pyc; do
+        [[ -f $bytecode && ! -L $bytecode ]] || continue
+        original_bytecode=/job/original-fedora/${bytecode#"$root/"}
+        [[ ! -e $original_bytecode && ! -L $original_bytecode ]] || continue
+        anthy_module=${bytecode##*/}
+        anthy_module=${anthy_module%%.cpython-*}.py
+        [[ -f $anthy_dir/$anthy_module && ! -L $anthy_dir/$anthy_module ]] || continue
+        if cmp -s -- "$anthy_dir/$anthy_module" "/job/original-fedora/${anthy_dir#"$root/"}/$anthy_module"; then
+            unlink -- "$bytecode"
+        fi
     done
-fi
+done
 if [[ $desktop == cutefish ]]; then
     # shellcheck source=cutefish-icons-proof.sh
     # shellcheck disable=SC1091
     source /builder/src/public/cutefish-icons-proof.sh
     public_cutefish_icons_proof "$root" "/cache/dnf-$channel" /job/original-cutefish /job/artifacts/desktop-inputs.tsv \
-        /etc/pki/rpm-gpg/RPM-GPG-KEY-uke-cutefish
+        "$key" "$fingerprint" || die 'Cutefish icon RPM verification failed'
     icon_proof=(--verified-cutefish-payload /job/original-cutefish)
 fi
 bash /builder/src/audit/check-target-payload.sh --original-kde-payload /job/original-fedora "${icon_proof[@]}" "$root"
