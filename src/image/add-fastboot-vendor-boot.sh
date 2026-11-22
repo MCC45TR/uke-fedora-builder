@@ -86,12 +86,15 @@ ln -s -- "$vendor" "$work/vendor_boot.img"
     sed -i -E '/  (android-info[.]txt|fastboot-info[.]txt|manifest[.]json|README[.]txt)$/d' SHA256SUMS
     sha256sum android-info.txt fastboot-info.txt manifest.json README.txt vendor_boot.img >> SHA256SUMS
     cp --reflink=auto -- "$input" "$archive"
+    [[ $(hash "$archive") == "$2" ]] || fail 'The Actions ZIP changed during assembly.'
     zip -q -1 "$archive" android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS vendor_boot.img
     unzip -tq "$archive"
     for file in android-info.txt fastboot-info.txt manifest.json README.txt SHA256SUMS vendor_boot.img; do
         unzip -p "$archive" "$file" | cmp - "$file"
     done
     printf '%s\n' "${files[@]}" vendor_boot.img | sort | cmp - <(unzip -Z -1 "$archive" | sort)
+    [[ $(unzip -p "$archive" vendor_boot.img | sha256sum | cut -d ' ' -f1) == "$4" ]] ||
+        fail 'Vendor boot changed during assembly.'
     sha256sum "$archive" > archive.sha256
     mkdir -- "$output"
     mv -- "$archive" "$output/"

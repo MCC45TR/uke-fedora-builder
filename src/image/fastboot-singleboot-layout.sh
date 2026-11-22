@@ -15,14 +15,6 @@ fastboot_rescue_kernel() {
     ' "$1" >/dev/null
 }
 
-fastboot_install_name() {
-    local day=$1 actual
-    [[ $day =~ ^[0-9]{6}$ ]] || return 2
-    actual=$(date -u -d "20${day:4:2}-${day:2:2}-${day:0:2}" +%d%m%y 2>/dev/null) || return 2
-    [[ $actual == "$day" ]] || return 2
-    printf 'fedora-rawhide-linux-kde-plasma-uke-senemos-sbfb-%s.zip\n' "$day"
-}
-
 fastboot_super_layout() {
     local capacity=$1 phase=${2:-ready} group alignment=1048576 metadata_size=65536 metadata_slots=3
     local metadata_bytes first_byte last_byte usable swap rescue unallocated
@@ -78,9 +70,8 @@ fastboot_seed_layout() {
 if [[ ${BASH_SOURCE[0]} == "$0" ]]; then
     set -Eeuo pipefail
     case ${1:-} in
-        name) [[ $# == 2 ]]; fastboot_install_name "$2";;
         layout) [[ $# == 2 || $# == 3 ]]; fastboot_super_layout "$2" "${3:-ready}";;
         seed) [[ $# == 3 ]]; fastboot_seed_layout "$2" "$3";;
-        *) printf 'Usage: %s name DDMMYY | layout SUPER_BYTES [ready|seed|growing] | seed RESCUE_BYTES MINIMUM_SUPER_BYTES\n' "${0##*/}" >&2; exit 2;;
+        *) printf 'Usage: %s layout SUPER_BYTES [ready|seed|growing] | seed RESCUE_BYTES MINIMUM_SUPER_BYTES\n' "${0##*/}" >&2; exit 2;;
     esac
 fi
