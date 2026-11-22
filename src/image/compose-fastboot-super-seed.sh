@@ -19,15 +19,7 @@ jq -e '.artifact_kind=="unqualified-fedora-rescue-root" and .architecture=="aarc
   .python_payload_audited==true and .matching_kernel_payload_verified==true and .ext4_readback_verified==true and
   .selinux_labels_verified==true and .root_read_only==true and .userdata_automount==false and
   (.raw_bytes|type=="number" and floor==. and .>=536870912 and .<=1073741824) and
-  (.sha256|test("^[a-f0-9]{64}$")) and .kernel.kernel_profile=="normal" and
-  .kernel.kernel_family=="senemos-uke-linux-kernel-mainline" and
-  .kernel.kernel_rpm_signature=="verified COPR signature" and
-  (.kernel | (.kernel_repository=="mcc45tr/uke-linux" and (.kernel_release |
-    .=="7.4.5-senemos" or test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$"))) or
-   (.kernel_repository=="mcc45tr/uke-linux-unstable" and
-    ((.kernel_release|test("^7[.]4[.][1-9][0-9]+-senemos$")) or
-     ((.kernel_release|test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$")) and
-      .kernel_release==.rpm_version_release))))' "$composition" >/dev/null
+  (.sha256|test("^[a-f0-9]{64}$"))' "$composition" >/dev/null
 [[ $(jq -Sc .kernel "$composition") == "$(jq -Sc . "$input/kernel-info.json")" ]]
 bytes=$(jq -er .raw_bytes "$composition")
 [[ $(stat -c %s "$image") == "$bytes" &&
@@ -51,6 +43,7 @@ cmp "$expected" "$input/source-sha256.txt"
 # shellcheck source=fastboot-singleboot-layout.sh
 # shellcheck disable=SC1091
 source "$repo/src/image/fastboot-singleboot-layout.sh"
+fastboot_rescue_kernel "$input/kernel-info.json"
 layout=$(fastboot_seed_layout "$bytes" "$minimum")
 layout_file=$(mktemp)
 trap 'unlink "$expected"; unlink "$layout_file"' EXIT

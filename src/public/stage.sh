@@ -362,6 +362,7 @@ public_desktop_repository "$desktop" /etc/yum.repos.d/uke-desktop.repo /etc/pki/
 # shellcheck source=root-packages.sh
 # shellcheck disable=SC1091
 source /builder/src/public/root-packages.sh
+release=$(jq -er .kernel_release /job/artifacts/kernel/kernel-info.json)
 public_root_packages packages "$fedora_release" "$channel" "$desktop" "$(jq -er .default_shell "$request")" || die 'Unsupported root package selection'
 if [[ $release == 7.4.5-senemos ]]; then
     [[ $partition != userdata ]] || packages+=(uke-senemos-dtbo)

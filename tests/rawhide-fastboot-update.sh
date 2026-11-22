@@ -3,9 +3,11 @@
 set -Eeuo pipefail
 export LC_ALL=C
 (( $# <= 1 ))
-metadata=''
-if [[ $# == 1 ]]; then
-    [[ -f $1 && $(stat -c %s "$1") -le 69632 ]]
+metadata=
+vendor_boot=false
+if [[ ${1:-} == --vendor-boot ]]; then vendor_boot=true; shift; fi
+if (( $# )); then
+    [[ $# == 1 && -f $1 && $(stat -c %s "$1") -le 69632 ]]
     metadata=$(realpath "$1")
 fi
 repo=$(cd -- "$(dirname -- "$0")/.." && pwd)
@@ -25,6 +27,15 @@ mkdir "$work/images"
     cd "$work/images"
     cp "$repo/configs/images/rawhide-fastboot/"*.txt .
     truncate -s 4096 boot.img dtbo.img rescue-boot.img
+    if [[ $vendor_boot == true ]]; then
+        truncate -s 4096 vendor_boot.img
+        sed -i '/^flash dtbo/i flash vendor_boot vendor_boot.img' fastboot-info.txt
+        cat >> android-info.txt <<'RULES'
+require has-slot:vendor_boot=yes
+require partition-size:vendor_boot_a=0x6000000|0x06000000|0x0000000006000000
+require partition-size:vendor_boot_b=0x6000000|0x06000000|0x0000000006000000
+RULES
+    fi
     # Two valid Android sparse chunks with a 4096-byte block size. The FILL
     # chunk carries one nonzero block, then DONT_CARE covers the rest.
     sparse_fixture() {
@@ -43,6 +54,7 @@ jq -n '{
     product:"uke", "is-userspace":"no", "current-slot":"a", "slot-count":"2",
     "snapshot-update-status":"none", "version-bootloader":"fixture", "version-baseband":"fixture",
     serialno:"FIXTURE", "max-download-size":"0x00100000",
+    "has-slot:vendor_boot":"yes", "partition-size:vendor_boot_a":"0x06000000", "partition-size:vendor_boot_b":"0x06000000",
     "has-slot:boot":"yes", "has-slot:dtbo":"yes", "has-slot:super":"no", "has-slot:userdata":"no",
     "partition-size:boot_a":" 0x06000000", "partition-size:boot_b":" 0x06000000",
     "partition-size:dtbo_a":" 0x01800000", "partition-size:dtbo_b":" 0x01800000",
@@ -56,7 +68,8 @@ run_case() {
     cat > "$case_dir/vars.json"
     dtbo=dtbo_$slot
     if [[ $(jq -er '."has-slot:dtbo"' "$case_dir/vars.json") == no ]]; then dtbo=dtbo; fi
-    jq -n --arg slot "$slot" --arg dtbo "$dtbo" '["super","userdata",$dtbo,"boot_"+$slot]' > "$case_dir/allowed.json"
+    jq -n --arg slot "$slot" --arg dtbo "$dtbo" --argjson vendor "$vendor_boot" '
+        ["super","userdata"]+(if $vendor then ["vendor_boot_"+$slot] else [] end)+[$dtbo,"boot_"+$slot]'  > "$case_dir/allowed.json"
     : > "$case_dir/commands.txt"
     for _ in {1..10}; do
         port=$((30000 + RANDOM % 20000))
@@ -76,11 +89,17 @@ run_case() {
     case $condition in
         accept)
             [[ $status == 0 ]]
-            printf 'super 4294967296\nuserdata 8589934592\n%s 4096\nboot_%s 4096\n' "$dtbo" "$slot" |
-                cmp - "$case_dir/accepted.txt"
+            {
+                printf 'super 4294967296\nuserdata 8589934592\n'
+                if [[ $vendor_boot == true ]]; then printf 'vendor_boot_%s 4096\n' "$slot"; fi
+                printf '%s 4096\nboot_%s 4096\n' "$dtbo" "$slot"
+            } | cmp - "$case_dir/accepted.txt"
             grep -Ev '^(getvar:|download:)' "$case_dir/commands.txt" > "$case_dir/mutations.txt"
-            printf 'set_active:%s\nflash:super\nflash:userdata\nflash:%s\nflash:boot_%s\nreboot\n' "$slot" "$dtbo" "$slot" |
-                cmp - "$case_dir/mutations.txt"
+            {
+                printf 'set_active:%s\nflash:super\nflash:userdata\n' "$slot"
+                if [[ $vendor_boot == true ]]; then printf 'flash:vendor_boot_%s\n' "$slot"; fi
+                printf 'flash:%s\nflash:boot_%s\nreboot\n' "$dtbo" "$slot"
+            } | cmp - "$case_dir/mutations.txt"
             if [[ -n $metadata ]]; then
                 grep -Fq 'extracting super_empty.img' "$case_dir/client.log"
                 if grep -Fq "archive does not contain 'super_empty.img'" "$case_dir/client.log"; then return 1; fi
@@ -109,4 +128,8 @@ run_case fastbootd a reject < <(jq '."is-userspace"="yes"' "$work/vars.json")
 run_case snapshot a reject < <(jq '."snapshot-update-status"="merging"' "$work/vars.json")
 run_case single-slot a reject < <(jq '."slot-count"="1"' "$work/vars.json")
 run_case too-small a undersized < <(jq '."partition-size:super"=" 0x20000000"' "$work/vars.json")
+if [[ $vendor_boot == true ]]; then
+    run_case vendor-boot-missing b reject < <(jq '."has-slot:vendor_boot"="no"' "$work/vars.json")
+    run_case vendor-boot-too-small b reject < <(jq '."partition-size:vendor_boot_b"="0x05000000"' "$work/vars.json")
+fi
 printf 'Stock fastboot update passed active-slot, 128/256/512 GB geometry, and refusal fixtures.\n'

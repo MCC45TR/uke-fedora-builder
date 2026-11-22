@@ -61,6 +61,8 @@ jobs:
           shellcheck --exclude=SC2015 src/public/*.sh packaging/rpm/image-tools/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
           bash tests/public-build-contract.sh
           bash tests/public-root-packages.sh
+          shellcheck src/image/add-fastboot-vendor-boot.sh tests/fastboot-vendor-boot-packaging.sh
+          bash tests/fastboot-vendor-boot-packaging.sh
           shellcheck tests/distribution-routing.sh
           bash tests/distribution-routing.sh
           shellcheck src/ubuntu/configure-root.sh tests/ubuntu-root-contract.sh
@@ -260,6 +262,7 @@ jobs:
               unzip -p "${archive[0]}" super_empty.img > /export/super_empty.img
               fastboot --version
               bash /builder/tests/rawhide-fastboot-update.sh /export/super_empty.img
+              bash /builder/tests/rawhide-fastboot-update.sh --vendor-boot /export/super_empty.img
             ' bash "$IMAGE_RELEASE" "$IMAGE_EVR" "$IMAGE_SOURCE" "$IMAGE_CHANNEL" "$IMAGE_DESKTOP"
           sudo chown -R "$(id -u):$(id -g)" "$export_dir/final"
           mv "$export_dir/final" "$RUNNER_TEMP/rawhide-fastboot"
