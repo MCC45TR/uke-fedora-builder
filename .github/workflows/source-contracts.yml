@@ -31,6 +31,10 @@ on:
         type: choice
         options: [zsh, bash, fish]
         default: zsh
+      fastboot_components_run:
+        description: Optional completed run with matching desktop and rescue artifacts
+        type: string
+        default: ''
 permissions:
   contents: read
 concurrency:
@@ -107,7 +111,7 @@ jobs:
           bash tests/desktop-isolation.sh
           echo 'Native helper builds and file fixtures run in the uke-image-tools COPR build.' >> "$GITHUB_STEP_SUMMARY"
   fastboot-desktop:
-    if: github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != '' && inputs.fastboot_components_run == ''
     needs: source
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 110
@@ -168,7 +172,7 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
   fastboot-rescue:
-    if: github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != ''
+    if: github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != '' && inputs.fastboot_components_run == ''
     needs: source
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 35
@@ -222,7 +226,12 @@ jobs:
           retention-days: 7
           compression-level: 6
   fastboot:
-    needs: [fastboot-desktop, fastboot-rescue]
+    if: >-
+      !cancelled() && github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != '' &&
+      needs.source.result == 'success' &&
+      (inputs.fastboot_components_run != '' ||
+       (needs.fastboot-desktop.result == 'success' && needs.fastboot-rescue.result == 'success'))
+    needs: [source, fastboot-desktop, fastboot-rescue]
     runs-on: ubuntu-24.04
     timeout-minutes: 55
     permissions:
@@ -232,13 +241,40 @@ jobs:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
         with:
           persist-credentials: false
+          fetch-depth: 0
+      - name: Verify the component producer
+        id: producer
+        env:
+          GH_TOKEN: ${{ github.token }}
+          COMPONENTS_RUN: ${{ inputs.fastboot_components_run }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          builder=$GITHUB_SHA
+          if [[ -n $COMPONENTS_RUN ]]; then
+            [[ $COMPONENTS_RUN =~ ^[1-9][0-9]{0,13}$ ]]
+            api="repos/$GITHUB_REPOSITORY/actions/runs/$COMPONENTS_RUN"
+            builder=$(gh api "$api" | jq -er --arg repo "$GITHUB_REPOSITORY" '
+              select(.status=="completed" and .event=="workflow_dispatch" and
+                .head_repository.full_name==$repo and .path==".github/workflows/source-contracts.yml") |
+              .head_sha | select(test("^[a-f0-9]{40}$"))')
+            git merge-base --is-ancestor "$builder" "$GITHUB_SHA"
+            gh api "$api/jobs" | jq -e '
+              [.jobs[] | select(.name=="fastboot-desktop" or .name=="fastboot-rescue") |
+                [.name,.conclusion]] | sort == [["fastboot-desktop","success"],["fastboot-rescue","success"]]'
+          fi
+          printf 'builder=%s\n' "$builder" >> "$GITHUB_OUTPUT"
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: rawhide-fastboot-desktop
+          github-token: ${{ inputs.fastboot_components_run != '' && github.token || '' }}
+          run-id: ${{ inputs.fastboot_components_run || github.run_id }}
           path: ${{ runner.temp }}/fastboot-desktop
       - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
         with:
           name: rawhide-fastboot-rescue
+          github-token: ${{ inputs.fastboot_components_run != '' && github.token || '' }}
+          run-id: ${{ inputs.fastboot_components_run || github.run_id }}
           path: ${{ runner.temp }}/fastboot-rescue
       - name: Assemble the singleboot fastboot ZIP
         id: package
@@ -248,6 +284,8 @@ jobs:
           IMAGE_SOURCE: ${{ inputs.fastboot_kernel_source }}
           IMAGE_CHANNEL: ${{ inputs.fastboot_channel }}
           IMAGE_DESKTOP: ${{ inputs.fastboot_desktop }}
+          IMAGE_SHELL: ${{ inputs.fastboot_shell }}
+          DESKTOP_BUILDER: ${{ steps.producer.outputs.builder }}
         run: |
           set -Eeuo pipefail
           (( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2{print $4}') >= 16*1024*1024 ))
@@ -256,7 +294,9 @@ jobs:
           export_dir="$RUNNER_TEMP/fastboot-export"
           mkdir "$export_dir"
           [[ $IMAGE_DESKTOP != kde-plasma ]] || IMAGE_DESKTOP=kde
-          docker run --rm --cpus=2 --memory=3g --env GITHUB_SHA \
+          jq -e --arg shell "$IMAGE_SHELL" '.default_shell==$shell' \
+            "$RUNNER_TEMP/fastboot-desktop/manifest.json" >/dev/null
+          docker run --rm --cpus=2 --memory=3g --env DESKTOP_BUILDER \
             --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/fastboot-desktop,target=/desktop,readonly" \
             --mount "type=bind,source=$RUNNER_TEMP/fastboot-rescue,target=/components,readonly" \

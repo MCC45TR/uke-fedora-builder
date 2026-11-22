@@ -36,7 +36,7 @@ desktop_manifest=$work/desktop.json
 boots=$components/super-boots
 seed=$components/super-seed
 jq -e --slurpfile rescue "$seed/rescue-source/kernel-info.json" --arg channel "$channel" \
-    --arg release "$release" --arg evr "$evr" --arg source "$source" --arg builder "${GITHUB_SHA:-}" --arg desktop "$desktop_profile" '
+    --arg release "$release" --arg evr "$evr" --arg source "$source" --arg builder "${DESKTOP_BUILDER:-}" --arg desktop "$desktop_profile" '
     .channel==$channel and .fedora_release=="rawhide" and .architecture=="aarch64" and
     .device=="uke" and .desktop==$desktop and (.default_shell|IN("bash","zsh","fish")) and .mode=="singleboot" and
     .partition=="userdata" and .filesystem=="ext4" and .root_raw_bytes==8589934592 and

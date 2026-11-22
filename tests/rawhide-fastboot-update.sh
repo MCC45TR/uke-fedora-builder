@@ -2,10 +2,10 @@
 # Exercise stock fastboot update over loopback with non-bootable test images.
 set -Eeuo pipefail
 export LC_ALL=C
-(( $# <= 1 ))
 metadata=
 vendor_boot=false
 if [[ ${1:-} == --vendor-boot ]]; then vendor_boot=true; shift; fi
+(( $# <= 1 ))
 if (( $# )); then
     [[ $# == 1 && -f $1 && $(stat -c %s "$1") -le 69632 ]]
     metadata=$(realpath "$1")
