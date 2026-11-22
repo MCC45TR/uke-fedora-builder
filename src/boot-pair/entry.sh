@@ -213,8 +213,13 @@ pair_main() {
         cp "$kernel/referances/copr/11090323/$name" "$WORK/inputs/kernel/$name"
     done < <(jq -r '.[]|[.file,.sha256]|@tsv' "$BUILDER/configs/boot/uke-boot-pair-rpms.json")
     mkdir -p "$WORK/inputs/support"
+    local support_root=$BUILDER/../uke-linux-hardware-support
+    local support_cache=copr/11108587/fedora-rawhide-aarch64
     while IFS=$'\t' read -r name hash; do
-        local package=$BUILDER/../uke-linux-hardware-support/uke-boot/referances/copr/11108587/fedora-rawhide-aarch64/$name
+        local package=$support_root/components/uke-boot/references/$support_cache/$name
+        if [[ ! -f $package ]]; then
+            package=$support_root/uke-boot/referances/$support_cache/$name
+        fi
         verify_cache "$package" "$hash"
         cp "$package" "$WORK/inputs/support/$name"
     done < <(jq -r '.[]|[.file,.sha256]|@tsv' "$BUILDER/configs/boot/uke-boot-pair-support-rpms.json")
