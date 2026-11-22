@@ -1,0 +1,5 @@
+require product=uke
+require is-userspace=no
+require slot-count=2
+require current-slot=a|b
+require snapshot-update-status=none

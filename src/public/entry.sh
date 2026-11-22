@@ -311,13 +311,18 @@ public_main() {
     if [[ -n $reference ]]; then install -m600 "$reference" "$WORK/inputs/reference.bin"; fi
     local native_image arm_image native_base arm_base recipe_sha arm_recipe=Containerfile.public native_recipe=Containerfile.public-native
     [[ -z $kernel_rpm ]] || arm_recipe=Containerfile.public-repository
-    if [[ $channel == unstable && -n $kernel_rpm ]]; then arm_recipe=Containerfile.public-unstable; native_recipe=$arm_recipe; fi
+    local signed_assembly=0
+    if [[ -n $kernel_rpm && ( $channel == unstable || $architecture == aarch64 ) ]]; then
+        signed_assembly=1
+        arm_recipe=Containerfile.public-unstable
+        native_recipe=$arm_recipe
+    fi
     native_base=$(jq -er --arg release "$fedora_release" --arg arch "$architecture" '.fedora_targets[$release].images[$arch]' "$WORK/recipe/configs/build-rules.json")
     arm_base=$(jq -er --arg release "$fedora_release" '.fedora_targets[$release].images.aarch64' "$WORK/recipe/configs/build-rules.json")
     recipe_sha=$({ printf '%s\n' "$fedora_release" "$native_base" "$arm_base" "$arm_recipe"; cat "$WORK/recipe/containers/Containerfile.public" "$WORK/recipe/containers/Containerfile.public-native" "$WORK/recipe/containers/Containerfile.public-repository" "$WORK/recipe/containers/Containerfile.public-unstable" "$WORK/recipe/configs/public-build.json" "$WORK/recipe/configs/build-rules.json"; } | sha256sum | cut -d ' ' -f1)
     native_image=localhost/uke-public-native:${recipe_sha:0:16}-$architecture
     arm_image=localhost/uke-public-arm64:${recipe_sha:0:16}
-    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $channel != unstable ]]; then
+    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $signed_assembly == 0 ]]; then
         arm_image=localhost/uke-public-repository:${recipe_sha:0:16}-$architecture
     fi
     public_worker "$native_image" "$host_platform" "$native_base" "$native_recipe"
@@ -327,9 +332,9 @@ public_main() {
         "$ENGINE" run --rm --network=none --security-opt label=disable -v "$WORK:/job" "$native_image" \
             cp /usr/bin/qemu-aarch64-static /job/inputs/qemu-aarch64-static
         UKE_AARCH64_INTERPRETER=$WORK/inputs/qemu-aarch64-static
-        [[ -n $kernel_rpm ]] || prepare_aarch64
+        if [[ -z $kernel_rpm || $signed_assembly == 1 ]]; then prepare_aarch64; fi
     fi
-    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $channel != unstable ]]; then
+    if [[ -n $kernel_rpm && $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $signed_assembly == 0 ]]; then
         # Package retrieval and native dnf do not execute target code. Only RPM
         # scriptlets use the verified AArch64 interpreter during root assembly.
         public_worker "$arm_image" "$host_platform" "$native_base" "$arm_recipe"
@@ -340,7 +345,7 @@ public_main() {
     # host's binfmt handler still runs RPM scriptlets and chroot commands. UKE_CROSS=0 emulates all steps.
     local cross=0 cross_image=localhost/uke-public-cross:${recipe_sha:0:16} root_image=$arm_image root_platform=linux/arm64
     # shortcut: KVM helpers build on AArch64; enable cross after porting their prebuilt paths.
-    if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $KERNEL_PROFILE == normal && $channel != unstable ]]; then
+    if [[ $architecture == x86_64 && ${UKE_CROSS:-1} != 0 && $KERNEL_PROFILE == normal && $signed_assembly == 0 ]]; then
         cross=1 root_image=$cross_image root_platform=$host_platform
         public_worker "$cross_image" "$host_platform" "$native_base" "$arm_recipe"
     fi
@@ -394,11 +399,11 @@ public_main() {
             say "Private shared core: $WORK/core.tar.zst (no filesystem image or Release asset)"
             return
         fi
-        if [[ $channel == unstable ]]; then public_stage "$arm_image" linux/arm64 filesystem
+        if ((signed_assembly)); then public_stage "$arm_image" linux/arm64 filesystem
         else public_stage "$native_image" "$host_platform" filesystem; fi
     fi
     local image_tools=null
-    if [[ $channel == unstable && -f $WORK/artifacts/tools/manifest.json ]]; then
+    if ((signed_assembly)) && [[ -f $WORK/artifacts/tools/manifest.json ]]; then
         image_tools=$(cat "$WORK/artifacts/tools/manifest.json")
     fi
     jq --argjson tools "$image_tools" --arg native "$("$ENGINE" image inspect --format '{{.Id}}' "$native_image")" \

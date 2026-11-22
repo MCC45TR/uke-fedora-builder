@@ -21,7 +21,7 @@ public_root_packages() {
         uke-touchscreen uke-ssc-fileservice uke-adaptive-display uke-battery-observer
         uke-charge-control uke-offline-charge)
     [[ $release != rawhide ]] || selection+=(fedora-repos-rawhide)
-    if [[ $channel == unstable ]]; then
+    if [[ $channel == unstable || $release == rawhide ]]; then
         local individual=()
         for package in "${selection[@]}"; do
             case $package in

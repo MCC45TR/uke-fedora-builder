@@ -19,17 +19,11 @@ for channel in stable testing unstable; do
             contains uke-touchscreen
             contains uke-firmware
             contains uke-offline-charge
-            if [[ $channel == unstable ]]; then
-                contains uke-core-meta
-                contains pipewire
-                contains pipewire-pulseaudio
-                if contains uke-additional || contains uke-core || contains uke-hw || contains uke-power || contains uke-sensors; then exit 1; fi
-                if contains uke-pipewire || contains uke-pipewire-pulseaudio; then exit 1; fi
-            else
-                contains uke-additional
-                contains pipewire
-                contains pipewire-pulseaudio
-            fi
+            contains uke-core-meta
+            contains pipewire
+            contains pipewire-pulseaudio
+            if contains uke-additional || contains uke-core || contains uke-hw || contains uke-power || contains uke-sensors; then exit 1; fi
+            if contains uke-pipewire || contains uke-pipewire-pulseaudio; then exit 1; fi
             if [[ $desktop == kde || $desktop == plasma-mobile || $desktop == nextkde ]]; then
                 contains plasma-setup
                 [[ $desktop != nextkde ]] || { contains nextkde; contains quickshell; }

@@ -3,10 +3,38 @@ on:
   push:
   pull_request:
   workflow_dispatch:
+    inputs:
+      fastboot_kernel_rpm:
+        description: Exact signed normal COPR kernel RPM EVR (leave empty for source checks only)
+        type: string
+        default: ''
+      fastboot_kernel_release:
+        description: Exact uname -r recorded by the signed COPR kernel
+        type: string
+        default: ''
+      fastboot_kernel_source:
+        description: The 40-character source commit recorded by the signed COPR kernel
+        type: string
+        default: ''
+      fastboot_channel:
+        description: Signed COPR package channel
+        type: choice
+        options: [testing, stable, unstable]
+        default: testing
+      fastboot_desktop:
+        description: Fedora Rawhide desktop
+        type: choice
+        options: [kde-plasma, gnome, cutefish]
+        default: kde-plasma
+      fastboot_shell:
+        description: First-login shell
+        type: choice
+        options: [zsh, bash, fish]
+        default: zsh
 permissions:
   contents: read
 concurrency:
-  group: image-source-contracts-${{ github.ref }}
+  group: image-source-contracts-${{ github.ref }}-${{ inputs.fastboot_kernel_rpm }}-${{ inputs.fastboot_channel }}-${{ inputs.fastboot_desktop }}
   cancel-in-progress: false
 jobs:
   source:
@@ -32,6 +60,7 @@ jobs:
           for script in src/public/*.sh packaging/rpm/image-tools/*.sh; do bash -n "$script"; done
           shellcheck --exclude=SC2015 src/public/*.sh packaging/rpm/image-tools/*.sh tests/public-build-contract.sh tests/public-channel-contract.sh
           bash tests/public-build-contract.sh
+          bash tests/public-root-packages.sh
           shellcheck tests/distribution-routing.sh
           bash tests/distribution-routing.sh
           shellcheck src/ubuntu/configure-root.sh tests/ubuntu-root-contract.sh
@@ -66,3 +95,193 @@ jobs:
           shellcheck src/public/desktop-isolation.sh tests/desktop-isolation.sh
           bash tests/desktop-isolation.sh
           echo 'Native helper builds and file fixtures run in the uke-image-tools COPR build.' >> "$GITHUB_STEP_SUMMARY"
+  fastboot-desktop:
+    if: github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != ''
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 110
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Assemble the desktop from signed RPMs
+        env:
+          IMAGE_EVR: ${{ inputs.fastboot_kernel_rpm }}
+          IMAGE_RELEASE: ${{ inputs.fastboot_kernel_release }}
+          IMAGE_SOURCE: ${{ inputs.fastboot_kernel_source }}
+          IMAGE_CHANNEL: ${{ inputs.fastboot_channel }}
+          IMAGE_DESKTOP: ${{ inputs.fastboot_desktop }}
+          IMAGE_SHELL: ${{ inputs.fastboot_shell }}
+          UKE_CONTAINER_ENGINE: docker
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 && $IMAGE_EVR =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ &&
+             $IMAGE_SOURCE =~ ^[0-9a-f]{40}$ && -n $IMAGE_RELEASE ]]
+          [[ $IMAGE_DESKTOP != kde-plasma ]] || IMAGE_DESKTOP=kde
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends jq zstd
+          output="$RUNNER_TEMP/rawhide-fastboot-desktop-build"
+          bash scripts/build-image.sh --release rawhide --mode singleboot --filesystem ext4 \
+            --desktop "$IMAGE_DESKTOP" --shell "$IMAGE_SHELL" --channel "$IMAGE_CHANNEL" --kernel-profile normal --kernel-rpm "$IMAGE_EVR" \
+            --linux-size 8192 --jobs 2 --out "$output" --yes
+          mapfile -t manifests < <(find "$output" -mindepth 3 -maxdepth 3 -path '*/artifacts/manifest.json')
+          [[ ${#manifests[@]} == 1 ]]
+          artifacts=${manifests[0]%/manifest.json}
+          jq -e --arg release "$IMAGE_RELEASE" --arg source "$IMAGE_SOURCE" --arg evr "$IMAGE_EVR" --arg desktop "$IMAGE_DESKTOP" '
+            .desktop==$desktop and .kernel_release==$release and
+            .kernel_source_commit==$source and (.rpm_version_release+.rpm_dist)==$evr
+          ' "$artifacts/manifest.json" >/dev/null
+          awk -F '\t' '
+            $1 ~ /^uke-pipewire-/ {bad=1}
+            $1 ~ /^pipewire-[0-9]/ && $3 == "Fedora Project" {pipewire=1; print}
+            $1 ~ /^pipewire-pulseaudio-[0-9]/ && $3 == "Fedora Project" {pulse=1; print}
+            END {exit (bad || !pipewire || !pulse)}
+          ' "$artifacts/installed-rpms.tsv"
+          payload="$RUNNER_TEMP/rawhide-fastboot-desktop"
+          mkdir "$payload"
+          mv "$artifacts/"{manifest.json,userdata.img,dtbo.img,dtbo-source-cohort.json,installed-rpms.tsv} "$payload/"
+          (cd "$payload"; sha256sum manifest.json userdata.img dtbo.img dtbo-source-cohort.json installed-rpms.tsv > SHA256SUMS)
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rawhide-fastboot-desktop
+          path: ${{ runner.temp }}/rawhide-fastboot-desktop
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 0
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        if: failure()
+        with:
+          name: fastboot-desktop-diagnostics
+          path: ${{ runner.temp }}/rawhide-fastboot-desktop-build/image-*/*.log
+          if-no-files-found: ignore
+          retention-days: 7
+  fastboot-rescue:
+    if: github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != ''
+    needs: source
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - name: Compose the signed boot profiles and live rescue seed
+        env:
+          IMAGE_EVR: ${{ inputs.fastboot_kernel_rpm }}
+          IMAGE_RELEASE: ${{ inputs.fastboot_kernel_release }}
+          IMAGE_SOURCE: ${{ inputs.fastboot_kernel_source }}
+          IMAGE_CHANNEL: ${{ inputs.fastboot_channel }}
+        shell: bash
+        run: |
+          set -Eeuo pipefail
+          [[ $(uname -m) == aarch64 ]]
+          image=$(jq -er '.fedora_targets.rawhide.images.aarch64' configs/build-rules.json)
+          [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
+          job="$RUNNER_TEMP/uke-rescue-job"
+          cache="$RUNNER_TEMP/uke-rescue-cache"
+          mkdir -m700 "$job" "$cache"
+          (( $(df -Pk "$job" | awk 'NR==2{print $4}') >= 24*1024*1024 ))
+          jq -n --arg evr "$IMAGE_EVR" --arg source "$IMAGE_SOURCE" --arg release "$IMAGE_RELEASE" --arg channel "$IMAGE_CHANNEL" '
+            {channel:$channel,fedora_release:"rawhide",kernel_profile:"normal",kernel_rpm_request:$evr,expected_kernel_release:$release,expected_kernel_source:$source}
+          ' > "$job/request.json"
+          docker run --rm --cpus=2 --memory=3g --pids-limit=512 \
+            --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$job,target=/job" \
+            --mount "type=bind,source=$cache,target=/cache" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf5 -y --setopt=install_weak_deps=False install jq gnupg2 curl cpio e2fsprogs util-linux coreutils findutils diffutils grep sed gawk binutils systemd systemd-libs libselinux libstdc++ kmod android-tools dnf5-plugins
+              : > /.uke-rescue-worker
+              bash /builder/src/image/compose-fedora-rescue.sh
+              bash /builder/src/image/compose-fastboot-super-seed.sh /job/artifacts/rescue 4294967296 /job/artifacts/super-seed
+              (cd /job/artifacts/super-seed; sha256sum -c --strict SHA256SUMS)
+              (cd /job/artifacts/super-boots; sha256sum boot.img rescue-boot.img super-profiles.json > SHA256SUMS)
+            '
+          owner="$(id -u):$(id -g)"
+          sudo chown "$owner" "$job/artifacts"
+          sudo chown -R "$owner" "$job/artifacts/super-boots" "$job/artifacts/super-seed"
+          printf 'Signed boot wrapper reproduction, FEDORA_RESCUE readback and the linux_swap/super seed verified.\n' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
+        with:
+          name: rawhide-fastboot-rescue
+          path: |
+            ${{ runner.temp }}/uke-rescue-job/artifacts/super-boots
+            ${{ runner.temp }}/uke-rescue-job/artifacts/super-seed
+          if-no-files-found: error
+          retention-days: 7
+          compression-level: 6
+  fastboot:
+    needs: [fastboot-desktop, fastboot-rescue]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 55
+    permissions:
+      contents: read
+      actions: read
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rawhide-fastboot-desktop
+          path: ${{ runner.temp }}/fastboot-desktop
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093
+        with:
+          name: rawhide-fastboot-rescue
+          path: ${{ runner.temp }}/fastboot-rescue
+      - name: Assemble the singleboot fastboot ZIP
+        id: package
+        env:
+          IMAGE_RELEASE: ${{ inputs.fastboot_kernel_release }}
+          IMAGE_EVR: ${{ inputs.fastboot_kernel_rpm }}
+          IMAGE_SOURCE: ${{ inputs.fastboot_kernel_source }}
+          IMAGE_CHANNEL: ${{ inputs.fastboot_channel }}
+          IMAGE_DESKTOP: ${{ inputs.fastboot_desktop }}
+        run: |
+          set -Eeuo pipefail
+          (( $(df -Pk "$RUNNER_TEMP" | awk 'NR==2{print $4}') >= 16*1024*1024 ))
+          image=$(jq -er '.fedora_targets.rawhide.images.x86_64' configs/build-rules.json)
+          [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
+          export_dir="$RUNNER_TEMP/fastboot-export"
+          mkdir "$export_dir"
+          [[ $IMAGE_DESKTOP != kde-plasma ]] || IMAGE_DESKTOP=kde
+          docker run --rm --cpus=2 --memory=3g --env GITHUB_SHA \
+            --mount "type=bind,source=$GITHUB_WORKSPACE,target=/builder,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/fastboot-desktop,target=/desktop,readonly" \
+            --mount "type=bind,source=$RUNNER_TEMP/fastboot-rescue,target=/components,readonly" \
+            --mount "type=bind,source=$export_dir,target=/export" \
+            "$image" bash -Eeuo pipefail -c '
+              dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs jq zip unzip socat diffutils findutils grep
+              bash /builder/src/image/package-rawhide-fastboot.sh /desktop /components /export/final "$@"
+              cd /export/final
+              sha256sum -c --strict SHA256SUMS
+              archive=(fedora-rawhide-uke-*.zip)
+              [[ ${#archive[@]} == 1 && -f ${archive[0]} ]]
+              unzip -p "${archive[0]}" super_empty.img > /export/super_empty.img
+              fastboot --version
+              bash /builder/tests/rawhide-fastboot-update.sh /export/super_empty.img
+            ' bash "$IMAGE_RELEASE" "$IMAGE_EVR" "$IMAGE_SOURCE" "$IMAGE_CHANNEL" "$IMAGE_DESKTOP"
+          sudo chown -R "$(id -u):$(id -g)" "$export_dir/final"
+          mv "$export_dir/final" "$RUNNER_TEMP/rawhide-fastboot"
+          archives=("$RUNNER_TEMP/rawhide-fastboot"/fedora-rawhide-uke-*.zip)
+          [[ ${#archives[@]} == 1 && -f ${archives[0]} ]]
+          archive=${archives[0]##*/}
+          printf 'file=%s\n' "$archive" >> "$GITHUB_OUTPUT"
+          printf 'Install on stock Uke with `fastboot update ./%s`.\n' "$archive" >> "$GITHUB_STEP_SUMMARY"
+          printf 'Signed %s kernel `%s` (COPR RPM `%s`).\n' "$IMAGE_CHANNEL" "$IMAGE_RELEASE" "$IMAGE_EVR" >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        id: download
+        with:
+          path: ${{ runner.temp }}/rawhide-fastboot/${{ steps.package.outputs.file }}
+          archive: false
+          if-no-files-found: error
+          retention-days: 14
+      - name: Verify the downloadable bytes match the fastboot ZIP
+        env:
+          ARTIFACT_DIGEST: ${{ steps.download.outputs.artifact-digest }}
+          ARCHIVE: ${{ steps.package.outputs.file }}
+        run: |
+          cd "$RUNNER_TEMP/rawhide-fastboot"
+          expected=$(awk -v archive="$ARCHIVE" '$2 == archive {print $1}' SHA256SUMS)
+          [[ $expected =~ ^[0-9a-f]{64}$ && $ARTIFACT_DIGEST == "$expected" ]]
+          printf 'Fastboot ZIP SHA-256 `%s`.\n' "$expected" >> "$GITHUB_STEP_SUMMARY"

@@ -15,7 +15,9 @@ cohort_identity() {
       $r.kernel_profile == $k.kernel_profile and
       (($k.kernel_profile == "normal" and
         $k.kernel_family == "senemos-uke-linux-kernel-mainline" and
-        ($k.kernel_release == $k.rpm_version_release or
+        ((($k.kernel_release | test("^7[.]4[.](5|[1-9][0-9]+)-senemos$")) and $k.kernel_version == "7.3.5" and
+          ($k.rpm_version_release | test("^7[.]3[.]5-[1-9][0-9]*$"))) or
+         $k.kernel_release == $k.rpm_version_release or
          (($k.rpm_version_release | startswith($k.kernel_release + ".")) and
           ($k.rpm_version_release | ltrimstr($k.kernel_release + ".") | test("^[1-9][0-9]*$"))))) or
        (($k.kernel_release | rtrimstr("-unstable")) as $abi |
@@ -29,7 +31,8 @@ cohort_identity() {
        ($k.kernel_profile == "el2-require" and
         $k.kernel_family == "senemos-uke-linux-kernel-mainline-kvm" and
         $k.kernel_release == ($k.rpm_version_release + "-kvm"))) and
-      ($k.kernel_release | startswith($r.kernel_version + "-")) and
+      (($k.kernel_release | startswith($r.kernel_version + "-")) or
+       ($k.kernel_profile == "normal" and ($k.kernel_release | test("^7[.]4[.](5|[1-9][0-9]+)-senemos$")))) and
       ($k.payload_sha256 | type == "string" and test("^[0-9a-f]{64}$")) and
       $k.kernel_source_commit == $r.kernel_commit and $k.kernel_version == $r.kernel_version and
       .builder_commit == $r.builder_commit and .kernel_commit == $r.kernel_commit and
@@ -51,11 +54,20 @@ cohort_identity() {
 # that exact relationship; never infer an ABI by dropping arbitrary suffixes.
 cohort_repository_release() (
     set -Eeuo pipefail
-    local root=$1 rpm_release=$2 profile=${3:-normal} abi base_abi source composition bundle
+    local root=$1 rpm_release=$2 profile=${3:-normal} abi base_abi source composition bundle published=false
     [[ $rpm_release =~ ^7[.]3[.][0-9]+-[1-9][0-9]*([.][1-9][0-9]*)?$ ]] || return 1
     abi=$(find "$root/usr/lib/modules" -mindepth 1 -maxdepth 1 -printf '%f\n') || return 1
     case $profile in
-        normal) [[ $abi =~ ^7[.]3[.][0-9]+-[1-9][0-9]*$ ]] || return 1; base_abi=$abi;;
+        normal)
+            if [[ $abi =~ ^7[.]4[.](5|[1-9][0-9]+)-senemos$ ]]; then
+                published=true
+                [[ $rpm_release =~ ^7[.]3[.]5-[1-9][0-9]*$ ]] || return 1
+                base_abi=$rpm_release
+            else
+                [[ $abi =~ ^7[.]3[.][0-9]+-[1-9][0-9]*$ ]] || return 1
+                base_abi=$abi
+            fi
+            ;;
         unstable) [[ $abi =~ ^7[.]3[.][0-9]+-[1-9][0-9]*-unstable$ ]] || return 1; base_abi=${abi%-unstable};;
         *) return 1;;
     esac
@@ -66,15 +78,26 @@ cohort_repository_release() (
     if [[ $rpm_release != "$base_abi" ]]; then
         [[ $rpm_release == "$base_abi".* && ${rpm_release#"$base_abi".} =~ ^[1-9][0-9]*$ ]] || return 1
     fi
-    if [[ $profile == unstable || $rpm_release != "$base_abi" ]]; then
+    if [[ $profile == unstable || $rpm_release != "$base_abi" || $published == true ]]; then
         source=$root/usr/share/senemos/uke/$abi/source-commit
         composition=$root/usr/share/senemos/uke/$abi/source-composition.json
         [[ -f $source && ! -L $source && -f $composition && ! -L $composition ]] || return 1
         [[ $(< "$source") =~ ^[0-9a-f]{40}$ ]] || return 1
-        jq -e --arg abi "$abi" --arg evr "$rpm_release" --arg source "$(< "$source")" '
+        jq -e --argjson published "$published" --arg abi "$abi" --arg evr "$rpm_release" --arg source "$(< "$source")" '
           .kernel_release==$abi and .source_commit==$source and
-          .upstream_version==($abi|split("-")[0]) and
-          .rpm_revision==($evr|split("-")[1])' "$composition" >/dev/null || return 1
+          .upstream_version==($evr|split("-")[0]) and
+          .rpm_revision==($evr|split("-")[1]) and
+          (if $published then
+              .publication.family=="senemos-uke-linux-kernel-mainline" and
+              (.publication.parent_copr_build|type=="number" and .>0 and floor==.) and
+              (if $abi=="7.4.5-senemos" then
+                 .publication.source_kernel_release==($evr+"-unstable")
+               else
+                 (.publication.normal_parent_copr_build|type=="number" and .>0 and floor==.) and
+                 (.publication.source_rpm_revision|type=="string" and test("^[1-9][0-9]*$")) and
+                 .publication.source_kernel_release==("7.3.5-"+.publication.source_rpm_revision+"-unstable")
+               end)
+           else true end)' "$composition" >/dev/null || return 1
     fi
     printf '%s\n' "$abi"
 )
@@ -125,6 +148,22 @@ cohort_boot_root_check() (
     [[ $selectors -le 1 && $selected == "$expected" ]]
 )
 
+# Use the RPM headers from the selected producer inventory to distinguish
+# legacy split packages from a core RPM that owns all three payloads.
+cohort_kernel_components() {
+    local inventory=$1 family=$2 evr=$3 component count=0
+    for component in -modules -dtbs -boot; do
+        if awk -F '\t' -v name="$family$component-$evr.aarch64" '$1==name { found=1 } END { exit !found }' "$inventory"; then
+            count=$((count + 1))
+        fi
+    done
+    case $count in
+        0) printf '%s\n' '' -core ;;
+        3) printf '%s\n' '' -core -modules -dtbs -boot ;;
+        *) printf 'Incomplete split RPM family in %s\n' "$inventory" >&2; return 1 ;;
+    esac
+}
+
 cohort_root_check() {
     # A fresh shell preserves fail-fast behavior even when a caller tests status
     # with if/!; Bash otherwise disables errexit throughout a called function.
@@ -137,7 +176,7 @@ cohort_root_check_main() (
     local request=$1 artifacts=$2 root=$3 codec=$4 expected_packages=$5 installed_packages=$6
     local info=$artifacts/kernel/kernel-info.json manifest=$artifacts/manifest.json
     cohort_identity "$request" "$info" "$manifest"
-    local release partition filesystem modules bundle scratch hash component nevra expected actual releases family rpm_release dist profile
+    local release partition filesystem modules bundle scratch hash component nevra expected actual releases family rpm_release dist profile components
     release=$(jq -er .kernel_release "$info")
     family=$(jq -er .kernel_family "$info")
     rpm_release=$(jq -er .rpm_version_release "$info")
@@ -163,13 +202,14 @@ cohort_root_check_main() (
     cohort_payload_inventory "$modules" > "$scratch/payload.sha256"
     cmp "$artifacts/kernel/payload.sha256" "$scratch/payload.sha256"
     # Compare installed package identity to the independently queried producer RPM set.
-    for component in '' -core -modules -dtbs -boot; do
+    components=$(cohort_kernel_components "$expected_packages" "$family" "$rpm_release$dist")
+    while IFS= read -r component; do
         nevra=$family$component-$rpm_release$dist.aarch64
         expected=$(awk -F '\t' -v name="$nevra" '$1==name {print $1 "\t" $2}' "$expected_packages")
         actual=$(awk -F '\t' -v name="$nevra" '$1==name {print $1 "\t" $2}' "$installed_packages")
         [[ -n $expected && $expected != *$'\n'* && $expected == "$actual" && $expected != *$'\t' ]]
         printf '%s\n' "$expected" >> "$scratch/expected-packages"
-    done
+    done <<< "$components"
     if [[ $partition == userdata ]]; then
         nevra=$family-singleboot-$rpm_release$dist.aarch64
         expected=$(awk -F '\t' -v name="$nevra" '$1==name {print $1 "\t" $2}' "$expected_packages")
