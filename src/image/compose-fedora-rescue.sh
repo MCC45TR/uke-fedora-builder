@@ -96,7 +96,7 @@ installed_bytes=0
 : > "$out/packages.tsv"
 for archive in "${rpms[@]}"; do
     [[ -f $archive && ! -L $archive ]]
-    IFS=$'\t' read -r name arch vendor size nevra < <(rpm -qp --qf $'%{NAME}\t%{ARCH}\t%{VENDOR}\t%{SIZE}\t%{NEVRA}\n' "$archive")
+    IFS=$'\t' read -r arch vendor size nevra < <(rpm -qp --qf $'%{ARCH}\t%{VENDOR}\t%{SIZE}\t%{NEVRA}\n' "$archive")
     [[ $arch == aarch64 || $arch == noarch ]]
     [[ $size =~ ^[0-9]+$ ]]
     installed_bytes=$((installed_bytes + size))
