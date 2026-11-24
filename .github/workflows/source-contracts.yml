@@ -131,7 +131,7 @@ jobs:
         shell: bash
         run: |
           set -Eeuo pipefail
-          [[ $(uname -m) == aarch64 && $IMAGE_EVR =~ ^7[.]3[.]5-[1-9][0-9]*[.]fc46$ &&
+          [[ $(uname -m) == aarch64 && $IMAGE_EVR =~ ^7[.]3[.][56]-[1-9][0-9]*[.]fc46$ &&
              $IMAGE_SOURCE =~ ^[0-9a-f]{40}$ && -n $IMAGE_RELEASE ]]
           [[ $IMAGE_DESKTOP != kde-plasma ]] || IMAGE_DESKTOP=kde
           sudo apt-get update
