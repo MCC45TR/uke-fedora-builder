@@ -5,13 +5,20 @@
 
 fastboot_rescue_kernel() {
     jq -e '
-        .kernel_profile=="normal" and .kernel_rpm_signature=="verified COPR signature" and
-        .kernel_family=="senemos-uke-linux-kernel-mainline" and
+        .kernel_rpm_signature=="verified COPR signature" and
         (.kernel_source_commit|test("^[a-f0-9]{40}$")) and
-        (.kernel_repository|IN("mcc45tr/uke-linux","mcc45tr/uke-linux-test","mcc45tr/uke-linux-unstable")) and
-        ((.kernel_release|test("^7[.]4[.][0-9]+-senemos$")) or
-         ((.kernel_release|test("^7[.]3[.](5-([2-9][0-9]|[1-9][0-9]{2,})|6-[1-9][0-9]*)$")) and
-          .kernel_release==.rpm_version_release))
+        ((.kernel_profile=="normal" and
+          .kernel_family=="senemos-uke-linux-kernel-mainline" and
+          (.kernel_repository|IN("mcc45tr/uke-linux","mcc45tr/uke-linux-test","mcc45tr/uke-linux-unstable")) and
+          ((.kernel_release|test("^7[.]4[.][0-9]+-senemos$")) or
+           ((.kernel_release|test("^7[.]3[.](5-([2-9][0-9]|[1-9][0-9]{2,})|6-[1-9][0-9]*)$")) and
+            .kernel_release==.rpm_version_release)))
+         or
+         (.kernel_profile=="unstable" and
+          .kernel_family=="senemos-uke-linux-kernel-mainline-unstable" and
+          .kernel_repository=="mcc45tr/uke-linux-unstable" and .rpm_dist==".fc46" and
+          (.rpm_version_release|test("^7[.]3[.][56]-[1-9][0-9]*$")) and
+          .kernel_release==(.rpm_version_release+"-unstable")))
     ' "$1" >/dev/null
 }
 

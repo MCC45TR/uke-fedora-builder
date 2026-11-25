@@ -93,6 +93,7 @@ jobs:
           bash tests/repository-kernel-plan.sh
           shellcheck src/public/cohort.sh tests/repository-kernel-identity.sh
           bash tests/repository-kernel-identity.sh
+          bash tests/rescue-seed-kernel.sh
           bash tests/public-worker-snapshot.sh docker
           shellcheck --exclude=SC2015 src/audit/check-target-payload.sh tests/payload-traversal.sh
           bash tests/payload-traversal.sh
