@@ -15,8 +15,12 @@ work=/job/rescue-work
 for path in "$out" "$root" "$work"; do [[ ! -e $path && ! -L $path ]] || fail 'owned output must be new'; done
 for tool in dnf5 rpm rpmkeys gpg curl jq readelf mke2fs e2fsck debugfs dumpe2fs cpio mount umount; do command -v "$tool" >/dev/null; done
 jq -e '(.channel | IN("stable","testing","unstable")) and
-  .kernel_profile=="normal" and .fedora_release=="rawhide" and
-  (.expected_kernel_release|test("^7[.](3[.][56]-[1-9][0-9]*|4[.][0-9]+-senemos)$")) and
+  .fedora_release=="rawhide" and
+  ((.kernel_profile=="normal" and
+    (.expected_kernel_release|test("^7[.](3[.][56]-[1-9][0-9]*|4[.][0-9]+-senemos)$"))) or
+   (.kernel_profile=="unstable" and .channel=="unstable" and
+    (.expected_kernel_release|test("^7[.]3[.][56]-[1-9][0-9]*-unstable$")) and
+    .expected_kernel_release==((.kernel_rpm_request|rtrimstr(".fc46"))+"-unstable"))) and
   (.expected_kernel_source|test("^[a-f0-9]{40}$")) and
   (.kernel_rpm_request|test("^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$"))' /job/request.json >/dev/null ||
     fail 'invalid channel, release or source identity in the rescue request'
@@ -24,7 +28,9 @@ jq -e '(.channel | IN("stable","testing","unstable")) and
 mkdir -p /job/artifacts
 mkdir -m700 "$out" "$root" "$work"
 mkdir -m0555 "$root/proc"
-read -r channel expected_release expected_source < <(jq -r '[.channel, (.expected_kernel_release // "7.4.5-senemos"), .expected_kernel_source] | @tsv' /job/request.json)
+read -r channel profile expected_release expected_source < <(
+    jq -r '[.channel, .kernel_profile, .expected_kernel_release, .expected_kernel_source] | @tsv' /job/request.json
+)
 kernel_repo=mcc45tr/$(jq -er --arg channel "$channel" '.channels[$channel].project' "$repo/configs/public-build.json")
 mounted=false
 cleanup() {
@@ -46,8 +52,8 @@ trap cleanup EXIT
 source "$repo/src/public/repository-tools.sh"
 bash "$repo/src/public/repository-kernel.sh"
 info=/job/artifacts/kernel/kernel-info.json
-jq -e --arg repo "$kernel_repo" --arg release "$expected_release" '
-  .kernel_profile=="normal" and .kernel_repository==$repo and
+jq -e --arg repo "$kernel_repo" --arg release "$expected_release" --arg profile "$profile" '
+  .kernel_profile==$profile and .kernel_repository==$repo and
   .kernel_rpm_signature=="verified COPR signature" and .kernel_release==$release' "$info" >/dev/null
 [[ $(jq -er .kernel_source_commit "$info") == "$expected_source" ]] || fail 'kernel source differs from the qualified request'
 release=$(jq -er .kernel_release "$info")

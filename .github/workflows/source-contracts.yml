@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
     inputs:
       fastboot_kernel_rpm:
-        description: Exact signed normal COPR kernel RPM EVR (leave empty for source checks only)
+        description: Exact signed COPR kernel RPM EVR (leave empty for source checks only)
         type: string
         default: ''
       fastboot_kernel_release:
@@ -111,7 +111,9 @@ jobs:
           bash tests/desktop-isolation.sh
           echo 'Native helper builds and file fixtures run in the uke-image-tools COPR build.' >> "$GITHUB_STEP_SUMMARY"
   fastboot-desktop:
-    if: github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != '' && inputs.fastboot_components_run == ''
+    if: >-
+      github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != '' &&
+      inputs.fastboot_components_run == '' && !endsWith(inputs.fastboot_kernel_release, '-unstable')
     needs: source
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 110
@@ -196,8 +198,13 @@ jobs:
           cache="$RUNNER_TEMP/uke-rescue-cache"
           mkdir -m700 "$job" "$cache"
           (( $(df -Pk "$job" | awk 'NR==2{print $4}') >= 24*1024*1024 ))
-          jq -n --arg evr "$IMAGE_EVR" --arg source "$IMAGE_SOURCE" --arg release "$IMAGE_RELEASE" --arg channel "$IMAGE_CHANNEL" '
-            {channel:$channel,fedora_release:"rawhide",kernel_profile:"normal",kernel_rpm_request:$evr,expected_kernel_release:$release,expected_kernel_source:$source}
+          profile=normal
+          if [[ $IMAGE_RELEASE == *-unstable ]]; then
+            [[ $IMAGE_CHANNEL == unstable ]]
+            profile=unstable
+          fi
+          jq -n --arg evr "$IMAGE_EVR" --arg source "$IMAGE_SOURCE" --arg release "$IMAGE_RELEASE" --arg channel "$IMAGE_CHANNEL" --arg profile "$profile" '
+            {channel:$channel,fedora_release:"rawhide",kernel_profile:$profile,kernel_rpm_request:$evr,expected_kernel_release:$release,expected_kernel_source:$source}
           ' > "$job/request.json"
           docker run --rm --cpus=2 --memory=3g --pids-limit=512 \
             --cap-add=SYS_ADMIN --security-opt apparmor=unconfined \
@@ -228,6 +235,7 @@ jobs:
   fastboot:
     if: >-
       !cancelled() && github.event_name == 'workflow_dispatch' && inputs.fastboot_kernel_rpm != '' &&
+      !endsWith(inputs.fastboot_kernel_release, '-unstable') &&
       needs.source.result == 'success' &&
       (inputs.fastboot_components_run != '' ||
        (needs.fastboot-desktop.result == 'success' && needs.fastboot-rescue.result == 'success'))
