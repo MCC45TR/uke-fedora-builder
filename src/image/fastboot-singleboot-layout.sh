@@ -10,7 +10,7 @@ fastboot_rescue_kernel() {
         (.kernel_source_commit|test("^[a-f0-9]{40}$")) and
         (.kernel_repository|IN("mcc45tr/uke-linux","mcc45tr/uke-linux-test","mcc45tr/uke-linux-unstable")) and
         ((.kernel_release|test("^7[.]4[.][0-9]+-senemos$")) or
-         ((.kernel_release|test("^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$")) and
+         ((.kernel_release|test("^7[.]3[.](5-([2-9][0-9]|[1-9][0-9]{2,})|6-[1-9][0-9]*)$")) and
           .kernel_release==.rpm_version_release))
     ' "$1" >/dev/null
 }

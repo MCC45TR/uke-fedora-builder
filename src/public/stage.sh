@@ -441,7 +441,7 @@ cp "$bundle/$partition.img" /job/artifacts/boot.img
 cmp /job/artifacts/boot.img "/job/artifacts/boot-$partition.img"
 if [[ $partition == userdata && $KERNEL_PROFILE == normal &&
       ( $release =~ ^7[.]4[.](5|[1-9][0-9]+)-senemos$ ||
-        $release =~ ^7[.]3[.]5-([2-9][0-9]|[1-9][0-9]{2,})$ ) ]]; then
+        $release =~ ^7[.]3[.](5-([2-9][0-9]|[1-9][0-9]{2,})|6-[1-9][0-9]*)$ ) ]]; then
     dtbo_owner=$base-singleboot
     [[ $release != 7.4.5-senemos ]] || dtbo_owner=uke-senemos-dtbo
     dtbo=/usr/lib/senemos/dtbo/dtbo.img

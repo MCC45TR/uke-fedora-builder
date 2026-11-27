@@ -16,9 +16,10 @@ for path in "$out" "$root" "$work"; do [[ ! -e $path && ! -L $path ]] || fail 'o
 for tool in dnf5 rpm rpmkeys gpg curl jq readelf mke2fs e2fsck debugfs dumpe2fs cpio mount umount; do command -v "$tool" >/dev/null; done
 jq -e '(.channel | IN("stable","testing","unstable")) and
   .kernel_profile=="normal" and .fedora_release=="rawhide" and
-  (.expected_kernel_release|test("^7[.](3[.]5-[1-9][0-9]*|4[.][0-9]+-senemos)$")) and
+  (.expected_kernel_release|test("^7[.](3[.][56]-[1-9][0-9]*|4[.][0-9]+-senemos)$")) and
   (.expected_kernel_source|test("^[a-f0-9]{40}$")) and
-  (.kernel_rpm_request|test("^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$"))' /job/request.json >/dev/null
+  (.kernel_rpm_request|test("^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$"))' /job/request.json >/dev/null ||
+    fail 'invalid channel, release or source identity in the rescue request'
 (( $(df -Pk /job | awk 'NR==2{print $4}') >= 8*1024*1024 )) || fail '8GiB free required, including the operating reserve'
 mkdir -p /job/artifacts
 mkdir -m700 "$out" "$root" "$work"
