@@ -3,10 +3,12 @@
 set -Eeuo pipefail
 export LC_ALL=C
 umask 077
-[[ $# == 8 && -d $1 && -d $2 && ! -e $3 ]]
+[[ ( $# == 8 || $# == 9 ) && -d $1 && -d $2 && ! -e $3 ]]
 desktop=$(realpath "$1") components=$(realpath "$2") output=$(realpath -m "$3")
 repo=$(cd -- "$(dirname -- "$0")/../.." && pwd)
 release=$4 evr=$5 source=$6 channel=$7 desktop_profile=$8
+test_key=${9:-}
+[[ $# == 8 || -f $test_key ]]
 [[ $evr =~ ^7[.]3[.][0-9]+-[1-9][0-9]*[.]fc46$ && $source =~ ^[0-9a-f]{40}$ ]]
 [[ $channel == stable || $channel == testing || $channel == unstable ]]
 desktop_slug=$desktop_profile
@@ -63,7 +65,6 @@ jq -e --slurpfile super "$seed/super-composition.json" '
     .source_scripts_verified and .unit_files_verified and .locked_root_verified and .human_account_absent and
     .activation_links_verified and .inspection_read_only
 ' "$seed/rescue-console-readback.json" >/dev/null
-for file in boot.img rescue-boot.img; do ln -s "$boots/$file" "$work/$file"; done
 ln -s "$seed/super.img" "$work/super.img"
 bash "$repo/src/image/compose-super-empty.sh" "$seed/super-layout.json" "$work/super_empty.img"
 # Check the metadata-only entry against each independent readback of super.img.
@@ -75,10 +76,9 @@ done
 hash() { sha256sum "$1" | cut -d ' ' -f1; }
 [[ $(hash "$work/dtbo.img") == "$(jq -er .dtbo_sha256 "$desktop_manifest")" ]]
 [[ $(hash "$work/userdata.img") == "$(jq -er .root_sparse_sha256 "$desktop_manifest")" ]]
-[[ $(hash "$work/boot.img") == "$(jq -er .userdata_super_sha256 "$boots/super-profiles.json")" ]]
-[[ $(hash "$work/rescue-boot.img") == "$(jq -er .rescue_sha256 "$boots/super-profiles.json")" ]]
+boot_source_sha=$(jq -er .userdata_super_sha256 "$boots/super-profiles.json")
+rescue_source_sha=$(jq -er .rescue_sha256 "$boots/super-profiles.json")
 [[ $(hash "$work/super.img") == "$(jq -er .super_sparse_sha256 "$seed/super-composition.json")" ]]
-[[ $(stat -Lc %s "$work/boot.img") == 100663296 && $(stat -Lc %s "$work/rescue-boot.img") == 100663296 ]]
 (( $(stat -Lc %s "$work/dtbo.img") <= 25165824 ))
 # Verify that the reused desktop root has the native swap manager and that its
 # kernel matches the signed wrappers rather than trusting its filename.
@@ -102,6 +102,16 @@ debugfs -R 'cat /etc/senemos/kernel-update.conf' "$work/userdata.raw" | grep -Fx
 debugfs -R 'cat /etc/senemos/userdata-update.conf' "$work/userdata.raw" | grep -Fx 'automatic=1'
 unlink "$work/userdata.raw"
 unlink "$work/vmlinuz"
+boot_avb=false
+if [[ -n $test_key ]]; then
+    bash "$repo/src/image/sign-fastboot-boot.sh" "$boots/boot.img" "$boot_source_sha" "$work/boot.img" "$test_key"
+    bash "$repo/src/image/sign-fastboot-boot.sh" "$boots/rescue-boot.img" "$rescue_source_sha" "$work/rescue-boot.img" "$test_key"
+    boot_avb=true
+else
+    [[ $(hash "$boots/boot.img") == "$boot_source_sha" && $(hash "$boots/rescue-boot.img") == "$rescue_source_sha" ]]
+    [[ $(stat -Lc %s "$boots/boot.img") == 100663296 && $(stat -Lc %s "$boots/rescue-boot.img") == 100663296 ]]
+    for file in boot.img rescue-boot.img; do ln -s "$boots/$file" "$work/$file"; done
+fi
 files=(boot.img dtbo.img rescue-boot.img super.img userdata.img)
 for file in "${files[@]}"; do
     stored=$(stat -Lc %s "$work/$file")
@@ -115,6 +125,7 @@ for file in "${files[@]}"; do
     '
 done > "$work/images.jsonl"
 jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-composition.json" \
+    --argjson boot_avb "$boot_avb" --arg boot_source "$boot_source_sha" --arg rescue_source "$rescue_source_sha" \
     --arg empty_sha256 "$(hash "$work/super_empty.img")" --arg channel "$channel" '
     . + {schema_version:1,artifact_kind:"uke-rawhide-super-fastboot",images:($images|from_entries),
          boot_sha256:($images|from_entries|.["boot.img"].sha256),boot_profile:"userdata-super",
@@ -124,7 +135,10 @@ jq --slurpfile images "$work/images.jsonl" --slurpfile super "$seed/super-compos
          installation:"fastboot update",installation_script:false,
          capacity_policy:"Grow to the measured physical userdata and super partitions during first boot",
          replaces_existing_userdata:true,rescue_boot_hardware_tested:false,
-         xiaomi_pad_7_128gb_hardware_tested:false,xiaomi_pad_7_256gb_hardware_tested:false}
+         xiaomi_pad_7_128gb_hardware_tested:false,xiaomi_pad_7_256gb_hardware_tested:false} |
+    if $boot_avb then . + {boot_avb:{partition_name:"boot",partition_size:100663296,algorithm:"SHA256_RSA4096",
+        signing_key:"AOSP RSA4096 test key",rollback_index:0,requires_unlocked_bootloader:true,
+        source_sha256:{"boot.img":$boot_source,"rescue-boot.img":$rescue_source}}} else . end
 ' "$desktop_manifest" > "$work/manifest.json"
 cp "$profile/"{android-info,fastboot-info}.txt "$work/"
 cat > "$work/README.txt" <<TEXT
@@ -161,9 +175,22 @@ Fedora setup has created the administrator.
   unzip -j $archive rescue-boot.img
   fastboot boot rescue-boot.img
 
+HyperOS OS3.0.304.0.WOZMIXM on a reported Xiaomi Pad 7 rejected RAM boot even
+with the stock Android boot image. Keep matching stock firmware for recovery
+on devices that reject this command.
+
 Live rescue USB login uses the administrator password and first mounts
 userdata read-only. Temporary rescue boot and login still need hardware testing.
 TEXT
+if [[ $boot_avb == true ]]; then
+    cat >> "$work/README.txt" <<'TEXT'
+
+Both boot images include AVB metadata for firmware that chains the boot
+partition from stock vbmeta. The public AOSP test key requires an unlocked
+bootloader. Keep the bootloader unlocked. Automatic kernel slot staging
+requires an updater that supports these AVB-wrapped boot images.
+TEXT
+fi
 (
     cd "$work"
     sha256sum android-info.txt fastboot-info.txt manifest.json README.txt super_empty.img "${files[@]}" > SHA256SUMS

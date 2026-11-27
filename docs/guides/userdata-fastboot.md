@@ -123,6 +123,17 @@ the selected slot's boot and DTBO. The plan needs a matching stock Uke
 bootloader and vendor boot. Installation replaces Android userdata and super.
 Use the ZIP and matching checksum from the same Actions run.
 
+For affected unlocked Xiaomi Pad 7 firmware that chains `boot` in stock
+`vbmeta`, select `fastboot_boot_avb` in the workflow. The packager adds a
+96 MiB `boot` partition footer to `boot.img` and `rescue-boot.img` using
+Fedora's host `avbtool` and the public AOSP RSA4096 test key pinned in
+`source-contracts.yml`. Keep the bootloader unlocked. Automatic kernel slot
+staging requires separate updater support for the AVB-wrapped images.
+On the Xiaomi Pad 7 reported in [issue #18](https://github.com/MCC45TR/uke-linux/issues/18),
+HyperOS OS3.0.304.0.WOZMIXM refused `fastboot boot` even with stock Android's
+boot image. The reported slot boot used the stock DTBO. Keep matching stock
+firmware available for recovery.
+
 An archive that includes `vendor_boot.img` can be assembled on a Linux host
 from a compatible local OEM image. Use the SHA-256 from the Actions summary and
 the independently verified SHA-256 of the local firmware:

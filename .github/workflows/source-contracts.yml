@@ -35,10 +35,14 @@ on:
         description: Optional completed run with matching desktop and rescue artifacts
         type: string
         default: ''
+      fastboot_boot_avb:
+        description: Add boot AVB footers for affected unlocked Pad 7 firmware
+        type: boolean
+        default: false
 permissions:
   contents: read
 concurrency:
-  group: image-source-contracts-${{ github.ref }}-${{ inputs.fastboot_kernel_rpm }}-${{ inputs.fastboot_channel }}-${{ inputs.fastboot_desktop }}
+  group: image-source-contracts-${{ github.ref }}-${{ inputs.fastboot_kernel_rpm }}-${{ inputs.fastboot_channel }}-${{ inputs.fastboot_desktop }}-${{ inputs.fastboot_boot_avb }}
   cancel-in-progress: false
 jobs:
   source:
@@ -67,6 +71,7 @@ jobs:
           bash tests/public-root-packages.sh
           shellcheck src/image/add-fastboot-vendor-boot.sh tests/fastboot-vendor-boot-packaging.sh
           bash tests/fastboot-vendor-boot-packaging.sh
+          shellcheck src/image/sign-fastboot-boot.sh tests/fastboot-boot-avb.sh
           tools="$RUNNER_TEMP/stock-fastboot"
           mkdir "$tools"
           curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 16777216 \
@@ -285,6 +290,7 @@ jobs:
           IMAGE_CHANNEL: ${{ inputs.fastboot_channel }}
           IMAGE_DESKTOP: ${{ inputs.fastboot_desktop }}
           IMAGE_SHELL: ${{ inputs.fastboot_shell }}
+          IMAGE_BOOT_AVB: ${{ inputs.fastboot_boot_avb }}
           DESKTOP_BUILDER: ${{ steps.producer.outputs.builder }}
         run: |
           set -Eeuo pipefail
@@ -293,6 +299,13 @@ jobs:
           [[ $image =~ ^registry[.]fedoraproject[.]org/fedora@sha256:[a-f0-9]{64}$ ]]
           export_dir="$RUNNER_TEMP/fastboot-export"
           mkdir "$export_dir"
+          avb_args=()
+          if [[ $IMAGE_BOOT_AVB == true ]]; then
+            curl --proto '=https' --tlsv1.2 -fsSL --retry 3 --max-filesize 8192 \
+              'https://android.googlesource.com/platform/external/avb/+/5ac0c3a071d811846a62412383dd6e259f341e6e/test/data/testkey_rsa4096.pem?format=TEXT' |
+              base64 -d > "$export_dir/avb-test-key.pem"
+            avb_args=(/export/avb-test-key.pem)
+          fi
           [[ $IMAGE_DESKTOP != kde-plasma ]] || IMAGE_DESKTOP=kde
           jq -e --arg shell "$IMAGE_SHELL" '.default_shell==$shell' \
             "$RUNNER_TEMP/fastboot-desktop/manifest.json" >/dev/null
@@ -302,7 +315,10 @@ jobs:
             --mount "type=bind,source=$RUNNER_TEMP/fastboot-rescue,target=/components,readonly" \
             --mount "type=bind,source=$export_dir,target=/export" \
             "$image" bash -Eeuo pipefail -c '
-              dnf5 -y --setopt=install_weak_deps=False install android-tools e2fsprogs jq zip unzip socat diffutils findutils grep tzdata
+              packages=(android-tools e2fsprogs jq zip unzip socat diffutils findutils grep tzdata)
+              if (( $# == 6 )); then packages+=(openssl); fi
+              dnf5 -y --setopt=install_weak_deps=False install "${packages[@]}"
+              if (( $# == 6 )); then bash /builder/tests/fastboot-boot-avb.sh "${6}"; fi
               bash /builder/src/image/package-rawhide-fastboot.sh /desktop /components /export/final "$@"
               cd /export/final
               sha256sum -c --strict SHA256SUMS
@@ -312,7 +328,7 @@ jobs:
               fastboot --version
               bash /builder/tests/rawhide-fastboot-update.sh /export/super_empty.img
               bash /builder/tests/rawhide-fastboot-update.sh --vendor-boot /export/super_empty.img
-            ' bash "$IMAGE_RELEASE" "$IMAGE_EVR" "$IMAGE_SOURCE" "$IMAGE_CHANNEL" "$IMAGE_DESKTOP"
+            ' bash "$IMAGE_RELEASE" "$IMAGE_EVR" "$IMAGE_SOURCE" "$IMAGE_CHANNEL" "$IMAGE_DESKTOP" "${avb_args[@]}"
           sudo chown -R "$(id -u):$(id -g)" "$export_dir/final"
           mv "$export_dir/final" "$RUNNER_TEMP/rawhide-fastboot"
           archives=("$RUNNER_TEMP/rawhide-fastboot"/fedora-rawhide-uke-*.zip)
@@ -321,6 +337,9 @@ jobs:
           printf 'file=%s\n' "$archive" >> "$GITHUB_OUTPUT"
           printf 'Install on stock Uke with `fastboot update ./%s`.\n' "$archive" >> "$GITHUB_STEP_SUMMARY"
           printf 'Signed %s kernel `%s` (COPR RPM `%s`).\n' "$IMAGE_CHANNEL" "$IMAGE_RELEASE" "$IMAGE_EVR" >> "$GITHUB_STEP_SUMMARY"
+          if [[ $IMAGE_BOOT_AVB == true ]]; then
+            printf 'Includes boot AVB footers signed with the public AOSP test key. Requires an unlocked bootloader.\n' >> "$GITHUB_STEP_SUMMARY"
+          fi
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         id: download
         with:
