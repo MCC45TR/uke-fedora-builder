@@ -1,0 +1,364 @@
+Name:           uke-protected-cohort-source-check
+Version:        1.0
+Release:        28%{?dist}
+Summary:        Native source verification of Uke AVB and signed cohort constraints
+License:        MIT AND BSD-2-Clause AND BSD-3-Clause
+URL:            https://github.com/MCC45TR/uke-fedora-builder
+Source0:        %{name}-%{version}.tar.xz
+Source1:        source-identity.json
+Source2:        libavb-ba2dec4b.tar.xz
+Source3:        libavb-LICENSE
+Source4:        mink-adapter-5e3c6951.tar.xz
+ExclusiveArch:  aarch64
+%global debug_package %{nil}
+BuildRequires:  gcc gcc-c++ binutils openssl-devel openssl bash jq coreutils findutils diffutils util-linux
+BuildRequires:  json-devel = 3.12.0
+BuildRequires:  pkgconfig(libsystemd)
+BuildRequires:  kernel-headers
+BuildRequires:  pkgconfig(qcomtee) pkgconfig(libcbor)
+# Upstream Fedora avbtool formats/signs disposable COPR-host fixtures only.
+# Python and avbtool are never target payloads; the descriptor inspection
+# frontend is an explicit temporary diagnostic, never an admission policy.
+BuildRequires:  android-tools python3
+Requires:       bash jq coreutils findutils util-linux-core
+
+%description
+Temporary source-check receipts and a descriptor inspection executable from
+native AArch64 COPR compilation. Public disposable fixtures support a bounded
+owned-loop block-I/O test without a formatter or Python on the target. The
+physical HWKM diagnostic can explicitly exercise a disposable generated key
+only on the fitted wrapped-only UFS profile. Explicit test-record commands can
+persist one disposable wrapped key for a separate reboot test; this is never
+a production volume key. Compare one read-only ICE block using that same
+record before and after a reboot. No production key release, boot admission, boot
+selection or runtime service is granted.
+No physical UFS or OEM trust qualification follows from these test fixtures.
+The bounded QTEE information diagnostic uses ordinary userspace credentials
+through original Fedora libqcomtee and an unmodified upstream MINK adapter.
+It exposes TPM TA information and the fitted keymaster64 version query.
+The explicit storage test generates one disposable KeyMint storage key and
+prepares it from an anonymous private file on the same boot.
+
+%prep
+%autosetup
+cp %{SOURCE3} libavb-LICENSE
+cp /usr/share/licenses/json-devel/LICENSE.MIT nlohmann-json-LICENSE.MIT
+echo '46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603  nlohmann-json-LICENSE.MIT' | sha256sum -c -
+test "$(uname -m)" = aarch64
+
+%build
+%set_build_flags
+mkdir build
+mkdir -p build/upstream/mink
+tar -xJf %{SOURCE4} -C build/upstream/mink
+for source in mink_adaptor.c supplicant.c syscall.S; do
+    gcc $CFLAGS -std=gnu11 -pthread \
+        -Ibuild/upstream/mink/libminkadaptor/include \
+        -Ibuild/upstream/mink/libminkadaptor/src $(pkg-config --cflags qcomtee) \
+        -c "build/upstream/mink/libminkadaptor/src/$source" -o "build/mink-$source.o"
+done
+gcc $CFLAGS -std=gnu11 -Wall -Wextra -Werror -pthread \
+    -Ibuild/upstream/mink/libminkadaptor/include $(pkg-config --cflags qcomtee libcbor) \
+    tests/qtee-fedora-credentials.c build/mink-*.o \
+    -o build/qtee-fedora-credentials-test $LDFLAGS $(pkg-config --libs qcomtee libcbor)
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    -Ibuild/upstream/mink/libminkadaptor/include \
+    src/image/qtee-tpm-discovery.cpp tests/qtee-tpm-discovery.cpp \
+    -o build/qtee-tpm-test $LDFLAGS -Wl,--wrap=fstat,--wrap=lstat,--wrap=close,--wrap=ioctl
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_AUTH_CLI \
+    src/image/protected-cohort-auth.cpp -o build/cohort-auth $LDFLAGS -lcrypto
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -c \
+    src/image/protected-cohort-auth.cpp -o build/cohort-auth.o
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_MANIFEST_CLI \
+    src/image/protected-cohort-auth.cpp src/image/protected-cohort-manifest.cpp \
+    -o build/cohort-manifest $LDFLAGS -lcrypto
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -c \
+    src/image/protected-cohort-manifest.cpp -o build/cohort-manifest.o
+mkdir -p build/upstream/libavb
+tar -xJf %{SOURCE2} -C build/upstream/libavb
+touch build/libavb-license-inputs.txt
+# Compile original upstream C as C, with its portable crypto/POSIX backend.
+# Its unmodified unsupported ML-DSA backend returns failure; Uke accepts only
+# the SHA256_RSA4096 profile and does not replace a verification routine.
+for source in avb_crypto avb_descriptor avb_hash_descriptor avb_mldsa \
+    avb_property_descriptor avb_rsa avb_sysdeps_posix avb_util avb_vbmeta_image \
+    avb_version crypto/sha256_impl crypto/sha512_impl crypto/mldsa_impl; do
+    gcc $CFLAGS -std=c11 -D_GNU_SOURCE -DAVB_COMPILATION \
+        -Ibuild/upstream/libavb -Ibuild/upstream/libavb/crypto \
+        -c "build/upstream/libavb/$source.c" -o "build/avb-${source//\//-}.o"
+    printf '%%s.c\n' "$source" >> build/libavb-license-inputs.txt
+done
+# Retain the original copyright/permission notices, including the embedded
+# Chromium/Olivier Gay routines and the JSON headers' internal attributions.
+# These small original-source archives avoid truncating a multi-part notice.
+find build/upstream/libavb -type f -name '*.h' -printf '%%P\n' >> build/libavb-license-inputs.txt
+sort -u -o build/libavb-license-inputs.txt build/libavb-license-inputs.txt
+test "$(grep -c '[.]c$' build/libavb-license-inputs.txt)" = 13
+if grep -Fx avb_crc32.c build/libavb-license-inputs.txt; then exit 1; fi
+tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
+    -cJf build/libavb-notices.tar.xz -C build/upstream/libavb -T "$PWD/build/libavb-license-inputs.txt"
+test -z "$(find /usr/include/nlohmann -type l -print -quit)"
+tar --sort=name --mtime=@1794700800 --owner=0 --group=0 --numeric-owner \
+    -cJf build/json-header-notices.tar.xz -C /usr/include nlohmann
+sha256sum nlohmann-json-LICENSE.MIT build/{libavb-notices,json-header-notices}.tar.xz \
+    > build/third-party-license-sha256.txt
+ar rcs build/libavb.a build/avb-*.o
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_VBMETA_CLI \
+    -Ibuild/upstream src/image/protected-cohort-{auth,manifest,vbmeta}.cpp \
+    build/libavb.a -o build/cohort-vbmeta $LDFLAGS -lcrypto
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Ibuild/upstream -c \
+    src/image/protected-cohort-vbmeta.cpp -o build/cohort-vbmeta.o
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -DUKE_COHORT_CONTENT_CLI \
+    -Ibuild/upstream src/image/protected-cohort-{auth,manifest,vbmeta,content}.cpp \
+    build/libavb.a -o build/cohort-content $LDFLAGS -lcrypto
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Ibuild/upstream -c \
+    src/image/protected-cohort-content.cpp -o build/cohort-content.o
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Ibuild/upstream -c \
+    src/image/protected-physical-cohort.cpp -o build/physical-cohort.o
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    src/image/inspect-physical-cohort.cpp build/cohort-{auth,manifest,vbmeta,content}.o \
+    build/physical-cohort.o build/libavb.a -o build/cohort-physical $LDFLAGS -lcrypto -lsystemd
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    tests/protected-cohort-physical.cpp build/cohort-{auth,manifest,vbmeta,content}.o \
+    build/physical-cohort.o build/libavb.a -o build/cohort-physical-test $LDFLAGS -lcrypto -lsystemd
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror src/boot/boot-image.cpp \
+    -o build/boot-image $LDFLAGS
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    src/image/hwkm-wrapped-key.cpp tests/hwkm-wrapped-key.cpp \
+    -o build/hwkm-wrapped-key-test $LDFLAGS \
+    -Wl,--wrap=ioctl,--wrap=fstat,--wrap=mmap,--wrap=munmap,--wrap=mlock,--wrap=madvise
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    src/image/hwkm-wrapped-key.cpp src/image/hwkm-disposable-record.cpp \
+    tests/hwkm-disposable-record.cpp -o build/hwkm-record-test $LDFLAGS \
+    -Wl,--wrap=ioctl,--wrap=pread,--wrap=pwrite,--wrap=fsync,--wrap=fstatvfs,--wrap=syscall,--wrap=mmap,--wrap=munmap
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    src/image/hwkm-inlinecrypt-read.cpp src/image/hwkm-wrapped-key.cpp tests/hwkm-inlinecrypt-read.cpp \
+    -o build/hwkm-inlinecrypt-read-test $LDFLAGS -lcrypto \
+    -Wl,--wrap=ioctl,--wrap=fstat,--wrap=fcntl,--wrap=open,--wrap=close,--wrap=getrandom,--wrap=syscall,--wrap=pread,--wrap=pwrite,--wrap=fsync
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image \
+    src/image/probe-hwkm.cpp src/image/hwkm-wrapped-key.cpp src/image/hwkm-inlinecrypt-read.cpp \
+    src/image/hwkm-disposable-record.cpp \
+    build/cohort-{auth,manifest,vbmeta,content}.o build/physical-cohort.o build/libavb.a \
+    -o build/hwkm-probe $LDFLAGS -lcrypto -lsystemd
+g++ $CXXFLAGS -std=c++20 -Wall -Wextra -Werror -Isrc/image -pthread \
+    -Ibuild/upstream/mink/libminkadaptor/include \
+    src/image/probe-qtee-tpm.cpp src/image/qtee-tpm-discovery.cpp build/mink-*.o \
+    build/cohort-{auth,manifest,vbmeta,content}.o build/physical-cohort.o build/libavb.a \
+    -o build/qtee-tpm-probe $LDFLAGS -lcrypto -lsystemd $(pkg-config --libs qcomtee)
+
+# Native tests produce the receipts that the install stage packages. RPM runs
+# %%install before %%check, so these must exist before entering %%install.
+readelf -h build/cohort-auth | grep -E 'Machine:.*AArch64'
+bash tests/protected-cohort-auth.sh build/cohort-auth "$PWD/build/native-result.json"
+readelf -h build/cohort-manifest | grep -E 'Machine:.*AArch64'
+bash tests/protected-cohort-manifest.sh build/cohort-manifest "$PWD/build/manifest-result.json"
+readelf -h build/cohort-vbmeta | grep -E 'Machine:.*AArch64'
+bash tests/protected-cohort-vbmeta.sh build/cohort-vbmeta "$PWD/build/vbmeta-result.json"
+readelf -h build/cohort-content | grep -E 'Machine:.*AArch64'
+readelf -h build/cohort-physical | grep -E 'Machine:.*AArch64'
+build/cohort-physical-test > build/physical-result.json
+readelf -h build/hwkm-wrapped-key-test | grep -E 'Machine:.*AArch64'
+build/hwkm-wrapped-key-test > build/hwkm-result.json
+readelf -h build/hwkm-inlinecrypt-read-test | grep -E 'Machine:.*AArch64'
+build/hwkm-inlinecrypt-read-test > build/hwkm-inlinecrypt-read-result.json
+readelf -h build/hwkm-record-test | grep -E 'Machine:.*AArch64'
+build/hwkm-record-test > build/hwkm-record-result.json
+readelf -h build/qtee-tpm-test | grep -E 'Machine:.*AArch64'
+build/qtee-tpm-test > build/qtee-tpm-result.json
+readelf -h build/qtee-fedora-credentials-test | grep -E 'Machine:.*AArch64'
+build/qtee-fedora-credentials-test > build/qtee-credentials-result.json
+readelf -h build/qtee-tpm-probe | grep -E 'Machine:.*AArch64'
+if build/qtee-tpm-probe --inspect > build/qtee-host-refusal.txt 2>&1; then exit 1; fi
+test "$(id -u)" -ne 0
+grep -Fx 'UKE_QTEE_TPM_PROBE_REJECTED stage=root-required' build/qtee-host-refusal.txt
+if build/qtee-tpm-probe --keymaster-version > build/keymaster-host-refusal.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_QTEE_KEYMASTER_PROBE_REJECTED stage=root-required' build/keymaster-host-refusal.txt
+if build/qtee-tpm-probe --keymaster-storage > build/keymaster-storage-host-refusal.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_QTEE_KEYMASTER_PROBE_REJECTED stage=root-required' build/keymaster-storage-host-refusal.txt
+readelf -h build/hwkm-probe | grep -E 'Machine:.*AArch64'
+if build/hwkm-probe --inspect > build/hwkm-host-refusal.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal.txt
+if build/hwkm-probe --exercise-disposable-key > build/hwkm-host-refusal-exercise.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal-exercise.txt
+if build/hwkm-probe --read-disposable-inlinecrypt > build/hwkm-host-refusal-inlinecrypt.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal-inlinecrypt.txt
+if build/hwkm-probe --read-disposable-inlinecrypt-record > build/hwkm-host-refusal-inlinecrypt-record.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal-inlinecrypt-record.txt
+test_digest=$(printf '0%.0s' {1..64})
+if build/hwkm-probe --read-disposable-vbmeta-profile-record a "$test_digest" > build/hwkm-host-refusal-vbmeta-profile.txt 2>&1; then exit 1; fi
+grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' build/hwkm-host-refusal-vbmeta-profile.txt
+for action in write read; do
+    if build/hwkm-probe "--$action-disposable-rescue-block" a "$test_digest" "$test_digest" "$test_digest" > "build/hwkm-host-refusal-rescue-$action.txt" 2>&1; then exit 1; fi
+    grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' "build/hwkm-host-refusal-rescue-$action.txt"
+done
+for args in 'a c' 'x '"$test_digest" 'a'; do
+    read -r -a bad <<<"$args"
+    rc=0
+    build/hwkm-probe --read-disposable-vbmeta-profile-record "${bad[@]}" || rc=$?
+    test "$rc" -eq 2
+done
+for mode in create prepare remove; do
+    if build/hwkm-probe "--$mode-disposable-key-record" > "build/hwkm-host-refusal-$mode.txt" 2>&1; then exit 1; fi
+    grep -Fx 'UKE_HWKM_PROBE_REJECTED stage=physical-owner-open' "build/hwkm-host-refusal-$mode.txt"
+done
+bash tests/protected-cohort-content.sh build/cohort-content build/boot-image "$PWD/build/content-result.json" "$PWD/build/content-fixture" build/cohort-physical
+rpm -q openssl openssl-libs json-devel gcc-c++ android-tools python3 systemd-devel systemd-libs kernel-headers quic-teec quic-teec-devel libcbor-devel > build/original-tools.txt
+sha256sum src/image/protected-cohort-{auth,manifest,vbmeta,content}.* tests/protected-cohort-{auth,manifest,vbmeta,content}.sh \
+    src/image/{fastboot-singleboot-layout,rescue-verity-layout}.sh src/boot/boot-image.cpp \
+    tests/protected-cohort-blocks.sh src/image/protected-physical-cohort.{cpp,hpp} \
+    src/image/inspect-physical-cohort.cpp tests/protected-cohort-physical.cpp \
+    src/image/hwkm-wrapped-key.{cpp,hpp} tests/hwkm-wrapped-key.cpp src/image/probe-hwkm.cpp \
+    src/image/hwkm-inlinecrypt-read.{cpp,hpp} tests/hwkm-inlinecrypt-read.cpp \
+    src/image/hwkm-disposable-record.{cpp,hpp} tests/hwkm-disposable-record.cpp \
+    src/image/qtee-tpm-discovery.{cpp,hpp} src/image/probe-qtee-tpm.cpp \
+    tests/qtee-tpm-discovery.cpp tests/qtee-fedora-credentials.c packaging/qtee-mink-source.json > build/source-sha256.txt
+find build/upstream/libavb -type f -print0 | sort -z | xargs -0 sha256sum > build/upstream-sha256.txt
+find build/upstream/mink -type f -print0 | sort -z | xargs -0 sha256sum > build/mink-upstream-sha256.txt
+
+%check
+jq -e '.readonly_mapping_fixture and .sha256_fixture and .refused_cases==5 and
+    .rescue_single_block_fixture and .wrong_rescue_digest_refused and
+    (.physical_encrypted_io|not)' build/hwkm-inlinecrypt-read-result.json
+jq -e '.openssl_interoperability and .refused_cases==27 and .exact_limit_passed and
+    .original_inputs_unchanged and (.role_admitted|not) and (.snapshot_authenticated|not)' build/native-result.json
+jq -e '.real_signature_then_semantic_validation and .signed_invalid_cases_refused==64 and
+    .decoded_duplicate_keys_refused and .all_listed_geometries_validated and
+    (.boot_payloads_verified|not) and (.role_admitted|not)' build/manifest-result.json
+jq -e '.original_fedora_avbtool_interoperability and .outer_avb_and_inner_pss_verified and
+    .refused_cases==35 and .typed_manifest_and_hash_descriptor_sizes_bound and
+    .keymint_signed_version_binding_verified and .keymint_refused_cases==10 and
+    .abl_boot_version_binding_verified and .abl_boot_version_refused_cases==9 and
+    .keymint_configure_frame_verified and .keymint_configure_refused_cases==5 and (.keymint_configure_sent|not) and
+    (.rollback_state_verified|not) and (.role_admitted|not)' build/vbmeta-result.json
+jq -e '.real_signed_metadata_then_fd_content_verification and .refused_cases==31 and
+    .partial_duplicate_failure_cleaned_up and .large_streaming_result.peak_rss_kib<65536 and
+    .vbmeta_fd_refused_cases==14 and .vbmeta_fd_snapshot_and_signatures_verified and
+    .vbmeta_fd_offsets_and_path_pinning_verified and .vbmeta_fd_handles_released and
+    (.physical_block_branch_tested|not) and (.role_admitted|not)' build/content-result.json
+jq -e '.topology_cases_refused==40 and .board_cases_refused==8 and .positive_layouts==4 and
+    .non_target_owner_refused and .private_owner_not_constructible_from_facts and
+    (.physical_ufs_qualified|not) and (.role_admitted|not)' build/physical-result.json
+jq -e '.production_implementation_tested and .syscall_doubles_for_firmware_and_block_facts and
+    .real_locked_nondumpable_fork_wiped_memory and .all_unmapped_key_pages_zero and
+    .consumed_input_on_failure and .no_automatic_ioctl_retry and .no_descriptor_or_memory_leak and
+    .maximum_live_key_pages<=3 and .refused_cases==49 and .zeroed_unmaps>40 and
+    (.physical_key_generated|not) and (.boot_policy_admitted|not)' build/hwkm-result.json
+jq -e '.real_private_file_transactions and .cross_process_readback and .atomic_no_replace and
+    .partial_failure_cleanup and .uncertain_commit_preserved and .short_interrupted_io and
+    .all_key_pages_zeroed_before_unmap and .no_descriptor_or_memory_leak and .refused_cases==30 and
+    (.physical_key_generated|not) and (.cold_boot_reuse_proved|not) and
+    (.boot_policy_admitted|not)' build/hwkm-record-result.json
+(cd build/content-fixture; sha256sum -c SHA256SUMS)
+jq -e '.production_parser_tested and .mink_api_and_provider_facts_doubled and
+    .three_tpm_types_checked and .fixed_queries_only and .no_handle_leak and
+    .refused_cases==31 and .keymaster_fixed_version_checked and .keymaster_refused_cases==15 and
+    .keymaster_storage_rpc_checked and .keymaster_storage_refused_cases==6 and
+    (.physical_tpm_found|not) and
+    (.credential_firmware_acceptance_proved|not) and (.sealed_release_proved|not)' build/qtee-tpm-result.json
+jq -e '.original_fedora_credentials_checked and .actual_mink_and_fedora_marshalling and
+    .ordinary_operation_2_nonnull_user_credential and .tee_output_flag_1 and
+    .exported_callback_released and (.firmware_called|not)' build/qtee-credentials-result.json
+test "$(find build/content-fixture -type f | wc -l)" = 6
+test ! -e build/content-fixture/key.pem
+
+%install
+install -d %{buildroot}%{_datadir}/%{name}
+install -pm644 build/native-result.json build/original-tools.txt build/source-sha256.txt \
+    build/manifest-result.json build/vbmeta-result.json build/content-result.json build/upstream-sha256.txt \
+    build/third-party-license-sha256.txt build/physical-result.json build/hwkm-result.json \
+    build/hwkm-host-refusal.txt build/hwkm-host-refusal-exercise.txt \
+    build/hwkm-inlinecrypt-read-result.json build/hwkm-host-refusal-inlinecrypt{,-record}.txt \
+    build/hwkm-host-refusal-vbmeta-profile.txt \
+    build/hwkm-host-refusal-rescue-{write,read}.txt \
+    build/hwkm-record-result.json build/hwkm-host-refusal-{create,prepare,remove}.txt \
+    build/qtee-tpm-result.json build/qtee-credentials-result.json build/qtee-host-refusal.txt \
+    build/keymaster-host-refusal.txt build/keymaster-storage-host-refusal.txt build/mink-upstream-sha256.txt \
+    %{SOURCE1} %{buildroot}%{_datadir}/%{name}/
+install -d %{buildroot}%{_libexecdir}/%{name} %{buildroot}%{_datadir}/%{name}/fixtures
+install -pm755 build/cohort-content %{buildroot}%{_libexecdir}/%{name}/cohort-content-inspect
+install -pm755 build/cohort-physical %{buildroot}%{_libexecdir}/%{name}/cohort-physical-inspect
+install -pm755 build/hwkm-probe %{buildroot}%{_libexecdir}/%{name}/hwkm-probe
+install -pm755 build/qtee-tpm-probe %{buildroot}%{_libexecdir}/%{name}/qtee-tpm-probe
+install -pm755 tests/protected-cohort-blocks.sh %{buildroot}%{_libexecdir}/%{name}/owned-block-fixture
+install -pm644 build/content-fixture/* %{buildroot}%{_datadir}/%{name}/fixtures/
+
+%files
+%license LICENSE libavb-LICENSE nlohmann-json-LICENSE.MIT build/libavb-notices.tar.xz build/json-header-notices.tar.xz
+%license build/upstream/mink/LICENSE.txt
+# Retain every upstream source/header notice, including the BSD-2-Clause TEE header.
+%license build/upstream/mink/libminkadaptor
+%{_datadir}/%{name}/
+%{_libexecdir}/%{name}/
+
+%changelog
+* Mon Nov 23 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-28
+- Preserve the native test's open interposition with fortified libc.
+
+* Mon Nov 23 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-27
+- Exercise the fixed disposable Fedora Live Rescue block with wrapped-key ICE.
+
+* Sun Nov 22 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-26
+- Gate a disposable HWKM read on an explicitly pinned physical VBMeta partition digest.
+
+* Sun Nov 22 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-25
+- Use a nonzero data unit number for the read-only single-block ICE probe.
+
+* Sun Nov 22 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-24
+- Read one UFS block through ICE with a persistent disposable key and report digests for cross-boot comparison.
+
+* Sat Nov 21 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-19
+- Verify authenticated AVB version metadata for KeyMint.
+
+* Sat Nov 21 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-18
+- Exercise an isolated KeyMint storage key and reject an altered copy.
+
+* Sat Nov 21 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-17
+- Query the fitted keymaster64 version through the ordinary QTEE object interface.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-16
+- Check the root-required refusal on the unprivileged COPR worker.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-15
+- Query only QTEE TPM information through ordinary Fedora credentials; retain all HWKM guards.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-14
+- Report fixed diagnostic failure stages without keys, paths or weakened ownership checks.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-13
+- Add private disposable-key record transactions for an explicit cross-reboot HWKM diagnostic.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-12
+- Add a bounded physical HWKM capability and disposable-key diagnostic for signed DNF delivery.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-11
+- Verify HWKM v2 generate/prepare UAPI, locked key memory and failure cleanup without firmware calls.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-10
+- Pin physical cohort devices through original sd-device and verify bounded VBMeta descriptor snapshots.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-9
+- Retain original JSON and libavb source copyright and permission notices in the diagnostic RPM.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-8
+- Supply a temporary native inspection tool and public fixtures for owned-loop qualification.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-7
+- Verify signed boot prefixes and the raw ARM64 kernel slice through owned read-only descriptors.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-6
+- Stage the upstream license in the build directory before packaging.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-5
+- Pin every upstream blob before generating the source archive.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-4
+- Verify the external AVB carrier using original libavb and Fedora avbtool fixtures.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-3
+- Validate signed manifest schemas, immutable kernel contexts and exact storage geometry.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-2
+- Produce native test receipts before the RPM install stage.
+
+* Sun Nov 15 2026 Uke Maintainers <75160848+MCC45TR@users.noreply.github.com> - 1.0-1
+- Compile the production verifier and check detached signatures and bounded input refusal.
