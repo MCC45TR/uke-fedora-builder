@@ -56,7 +56,7 @@ COMMAND
 }
 
 public_first_boot_policy() {
-    local root=$1 receipt=$2 command unit epoch
+    local root=$1 receipt=$2 command unit epoch capacity_exec capacity_backend
     [[ -d $root && ! -L $root && $root != / ]] || return 1
     [[ -x $root/usr/bin/clear && -x $root/usr/bin/uke-control && -x $root/usr/libexec/senemos-uke/uke-install-profile &&
        -x $root/usr/lib/systemd/systemd-growfs && -f $root/usr/lib/systemd/system/systemd-growfs-root.service ]] || return 1
@@ -71,10 +71,18 @@ public_first_boot_policy() {
     rm -f -- "$root/var/lib/senemos/installation/online-grow-complete" "$root/var/lib/senemos/installation/online-grow-complete.tmp"
     printf 'half\n' > "$root/var/lib/uke-control/swap-policy"
     chmod 600 "$root/var/lib/uke-control/swap-policy"
-    command=$(public_capacity_command)
-    command=${command//\\/\\\\}; command=${command//\"/\\\"}
-    command=${command//\$/\$\$}; command=${command//$'\n'/\\n}
-    command=${command//%/%%}
+    if [[ -x $root/usr/libexec/uke-control/ukectl &&
+          $(rpm --root "$root" -q --whatprovides 'uke-control(root-capacity-guard-v1)' --qf '%{NAME}\n' 2>/dev/null) == uke-control ]]; then
+        capacity_exec='/usr/libexec/uke-control/ukectl verify-root-capacity'
+        capacity_backend=ukectl
+    else
+        command=$(public_capacity_command)
+        command=${command//\\/\\\\}; command=${command//\"/\\\"}
+        command=${command//\$/\$\$}; command=${command//$'\n'/\\n}
+        command=${command//%/%%}
+        capacity_exec="/usr/bin/bash -euc \"$command\""
+        capacity_backend=compatibility-shell
+    fi
     cat > "$root/etc/systemd/system/uke-root-capacity.service" <<UNIT
 [Unit]
 Description=Verify the grown Uke EXT4 root against its physical userdata capacity
@@ -85,10 +93,10 @@ Before=uke-control.service uke-swap-ready.service systemd-user-sessions.service 
 [Service]
 Type=oneshot
 Environment=LC_ALL=C
-ExecStart=/usr/bin/bash -euc "$command"
+ExecStart=$capacity_exec
 RemainAfterExit=yes
-StandardOutput=journal+console
-StandardError=journal+console
+StandardOutput=journal
+StandardError=journal
 TimeoutStartSec=60
 
 [Install]
@@ -127,9 +135,10 @@ UNIT
        $(systemctl --root="$root" is-enabled uke-swap-ready.service) == enabled &&
        $(systemctl --root="$root" is-enabled uke-control.service) == enabled ]]
     systemd-analyze --root="$root" verify uke-root-capacity.service uke-swap-ready.service || return
-    jq -n --argjson epoch "$epoch" '{root_growth:"original-systemd-growfs-root",root_selector:"PARTLABEL=userdata",
+    jq -n --argjson epoch "$epoch" --arg capacity_backend "$capacity_backend" '{root_growth:"original-systemd-growfs-root",root_selector:"PARTLABEL=userdata",
         duplicate_grow_service_masked:true,capacity_gate_before_setup:true,swap_policy:"half",
         swap_backend:"existing-uke-control-disk-swap",swap_after_capacity:true,clear_binary_verified:true,
+        root_capacity_backend:$capacity_backend,
         persistent_journal:true,clock_epoch_provider:"systemd-standard-state-mtime",
         clock_epoch_seed:$epoch,extra_clock_daemon:false,hardware_tested:false}' > "$receipt"
 }

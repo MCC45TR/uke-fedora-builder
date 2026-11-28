@@ -72,4 +72,17 @@ done
 grep -Fq 'ExecStart=/usr/bin/uke-control swap apply' "$work/root/etc/systemd/system/uke-swap-ready.service"
 grep -Fq '%%s' "$work/root/etc/systemd/system/uke-root-capacity.service"
 jq -e '.duplicate_grow_service_masked and .capacity_gate_before_setup and .swap_after_capacity' "$work/policy.json" >/dev/null
+jq -e '.root_capacity_backend == "compatibility-shell"' "$work/policy.json" >/dev/null
+mkdir -p "$work/root/usr/libexec/uke-control"
+printf '#!/bin/sh\nexit 0\n' > "$work/root/usr/libexec/uke-control/ukectl"
+chmod +x "$work/root/usr/libexec/uke-control/ukectl"
+rpm() {
+    [[ $* == *'--whatprovides uke-control(root-capacity-guard-v1)'* ]] || return 1
+    printf '%s\n' uke-control
+}
+public_first_boot_policy "$work/root" "$work/native-policy.json"
+grep -Fxq 'ExecStart=/usr/libexec/uke-control/ukectl verify-root-capacity' "$work/root/etc/systemd/system/uke-root-capacity.service"
+grep -Fxq 'StandardOutput=journal' "$work/root/etc/systemd/system/uke-root-capacity.service"
+grep -Fxq 'Requires=systemd-growfs-root.service' "$work/root/etc/systemd/system/uke-root-capacity.service"
+jq -e '.root_capacity_backend == "ukectl" and .capacity_gate_before_setup and .swap_after_capacity' "$work/native-policy.json" >/dev/null
 echo 'Private EXT4 grows to device-sized capacity, preserves its label/data and repeats safely; stale markers, undersized filesystems and unsafe geometry reject.'
